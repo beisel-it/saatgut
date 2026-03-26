@@ -3977,7 +3977,7 @@ export function SaatgutApp() {
                 />
               </section>
               <div className="space-y-4">
-              <Panel title={t.rules.title} subtitle={t.rules.subtitle} className="max-w-5xl">
+              <Panel title={t.rules.title} subtitle={t.rules.subtitle}>
                 <DataForm state={ruleState} onSubmit={submitRule} submitLabel={t.rules.saveRule}>
                   <Field label={t.forms.variety} name="varietyId" fieldErrors={ruleState.fieldErrors} optionalLabel={t.common.optional}>
                     <select
@@ -5995,10 +5995,10 @@ function RuleGrid({
   return (
     <div className="grid gap-4">
       {groups.map((group) => (
-        <section key={group.title} className="rounded-lg border border-[var(--border)] bg-white/70 p-4">
+        <section key={group.title} className="rounded-lg border border-[var(--border)] bg-white/70 p-5 md:p-6">
           <div className="mb-4">
             <h3 className="text-base font-semibold">{group.title}</h3>
-            <p className="mt-2 max-w-[44ch] text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+            <p className="mt-2 max-w-none text-sm leading-6 text-[color:rgba(24,49,40,0.68)] md:max-w-[64ch]">
               {group.help}
             </p>
           </div>
