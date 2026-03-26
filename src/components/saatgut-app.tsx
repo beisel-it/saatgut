@@ -3464,9 +3464,25 @@ export function SaatgutApp() {
                         key={entry.variety.id}
                         variety={entry.variety}
                         species={entry.species}
+                        speciesOptions={dashboard?.species ?? []}
                         seedBatches={entry.seedBatches}
                         warningsByBatch={storageWarningsByBatch}
                         latestTest={entry.latestTest}
+                        varietyEditId={varietyEditId}
+                        varietyEditForm={varietyEditForm}
+                        varietyEditState={varietyEditState}
+                        setVarietyEditForm={setVarietyEditForm}
+                        onStartVarietyEdit={startVarietyEdit}
+                        onCancelVarietyEdit={cancelVarietyEdit}
+                        onSubmitVarietyEdit={submitVarietyEdit}
+                        onDeleteVariety={(variety) => openCatalogDelete({ type: "variety", id: variety.id, label: variety.name })}
+                        onEditSeedBatch={openSeedBatchEdit}
+                        onDeleteSeedBatch={(seedBatch) =>
+                          openCatalogDelete({
+                            type: "seedBatch",
+                            id: seedBatch.id,
+                            label: `${entry.variety.name} · ${seedBatch.source ?? t.common.batchFallback}`,
+                          })}
                         locale={locale}
                         t={t}
                       />
@@ -5436,17 +5452,55 @@ function CollapsiblePanel({
 function CatalogVarietyCard({
   variety,
   species,
+  speciesOptions,
   seedBatches,
   warningsByBatch,
   latestTest,
+  varietyEditId,
+  varietyEditForm,
+  varietyEditState,
+  setVarietyEditForm,
+  onStartVarietyEdit,
+  onCancelVarietyEdit,
+  onSubmitVarietyEdit,
+  onDeleteVariety,
+  onEditSeedBatch,
+  onDeleteSeedBatch,
   locale,
   t,
 }: {
   variety: Variety;
   species: Variety["species"] | Species | null;
+  speciesOptions: Species[];
   seedBatches: SeedBatch[];
   warningsByBatch: Map<string, NonNullable<SeedBatch["storageWarnings"]>>;
   latestTest: NonNullable<SeedBatch["germinationTests"]>[number] | null;
+  varietyEditId: string;
+  varietyEditForm: {
+    speciesId: string;
+    name: string;
+    description: string;
+    heirloom: boolean;
+    tags: string;
+    notes: string;
+    synonyms: string;
+  };
+  varietyEditState: FormState;
+  setVarietyEditForm: React.Dispatch<React.SetStateAction<{
+    speciesId: string;
+    name: string;
+    description: string;
+    heirloom: boolean;
+    tags: string;
+    notes: string;
+    synonyms: string;
+  }>>;
+  onStartVarietyEdit: (variety: Variety) => void;
+  onCancelVarietyEdit: () => void;
+  onSubmitVarietyEdit: (event: React.FormEvent<HTMLFormElement>) => void | Promise<void>;
+  onDeleteVariety: (variety: Variety) => void;
+  onEditSeedBatch: (seedBatch: SeedBatch) => void;
+  onDeleteSeedBatch: (seedBatch: SeedBatch) => void;
   locale: Locale;
   t: AppMessages;
 }) {
@@ -5486,10 +5540,103 @@ function CatalogVarietyCard({
       </summary>
 
       <div className="mt-5 border-t border-[var(--border)] pt-5">
-        {variety.description ? (
-          <p className="max-w-[42rem] text-sm leading-6 text-[color:rgba(24,49,40,0.74)]">
-            {variety.description}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="max-w-[42rem]">
+            {variety.description ? (
+              <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.74)]">
+                {variety.description}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onStartVarietyEdit(variety)}
+              className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold"
+            >
+              {t.common.edit}
+            </button>
+            <button
+              type="button"
+              onClick={() => onDeleteVariety(variety)}
+              className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700"
+            >
+              {t.common.delete}
+            </button>
+          </div>
+        </div>
+
+        {varietyEditId === variety.id ? (
+          <div className="mt-4 rounded-lg border border-[var(--border)] bg-white p-4">
+            <DataForm state={varietyEditState} onSubmit={onSubmitVarietyEdit} submitLabel={t.common.saveChanges}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label={t.forms.species} name="speciesId" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional}>
+                  <select
+                    className="field-input"
+                    value={varietyEditForm.speciesId}
+                    onChange={(event) => setVarietyEditForm((current) => ({ ...current, speciesId: event.target.value }))}
+                  >
+                    <option value="">{t.common.selectSpecies}</option>
+                    {speciesOptions.map((entry) => (
+                      <option key={entry.id} value={entry.id}>{entry.commonName}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label={t.forms.varietyName} name="name" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional}>
+                  <input
+                    className="field-input"
+                    value={varietyEditForm.name}
+                    onChange={(event) => setVarietyEditForm((current) => ({ ...current, name: event.target.value }))}
+                  />
+                </Field>
+              </div>
+              <Field label={t.forms.description} name="description" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional} optional>
+                <textarea
+                  className="field-input min-h-24"
+                  value={varietyEditForm.description}
+                  onChange={(event) => setVarietyEditForm((current) => ({ ...current, description: event.target.value }))}
+                />
+              </Field>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label={t.forms.tags} name="tags" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional} optional>
+                  <input
+                    className="field-input"
+                    value={varietyEditForm.tags}
+                    onChange={(event) => setVarietyEditForm((current) => ({ ...current, tags: event.target.value }))}
+                  />
+                </Field>
+                <Field label={t.forms.synonyms} name="synonyms" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional} optional>
+                  <input
+                    className="field-input"
+                    value={varietyEditForm.synonyms}
+                    onChange={(event) => setVarietyEditForm((current) => ({ ...current, synonyms: event.target.value }))}
+                  />
+                </Field>
+              </div>
+              <Field label={t.forms.notes} name="notes" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional} optional>
+                <textarea
+                  className="field-input min-h-24"
+                  value={varietyEditForm.notes}
+                  onChange={(event) => setVarietyEditForm((current) => ({ ...current, notes: event.target.value }))}
+                />
+              </Field>
+              <label className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-medium text-[var(--foreground)]">
+                <input
+                  type="checkbox"
+                  checked={varietyEditForm.heirloom}
+                  onChange={(event) => setVarietyEditForm((current) => ({ ...current, heirloom: event.target.checked }))}
+                />
+                <span>{t.catalog.heirloom}</span>
+              </label>
+              <button
+                type="button"
+                onClick={onCancelVarietyEdit}
+                className="w-full rounded-lg border border-[var(--border)] bg-white px-5 py-3 text-sm font-semibold text-[var(--foreground)] sm:w-fit"
+              >
+                {t.common.cancel}
+              </button>
+            </DataForm>
+          </div>
         ) : null}
 
         {variety.tags.length || variety.synonyms?.length ? (
@@ -5524,6 +5671,8 @@ function CatalogVarietyCard({
                   warnings={warningsByBatch.get(seedBatch.id) ?? []}
                   germinationTests={seedBatch.germinationTests ?? []}
                   adjustments={seedBatch.stockTransactions?.filter((transaction) => transaction.type !== "INITIAL_STOCK") ?? []}
+                  onEdit={() => onEditSeedBatch(seedBatch)}
+                  onDelete={() => onDeleteSeedBatch(seedBatch)}
                   locale={locale}
                   t={t}
                 />
@@ -5683,6 +5832,8 @@ function SeedBatchCard({
   warnings,
   germinationTests,
   adjustments,
+  onEdit,
+  onDelete,
   locale,
   t,
 }: {
@@ -5691,6 +5842,8 @@ function SeedBatchCard({
   warnings: NonNullable<SeedBatch["storageWarnings"]>;
   germinationTests: NonNullable<SeedBatch["germinationTests"]>;
   adjustments: NonNullable<SeedBatch["stockTransactions"]>;
+  onEdit: () => void;
+  onDelete: () => void;
   locale: Locale;
   t: AppMessages;
 }) {
@@ -5703,9 +5856,21 @@ function SeedBatchCard({
             {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()} · {seedBatch.storageLocation || t.seedBatch.noStorageLocation}
           </p>
         </div>
-        <span className="rounded-md bg-white px-3 py-1 text-xs font-semibold">
-          {seedBatch.harvestYear ? `${t.seedBatch.harvestPrefix} ${seedBatch.harvestYear}` : t.seedBatch.yearUnknown}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-md bg-white px-3 py-1 text-xs font-semibold">
+            {seedBatch.harvestYear ? `${t.seedBatch.harvestPrefix} ${seedBatch.harvestYear}` : t.seedBatch.yearUnknown}
+          </span>
+          <button type="button" onClick={onEdit} className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold">
+            {t.common.edit}
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700"
+          >
+            {t.common.delete}
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
