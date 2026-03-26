@@ -40,8 +40,10 @@ import {
   fetchWorkspaceMembers,
   getSession,
   inviteWorkspaceCollaborator,
+  listPasskeys,
   loginUser,
   logoutUser,
+  removePasskey,
   removeWorkspaceMember,
   registerUser,
   reverseSeedBatchTransaction,
@@ -347,9 +349,13 @@ export function SaatgutApp() {
   const [inviteState, setInviteState] = useState<FormState>(initialFormState);
   const [memberState, setMemberState] = useState<FormState>(initialFormState);
   const [passwordState, setPasswordState] = useState<FormState>(initialFormState);
+  const [passkeyManagementState, setPasskeyManagementState] = useState<FormState>(initialFormState);
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
   const [workspaceInvites, setWorkspaceInvites] = useState<UserInvite[]>([]);
+  const [passkeys, setPasskeys] = useState<PasskeyCredential[]>([]);
+  const [passkeysLoading, setPasskeysLoading] = useState(false);
   const [memberActionId, setMemberActionId] = useState<string | null>(null);
+  const [passkeyActionId, setPasskeyActionId] = useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
   const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, SessionSnapshot["membership"]["role"]>>({});
   const [latestInviteToken, setLatestInviteToken] = useState<{
@@ -358,7 +364,7 @@ export function SaatgutApp() {
     expiresAt: string;
     token: string;
   } | null>(null);
-  const [latestEnrolledPasskey, setLatestEnrolledPasskey] = useState<PasskeyCredential | null>(null);
+  const [passwordFallbackAvailable, setPasswordFallbackAvailable] = useState(true);
 
   const [registerForm, setRegisterForm] = useState({
     email: "",
@@ -659,6 +665,25 @@ export function SaatgutApp() {
       setWorkspaceState(toFormState(error, t));
     } finally {
       setWorkspaceLoading(false);
+    }
+  }
+
+  async function loadPasskeyManagement(resetState = false) {
+    if (!session) return;
+
+    setPasskeysLoading(true);
+    if (resetState) {
+      setPasskeyManagementState(initialFormState);
+    }
+
+    try {
+      const result = await listPasskeys();
+      setPasskeys(result.items);
+      setPasswordFallbackAvailable(result.passwordFallbackAvailable);
+    } catch (error) {
+      setPasskeyManagementState(toFormState(error, t));
+    } finally {
+      setPasskeysLoading(false);
     }
   }
 
@@ -1554,7 +1579,9 @@ export function SaatgutApp() {
     setInviteState(initialFormState);
     setMemberState(initialFormState);
     setPasskeyEnrollState(initialFormState);
+    setPasskeyManagementState(initialFormState);
     setInviteCopied(false);
+    void loadPasskeyManagement(true);
     if (canManageWorkspace) {
       void loadWorkspaceCollaboration();
     }
@@ -1628,6 +1655,7 @@ export function SaatgutApp() {
         newPassword: passwordForm.newPassword,
       });
       setSession((current) => (current ? { ...current, user: result.user } : current));
+      await loadPasskeyManagement();
       setPasswordForm({
         currentPassword: "",
         newPassword: "",
@@ -1662,10 +1690,10 @@ export function SaatgutApp() {
       const credential = await startRegistration({
         optionsJSON: begin.options as PublicKeyCredentialCreationOptionsJSON,
       });
-      const result = await completePasskeyEnrollment({
+      await completePasskeyEnrollment({
         response: credential satisfies RegistrationResponseJSON,
       });
-      setLatestEnrolledPasskey(result.passkey);
+      await loadPasskeyManagement();
       setPasskeyEnrollState({
         error: null,
         success: t.statuses.passkeyEnrolled,
@@ -1675,6 +1703,32 @@ export function SaatgutApp() {
       setPasskeyEnrollState(toFormState(error, t));
     } finally {
       setPasskeyBusy(false);
+    }
+  }
+
+  async function handlePasskeyRemoval(passkey: PasskeyCredential) {
+    if (!passkey.canRemove) return;
+
+    const confirmed = window.confirm(
+      t.workspace.removePasskeyConfirm.replace("{passkey}", passkey.credentialPreview ?? passkey.id),
+    );
+    if (!confirmed) return;
+
+    setPasskeyManagementState(initialFormState);
+    setPasskeyActionId(passkey.id);
+
+    try {
+      await removePasskey(passkey.id);
+      await loadPasskeyManagement();
+      setPasskeyManagementState({
+        error: null,
+        success: t.statuses.passkeyRemoved,
+        fieldErrors: {},
+      });
+    } catch (error) {
+      setPasskeyManagementState(toFormState(error, t));
+    } finally {
+      setPasskeyActionId(null);
     }
   }
 
@@ -4069,6 +4123,8 @@ export function SaatgutApp() {
                       {t.workspace.passkeysSubtitle}
                     </p>
                   </div>
+                  {passkeyManagementState.error ? <Alert tone="danger">{passkeyManagementState.error}</Alert> : null}
+                  {passkeyManagementState.success ? <Alert tone="success">{passkeyManagementState.success}</Alert> : null}
                   {passkeyEnrollState.error ? <Alert tone="danger">{passkeyEnrollState.error}</Alert> : null}
                   {passkeyEnrollState.success ? <Alert tone="success">{passkeyEnrollState.success}</Alert> : null}
                   <div className="grid gap-4 lg:grid-cols-[minmax(0,0.88fr)_minmax(18rem,0.72fr)]">
@@ -4088,25 +4144,59 @@ export function SaatgutApp() {
                         <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.56)]">
                           <span>{webAuthnReady ? t.workspace.passkeysReady : t.workspace.passkeysNotReady}</span>
                           {platformPasskeyReady ? <span>{t.auth.passkeyDeviceReadyLabel}</span> : null}
+                          <span>
+                            {t.workspace.passwordFallbackLabel}: {passwordFallbackAvailable ? t.common.yes : t.common.no}
+                          </span>
                         </div>
                       </div>
                     </div>
                     <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4">
-                      <h4 className="text-base font-semibold tracking-tight">{t.workspace.latestPasskeyTitle}</h4>
+                      <h4 className="text-base font-semibold tracking-tight">{t.workspace.passkeysListTitle}</h4>
                       <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
-                        {t.workspace.latestPasskeySubtitle}
+                        {t.workspace.passkeysListSubtitle}
                       </p>
-                      {latestEnrolledPasskey ? (
-                        <div className="mt-4 grid gap-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
-                          <p>{t.workspace.deviceType}: {labelPasskeyDeviceType(latestEnrolledPasskey.deviceType, locale)}</p>
-                          <p>{t.workspace.backedUp}: {latestEnrolledPasskey.backedUp ? t.common.yes : t.common.no}</p>
-                          <p>{t.workspace.createdAt}: {formatDate(latestEnrolledPasskey.createdAt, locale, t.common.notSet)}</p>
-                          <p>{t.workspace.lastUsed}: {formatDate(latestEnrolledPasskey.lastUsedAt, locale, t.common.notSet)}</p>
+                      {passkeysLoading ? (
+                        <p className="mt-4 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                          {t.workspace.passkeysLoading}
+                        </p>
+                      ) : passkeys.length ? (
+                        <div className="mt-4 grid gap-3">
+                          {passkeys.map((passkey) => (
+                            <article key={passkey.id} className="rounded-lg border border-[var(--border)] bg-white/80 p-4">
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0 space-y-2">
+                                  <p className="text-sm font-semibold text-[var(--foreground)]">
+                                    {passkey.credentialPreview ?? passkey.id}
+                                  </p>
+                                  <div className="grid gap-1 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                                    <p>{t.workspace.deviceType}: {labelPasskeyDeviceType(passkey.deviceType, locale)}</p>
+                                    <p>{t.workspace.backedUp}: {passkey.backedUp ? t.common.yes : t.common.no}</p>
+                                    <p>{t.workspace.createdAt}: {formatDate(passkey.createdAt, locale, t.common.notSet)}</p>
+                                    <p>{t.workspace.lastUsed}: {formatDate(passkey.lastUsedAt, locale, t.common.notSet)}</p>
+                                    <p>{t.workspace.transportsLabel}: {passkey.transports.join(", ") || t.common.notSet}</p>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void handlePasskeyRemoval(passkey);
+                                  }}
+                                  className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)] sm:w-fit"
+                                  disabled={!passkey.canRemove || passkeyActionId === passkey.id}
+                                >
+                                  {passkeyActionId === passkey.id ? t.workspace.removingPasskey : t.workspace.removePasskey}
+                                </button>
+                              </div>
+                              {!passkey.canRemove ? (
+                                <p className="mt-3 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                                  {t.workspace.lastSignInMethodHint}
+                                </p>
+                              ) : null}
+                            </article>
+                          ))}
                         </div>
                       ) : (
-                        <p className="mt-4 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
-                          {t.workspace.passkeysHint}
-                        </p>
+                        <p className="mt-4 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">{t.workspace.passkeysEmpty}</p>
                       )}
                     </div>
                   </div>

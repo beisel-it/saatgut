@@ -66,6 +66,8 @@ const de = {
     PASSKEY_ALREADY_REGISTERED: "Dieser Passkey ist bereits mit einem Konto verbunden.",
     INVALID_PASSKEY: "Die Passkey-Anmeldung konnte nicht bestätigt werden.",
     NO_WORKSPACE: "Für dieses Konto wurde kein Arbeitsbereich gefunden.",
+    PASSKEY_NOT_FOUND: "Dieser Passkey wurde für dieses Konto nicht gefunden.",
+    LAST_SIGNIN_METHOD: "Dieser Passkey kann gerade nicht entfernt werden, weil sonst keine Anmeldemethode übrig bleibt.",
   },
   statuses: {
     sessionLoadFailed: "Die Sitzung konnte nicht geladen werden.",
@@ -90,6 +92,7 @@ const de = {
     stockReversalApplied: "Korrekturstorno übernommen.",
     passwordChanged: "Passwort aktualisiert.",
     passkeyEnrolled: "Passkey hinzugefügt.",
+    passkeyRemoved: "Passkey entfernt.",
     workspaceInviteCreated: "Einladung erstellt.",
     workspaceMemberUpdated: "Mitgliedsrolle aktualisiert.",
     workspaceMemberRemoved: "Mitglied entfernt.",
@@ -311,20 +314,29 @@ const de = {
     changePassword: "Passwort aktualisieren",
     passkeysTitle: "Passkeys hinzufügen",
     passkeysSubtitle:
-      "Lege zusätzliche Passkeys für schnelle Anmeldungen auf diesem Gerät oder in Deinem Passwortmanager an.",
+      "Lege Passkeys für schnelle Anmeldungen an und behalte im Blick, welche Anmeldemethoden für Dein Konto aktiv sind.",
     passkeysAction: "Passkey hinzufügen",
     passkeysAdding: "Passkey wird hinzugefügt…",
     passkeysHint:
-      "Die aktuelle Backend-Version unterstützt das Hinzufügen neuer Passkeys. Eine vollständige Liste oder das Entfernen einzelner Passkeys folgt erst mit einem eigenen Verwaltungsvertrag.",
+      "Du kannst weitere Passkeys hinzufügen und vorhandene entfernen, solange danach noch mindestens eine sichere Anmeldemethode bleibt.",
     passkeysReady: "Dieses Gerät kann Passkeys verwenden.",
     passkeysNotReady: "Auf diesem Gerät ist gerade keine Passkey-Erstellung verfügbar.",
-    latestPasskeyTitle: "Zuletzt hinzugefügter Passkey",
-    latestPasskeySubtitle:
-      "Diese Angaben stammen aus der letzten erfolgreichen Passkey-Einrichtung in dieser Sitzung.",
+    passkeysListTitle: "Gespeicherte Passkeys",
+    passkeysListSubtitle:
+      "Die Liste zeigt, welche Passkeys für dieses Konto hinterlegt sind und ob sie entfernt werden dürfen.",
+    passkeysLoading: "Passkeys werden geladen…",
+    passkeysEmpty: "Für dieses Konto ist noch kein Passkey hinterlegt.",
     lastUsed: "Zuletzt verwendet",
     createdAt: "Hinzugefügt",
     deviceType: "Gerätetyp",
     backedUp: "Synchronisiert",
+    transportsLabel: "Verbindung",
+    passwordFallbackLabel: "Passwort als Reserve",
+    removePasskey: "Entfernen",
+    removingPasskey: "Entferne…",
+    removePasskeyConfirm: "Diesen Passkey wirklich entfernen? {passkey}",
+    lastSignInMethodHint:
+      "Dieser Passkey ist aktuell Teil Deiner letzten verbleibenden Anmeldemethode. Lege zuerst einen weiteren Passkey oder ein Passwort an.",
     inviteTitle: "Mitgärtner:in einladen",
     inviteSubtitle:
       "Verschicke einen Zugang für diesen Arbeitsbereich. Die Einladung kann Mitglied- oder Lesezugriff vergeben.",
@@ -671,6 +683,8 @@ const en: AppMessages = {
     PASSKEY_ALREADY_REGISTERED: "That passkey is already connected to an account.",
     INVALID_PASSKEY: "The passkey sign-in could not be verified.",
     NO_WORKSPACE: "No workspace was found for this account.",
+    PASSKEY_NOT_FOUND: "That passkey was not found for this account.",
+    LAST_SIGNIN_METHOD: "That passkey cannot be removed because it would leave the account without a sign-in method.",
   },
   statuses: {
     sessionLoadFailed: "Failed to load session.",
@@ -695,6 +709,7 @@ const en: AppMessages = {
     stockReversalApplied: "Correction reversal applied.",
     passwordChanged: "Password updated.",
     passkeyEnrolled: "Passkey added.",
+    passkeyRemoved: "Passkey removed.",
     workspaceInviteCreated: "Invite created.",
     workspaceMemberUpdated: "Member role updated.",
     workspaceMemberRemoved: "Member removed.",
@@ -916,20 +931,29 @@ const en: AppMessages = {
     changePassword: "Update password",
     passkeysTitle: "Add passkeys",
     passkeysSubtitle:
-      "Create additional passkeys for faster sign-in on this device or through your password manager.",
+      "Create passkeys for faster sign-in and keep track of which sign-in methods are still available for your account.",
     passkeysAction: "Add passkey",
     passkeysAdding: "Adding passkey…",
     passkeysHint:
-      "The current backend contract supports adding new passkeys. A full list and per-passkey removal will follow in a later management contract.",
+      "You can add more passkeys and remove existing ones as long as at least one secure sign-in method remains afterward.",
     passkeysReady: "This device can create and use passkeys.",
     passkeysNotReady: "Passkey creation is not currently available on this device.",
-    latestPasskeyTitle: "Most recently added passkey",
-    latestPasskeySubtitle:
-      "These details reflect the latest successful passkey enrollment in this session.",
+    passkeysListTitle: "Saved passkeys",
+    passkeysListSubtitle:
+      "This list shows which passkeys are enrolled for this account and whether each one can be removed.",
+    passkeysLoading: "Loading passkeys…",
+    passkeysEmpty: "No passkeys are enrolled for this account yet.",
     lastUsed: "Last used",
     createdAt: "Added",
     deviceType: "Device type",
     backedUp: "Backed up",
+    transportsLabel: "Transport",
+    passwordFallbackLabel: "Password fallback",
+    removePasskey: "Remove",
+    removingPasskey: "Removing…",
+    removePasskeyConfirm: "Remove this passkey? {passkey}",
+    lastSignInMethodHint:
+      "This passkey is part of the last remaining sign-in method for the account. Add another passkey or set a password first.",
     inviteTitle: "Invite a collaborator",
     inviteSubtitle:
       "Create access for this workspace. Invites can grant member or read-only access.",
