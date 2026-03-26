@@ -139,6 +139,27 @@ export function createSpecies(input: {
   });
 }
 
+export function updateSpecies(
+  speciesId: string,
+  input: {
+    commonName?: string;
+    latinName?: string | null;
+    category?: Species["category"];
+    notes?: string | null;
+  },
+) {
+  return request<Species>(`/api/v1/species/${speciesId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteSpecies(speciesId: string) {
+  return request<void>(`/api/v1/species/${speciesId}`, {
+    method: "DELETE",
+  });
+}
+
 export function createVariety(input: {
   speciesId: string;
   name: string;
@@ -151,6 +172,30 @@ export function createVariety(input: {
   return request<Variety>("/api/v1/varieties", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export function updateVariety(
+  varietyId: string,
+  input: {
+    speciesId?: string;
+    name?: string;
+    description?: string | null;
+    heirloom?: boolean;
+    tags?: string[];
+    notes?: string | null;
+    synonyms?: string[];
+  },
+) {
+  return request<Variety>(`/api/v1/varieties/${varietyId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteVariety(varietyId: string) {
+  return request<void>(`/api/v1/varieties/${varietyId}`, {
+    method: "DELETE",
   });
 }
 
@@ -172,6 +217,34 @@ export function createSeedBatch(input: {
   return request<SeedBatch>("/api/v1/seed-batches", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export function updateSeedBatch(
+  seedBatchId: string,
+  input: {
+    varietyId?: string;
+    source?: string | null;
+    harvestYear?: number | null;
+    storageLocation?: string | null;
+    storageTemperatureC?: number | null;
+    storageHumidityPercent?: number | null;
+    storageLightExposure?: SeedBatch["storageLightExposure"];
+    storageMoistureLevel?: SeedBatch["storageMoistureLevel"];
+    storageContainer?: string | null;
+    storageQualityCheckedAt?: string | null;
+    notes?: string | null;
+  },
+) {
+  return request<SeedBatch>(`/api/v1/seed-batches/${seedBatchId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteSeedBatch(seedBatchId: string) {
+  return request<void>(`/api/v1/seed-batches/${seedBatchId}`, {
+    method: "DELETE",
   });
 }
 

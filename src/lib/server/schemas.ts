@@ -30,6 +30,12 @@ export const speciesCreateSchema = z.object({
   notes: z.string().trim().max(2000).optional().nullable(),
 });
 
+export const speciesUpdateSchema = speciesCreateSchema
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one species field must be provided.",
+  });
+
 export const varietyCreateSchema = z.object({
   speciesId: z.string().cuid(),
   name: z.string().trim().min(1).max(160),
@@ -39,6 +45,12 @@ export const varietyCreateSchema = z.object({
   notes: z.string().trim().max(2000).optional().nullable(),
   synonyms: z.array(z.string().trim().min(1).max(160)).max(12).default([]),
 });
+
+export const varietyUpdateSchema = varietyCreateSchema
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one variety field must be provided.",
+  });
 
 export const seedBatchCreateSchema = z.object({
   varietyId: z.string().cuid(),
@@ -54,6 +66,22 @@ export const seedBatchCreateSchema = z.object({
   storageContainer: z.string().trim().max(160).optional().nullable(),
   storageQualityCheckedAt: z.string().datetime().optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
+});
+
+export const seedBatchUpdateSchema = z.object({
+  varietyId: z.string().cuid().optional(),
+  source: z.string().trim().max(160).optional().nullable(),
+  harvestYear: z.number().int().min(1900).max(2100).optional().nullable(),
+  storageLocation: z.string().trim().max(160).optional().nullable(),
+  storageTemperatureC: z.number().min(-30).max(60).optional().nullable(),
+  storageHumidityPercent: z.number().int().min(0).max(100).optional().nullable(),
+  storageLightExposure: z.nativeEnum(StorageLightExposure).optional().nullable(),
+  storageMoistureLevel: z.nativeEnum(StorageMoistureLevel).optional().nullable(),
+  storageContainer: z.string().trim().max(160).optional().nullable(),
+  storageQualityCheckedAt: z.string().datetime().optional().nullable(),
+  notes: z.string().trim().max(2000).optional().nullable(),
+}).refine((value) => Object.keys(value).length > 0, {
+  message: "At least one seed batch field must be provided.",
 });
 
 export const growingProfileCreateSchema = z.object({

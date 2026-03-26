@@ -124,6 +124,66 @@ export async function createSpecies(
   });
 }
 
+export async function updateSpecies(
+  auth: AuthContext,
+  speciesId: string,
+  input: {
+    commonName?: string;
+    latinName?: string | null;
+    category?: Prisma.SpeciesUpdateInput["category"];
+    notes?: string | null;
+  },
+) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    await assertSpeciesInWorkspace(tx, auth.workspaceId, speciesId);
+
+    const species = await tx.species.update({
+      where: { id: speciesId },
+      data: {
+        commonName: input.commonName,
+        latinName: input.latinName,
+        category: input.category,
+        notes: input.notes,
+      },
+    });
+
+    await writeAuditLog(tx, auth, "species.update", "Species", species.id, {
+      fields: Object.keys(input),
+    });
+
+    return species;
+  });
+}
+
+export async function deleteSpecies(auth: AuthContext, speciesId: string) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    await assertSpeciesInWorkspace(tx, auth.workspaceId, speciesId);
+
+    const varietyCount = await tx.variety.count({
+      where: {
+        workspaceId: auth.workspaceId,
+        speciesId,
+      },
+    });
+
+    if (varietyCount > 0) {
+      throw new ApiError(
+        409,
+        "SPECIES_DELETE_BLOCKED",
+        "Species cannot be deleted while varieties still reference it.",
+        { varietyCount },
+      );
+    }
+
+    await tx.species.delete({ where: { id: speciesId } });
+    await writeAuditLog(tx, auth, "species.delete", "Species", speciesId, {});
+  });
+}
+
 export async function listVarieties(auth: AuthContext) {
   return prisma.variety.findMany({
     where: { workspaceId: auth.workspaceId },
@@ -219,6 +279,88 @@ export async function createVariety(
     });
 
     return variety;
+  });
+}
+
+export async function updateVariety(
+  auth: AuthContext,
+  varietyId: string,
+  input: {
+    speciesId?: string;
+    name?: string;
+    description?: string | null;
+    heirloom?: boolean;
+    tags?: string[];
+    notes?: string | null;
+    synonyms?: string[];
+  },
+) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    await assertVarietyInWorkspace(tx, auth.workspaceId, varietyId);
+
+    if (input.speciesId) {
+      await assertSpeciesInWorkspace(tx, auth.workspaceId, input.speciesId);
+    }
+
+    const variety = await tx.variety.update({
+      where: { id: varietyId },
+      data: {
+        speciesId: input.speciesId,
+        name: input.name,
+        description: input.description,
+        heirloom: input.heirloom,
+        tags: input.tags,
+        notes: input.notes,
+        synonyms:
+          input.synonyms === undefined
+            ? undefined
+            : {
+                deleteMany: {},
+                create: input.synonyms.map((synonym) => ({ name: synonym })),
+              },
+      },
+      include: {
+        species: true,
+        synonyms: true,
+        cultivationRule: true,
+      },
+    });
+
+    await writeAuditLog(tx, auth, "variety.update", "Variety", variety.id, {
+      fields: Object.keys(input),
+    });
+
+    return variety;
+  });
+}
+
+export async function deleteVariety(auth: AuthContext, varietyId: string) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    await assertVarietyInWorkspace(tx, auth.workspaceId, varietyId);
+
+    const [seedBatchCount, plantingEventCount, journalEntryCount, reminderTaskCount] =
+      await Promise.all([
+        tx.seedBatch.count({ where: { workspaceId: auth.workspaceId, varietyId } }),
+        tx.plantingEvent.count({ where: { workspaceId: auth.workspaceId, varietyId } }),
+        tx.plantingJournalEntry.count({ where: { workspaceId: auth.workspaceId, varietyId } }),
+        tx.reminderTask.count({ where: { workspaceId: auth.workspaceId, varietyId } }),
+      ]);
+
+    if (seedBatchCount || plantingEventCount || journalEntryCount || reminderTaskCount) {
+      throw new ApiError(
+        409,
+        "VARIETY_DELETE_BLOCKED",
+        "Variety cannot be deleted while it still has catalog or history references.",
+        { seedBatchCount, plantingEventCount, journalEntryCount, reminderTaskCount },
+      );
+    }
+
+    await tx.variety.delete({ where: { id: varietyId } });
+    await writeAuditLog(tx, auth, "variety.delete", "Variety", varietyId, {});
   });
 }
 
@@ -322,6 +464,125 @@ export async function createSeedBatch(
     });
 
     return seedBatch;
+  });
+}
+
+export async function updateSeedBatch(
+  auth: AuthContext,
+  seedBatchId: string,
+  input: {
+    varietyId?: string;
+    source?: string | null;
+    harvestYear?: number | null;
+    storageLocation?: string | null;
+    storageTemperatureC?: number | null;
+    storageHumidityPercent?: number | null;
+    storageLightExposure?: Prisma.SeedBatchUpdateInput["storageLightExposure"];
+    storageMoistureLevel?: Prisma.SeedBatchUpdateInput["storageMoistureLevel"];
+    storageContainer?: string | null;
+    storageQualityCheckedAt?: string | null;
+    notes?: string | null;
+  },
+) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    await assertSeedBatchInWorkspace(tx, auth.workspaceId, seedBatchId);
+
+    if (input.varietyId) {
+      await assertVarietyInWorkspace(tx, auth.workspaceId, input.varietyId);
+    }
+
+    const seedBatch = await tx.seedBatch.update({
+      where: { id: seedBatchId },
+      data: {
+        varietyId: input.varietyId,
+        source: input.source,
+        harvestYear: input.harvestYear,
+        storageLocation: input.storageLocation,
+        storageTemperatureC:
+          input.storageTemperatureC === undefined
+            ? undefined
+            : input.storageTemperatureC === null
+              ? null
+              : new Prisma.Decimal(input.storageTemperatureC),
+        storageHumidityPercent: input.storageHumidityPercent,
+        storageLightExposure: input.storageLightExposure,
+        storageMoistureLevel: input.storageMoistureLevel,
+        storageContainer: input.storageContainer,
+        storageQualityCheckedAt:
+          input.storageQualityCheckedAt === undefined
+            ? undefined
+            : input.storageQualityCheckedAt === null
+              ? null
+              : new Date(input.storageQualityCheckedAt),
+        notes: input.notes,
+      },
+      include: {
+        germinationTests: { orderBy: { testedAt: "desc" } },
+        stockTransactions: { orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }] },
+      },
+    });
+
+    await writeAuditLog(tx, auth, "seedBatch.update", "SeedBatch", seedBatch.id, {
+      fields: Object.keys(input),
+    });
+
+    return {
+      ...seedBatch,
+      storageWarnings: buildSeedBatchWarnings({
+        harvestYear: seedBatch.harvestYear,
+        storageLocation: seedBatch.storageLocation,
+        storageTemperatureC: seedBatch.storageTemperatureC,
+        storageHumidityPercent: seedBatch.storageHumidityPercent,
+        storageLightExposure: seedBatch.storageLightExposure,
+        storageMoistureLevel: seedBatch.storageMoistureLevel,
+        latestGerminationRate: seedBatch.germinationTests[0]?.germinationRate ?? null,
+        latestGerminationTestedAt: seedBatch.germinationTests[0]?.testedAt ?? null,
+      }),
+    };
+  });
+}
+
+export async function deleteSeedBatch(auth: AuthContext, seedBatchId: string) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    await assertSeedBatchInWorkspace(tx, auth.workspaceId, seedBatchId);
+
+    const [germinationTestCount, plantingEventCount, journalEntryCount, reminderTaskCount, stockTransactions] =
+      await Promise.all([
+        tx.germinationTest.count({ where: { workspaceId: auth.workspaceId, seedBatchId } }),
+        tx.plantingEvent.count({ where: { workspaceId: auth.workspaceId, seedBatchId } }),
+        tx.plantingJournalEntry.count({ where: { workspaceId: auth.workspaceId, seedBatchId } }),
+        tx.reminderTask.count({ where: { workspaceId: auth.workspaceId, seedBatchId } }),
+        tx.seedBatchTransaction.findMany({
+          where: { workspaceId: auth.workspaceId, seedBatchId },
+          select: { type: true },
+        }),
+      ]);
+
+    const nonInitialTransactionCount = stockTransactions.filter(
+      (transaction) => transaction.type !== SeedBatchTransactionType.INITIAL_STOCK,
+    ).length;
+
+    if (germinationTestCount || plantingEventCount || journalEntryCount || reminderTaskCount || nonInitialTransactionCount) {
+      throw new ApiError(
+        409,
+        "SEED_BATCH_DELETE_BLOCKED",
+        "Seed batch cannot be deleted while it still has quality or operational history.",
+        {
+          germinationTestCount,
+          plantingEventCount,
+          journalEntryCount,
+          reminderTaskCount,
+          nonInitialTransactionCount,
+        },
+      );
+    }
+
+    await tx.seedBatch.delete({ where: { id: seedBatchId } });
+    await writeAuditLog(tx, auth, "seedBatch.delete", "SeedBatch", seedBatchId, {});
   });
 }
 

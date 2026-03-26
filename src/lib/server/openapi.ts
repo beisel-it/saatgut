@@ -96,13 +96,49 @@ export function getOpenApiDocument() {
         get: { summary: "List species", responses: { "200": { description: "Species list" } } },
         post: { summary: "Create a species", responses: { "201": { description: "Created" } } },
       },
+      "/species/{speciesId}": {
+        patch: {
+          summary: "Update a species",
+          parameters: [{ name: "speciesId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Updated" } },
+        },
+        delete: {
+          summary: "Delete a species when no varieties still depend on it",
+          parameters: [{ name: "speciesId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "204": { description: "Deleted" } },
+        },
+      },
       "/varieties": {
         get: { summary: "List varieties", responses: { "200": { description: "Variety list" } } },
         post: { summary: "Create a variety", responses: { "201": { description: "Created" } } },
       },
+      "/varieties/{varietyId}": {
+        patch: {
+          summary: "Update a variety",
+          parameters: [{ name: "varietyId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Updated" } },
+        },
+        delete: {
+          summary: "Delete a variety when it has no downstream catalog or history references",
+          parameters: [{ name: "varietyId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "204": { description: "Deleted" } },
+        },
+      },
       "/seed-batches": {
         get: { summary: "List seed batches", responses: { "200": { description: "Seed batch list" } } },
         post: { summary: "Create a seed batch", responses: { "201": { description: "Created" } } },
+      },
+      "/seed-batches/{seedBatchId}": {
+        patch: {
+          summary: "Update seed batch catalog metadata",
+          parameters: [{ name: "seedBatchId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Updated" } },
+        },
+        delete: {
+          summary: "Delete a seed batch when it has no quality or operational history",
+          parameters: [{ name: "seedBatchId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "204": { description: "Deleted" } },
+        },
       },
       "/profiles": {
         get: { summary: "List growing profiles", responses: { "200": { description: "Profile list" } } },
