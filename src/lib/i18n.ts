@@ -366,6 +366,10 @@ const de = {
     companionFilterLabel: "Gute Nachbarn",
     companionSelectorHint:
       "Wähle Sorten aus, die sich in Mischkultur oder direkter Nachbarschaft bewährt haben.",
+    quickCompanionHint:
+      "Optional: Verknüpfe schon beim Erfassen der Packung passende Nachbarpflanzen für spätere Beetplanung.",
+    inlineCompanionHint:
+      "Pflege hier direkt die strukturierten Nachbarpflanzen, die zu dieser Sorte passen.",
     companionSummaryLabel: "Gute Nachbarn:",
     noCompanionLinks: "Noch keine strukturierten Nachbarpflanzen verknüpft.",
     addCompanionAction: "Nachbarpflanze hinzufügen",
@@ -1114,6 +1118,10 @@ const en: AppMessages = {
     companionFilterLabel: "Good neighbors",
     companionSelectorHint:
       "Choose varieties that work well nearby or in the same companion-planting plan.",
+    quickCompanionHint:
+      "Optional: link good-neighbor varieties right in the quick-add flow so planning is ready later.",
+    inlineCompanionHint:
+      "Manage the structured companion varieties for this variety directly here.",
     companionSummaryLabel: "Good neighbors:",
     noCompanionLinks: "No structured companion links yet.",
     addCompanionAction: "Add companion variety",

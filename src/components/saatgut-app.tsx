@@ -119,6 +119,7 @@ type PacketIntakeFormValues = {
   harvestYear: string;
   storageLocation: string;
   notes: string;
+  companionIds: string[];
 };
 
 type CropGuidance = {
@@ -176,6 +177,7 @@ function createInitialPacketIntakeForm(): PacketIntakeFormValues {
     harvestYear: "",
     storageLocation: "",
     notes: "",
+    companionIds: [],
   };
 }
 
@@ -1526,6 +1528,15 @@ export function SaatgutApp() {
         });
       }
 
+      if (packetIntakeForm.companionIds.length) {
+        const existingCompanionIds = new Set((variety.companionVarieties ?? []).map((companion) => companion.id));
+        await Promise.all(
+          packetIntakeForm.companionIds
+            .filter((companionId) => companionId !== variety.id && !existingCompanionIds.has(companionId))
+            .map((companionId) => createVarietyCompanion(variety.id, companionId)),
+        );
+      }
+
       await createSeedBatch({
         varietyId: variety.id,
         source: packetIntakeForm.source || null,
@@ -2704,8 +2715,18 @@ export function SaatgutApp() {
                         onChange={(event) =>
                           setPacketIntakeForm((current) => ({ ...current, notes: event.target.value }))
                         }
-                      />
-                    </Field>
+                        />
+                      </Field>
+                    <CompanionSelector
+                      label={t.forms.companionVarieties}
+                      hint={t.catalog.quickCompanionHint}
+                      selectedIds={packetIntakeForm.companionIds}
+                      options={selectableCompanionVarieties}
+                      onChange={(companionIds) =>
+                        setPacketIntakeForm((current) => ({ ...current, companionIds }))
+                      }
+                      t={t}
+                    />
                     <p className="max-w-[44ch] text-sm leading-6 text-[color:rgba(24,49,40,0.62)]">
                       {t.catalog.intakeCreateHint}
                     </p>
@@ -3645,6 +3666,7 @@ export function SaatgutApp() {
                         varietyEditForm={varietyEditForm}
                         varietyEditState={varietyEditState}
                         setVarietyEditForm={setVarietyEditForm}
+                        companionOptions={selectableCompanionVarieties}
                         onStartVarietyEdit={startVarietyEdit}
                         onCancelVarietyEdit={cancelVarietyEdit}
                         onSubmitVarietyEdit={submitVarietyEdit}
@@ -5660,6 +5682,7 @@ function CatalogVarietyCard({
   varietyEditForm,
   varietyEditState,
   setVarietyEditForm,
+  companionOptions,
   onStartVarietyEdit,
   onCancelVarietyEdit,
   onSubmitVarietyEdit,
@@ -5704,6 +5727,7 @@ function CatalogVarietyCard({
     notes: string;
     synonyms: string;
   }>>;
+  companionOptions: Array<{ id: string; label: string }>;
   onStartVarietyEdit: (variety: Variety) => void;
   onCancelVarietyEdit: () => void;
   onSubmitVarietyEdit: (event: React.FormEvent<HTMLFormElement>) => void | Promise<void>;
@@ -5880,6 +5904,16 @@ function CatalogVarietyCard({
                 values={varietyEditForm}
                 setValues={setVarietyEditForm}
                 fieldErrors={varietyEditState.fieldErrors}
+                t={t}
+              />
+              <CompanionSelector
+                label={t.forms.companionVarieties}
+                hint={t.catalog.inlineCompanionHint}
+                selectedIds={varietyEditForm.companionIds}
+                options={companionOptions.filter((option) => option.id !== variety.id)}
+                onChange={(companionIds) =>
+                  setVarietyEditForm((current) => ({ ...current, companionIds }))
+                }
                 t={t}
               />
               <div className="grid gap-4 md:grid-cols-2">
