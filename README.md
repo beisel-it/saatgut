@@ -1,51 +1,102 @@
 # Saatgut
 
-Saatgut is a self-hosted seed-bank and cultivation journal web app for managing varieties, seed batches, frost-date-based growing profiles, cultivation rules, and a practical 14-day calendar of upcoming garden work.
+![Next.js](https://img.shields.io/badge/Next.js-15-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+![Prisma](https://img.shields.io/badge/Prisma-6-2D3748)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)
+![Vitest](https://img.shields.io/badge/Vitest-tested-6E9F18)
+![Playwright](https://img.shields.io/badge/Playwright-e2e-45BA4B)
+
+Saatgut is a self-hosted seed-bank and cultivation journal web app for running a practical home-growing workflow: catalog varieties, track seed batches, define frost-date-based growing profiles, derive a 14-day calendar, record planting activity, and manage seed quality signals such as germination tests and stock corrections.
+
+## What Is Shipped
+
+The current implementation includes:
+
+- cookie-based registration, login, password change, invites, and session handling
+- authenticated app shell with responsive navigation
+- species and variety management, including tags and synonyms
+- seed batch tracking with storage metadata, warning display, germination tests, and stock transaction history
+- growing profiles with active-profile handling and persisted phenology state
+- cultivation rules for frost-relative planning
+- 14-day calendar output from the backend planning engine
+- planting event capture with stock deduction
+- journal logging plus operational/API surfaces for timeline, tasks, exports, backups, API tokens, MCP, and OpenAPI output
+
+The core web UI is focused on seed-bank and planning workflows. Some operational surfaces are currently API-first rather than fully represented in the main page UI.
 
 ## Stack
 
-- Next.js 15 with App Router
+- Next.js 15 App Router
 - TypeScript
 - Prisma
 - PostgreSQL 16
 - Tailwind CSS v4
 - Vitest
+- Playwright
 - Docker Compose
 
-## Quick Start
+## Project Layout
 
-1. Copy `.env.example` to `.env.local` for local app development or `.env` for Docker Compose.
-2. Install dependencies and generate Prisma client with `npm install && npm run setup`.
-3. Start PostgreSQL with `docker compose up db -d`.
-4. Apply migrations with `npm run db:deploy`.
-5. Start the web app with `npm run dev`.
+```text
+src/app/                    App Router pages and API routes
+src/components/             Main client-side UI
+src/lib/client/             Frontend API client and shared types
+src/lib/server/             Domain services, serializers, validation, operations
+src/lib/auth/               Session, password, invite, and API token helpers
+prisma/                     Schema and migrations
+docker/                     Database image and entrypoint helpers
+scripts/                    Operational scripts such as PostgreSQL backup
+tests/                      Vitest and Playwright coverage
+```
+
+## Local Development
+
+1. Copy `.env.example` to `.env.local`.
+2. Install dependencies and generate the Prisma client:
+
+```bash
+npm install
+npm run setup
+```
+
+3. Start PostgreSQL:
+
+```bash
+docker compose up db -d
+```
+
+4. Apply migrations:
+
+```bash
+npm run db:deploy
+```
+
+5. Start the app:
+
+```bash
+npm run dev
+```
 
 Open `http://localhost:3000`.
 
-## Full Stack With Docker Compose
+## Docker Compose
 
-Run the full stack with:
+Run the app and database together with:
 
 ```bash
 docker compose up --build
 ```
 
-The web app will be available on `http://localhost:3000` and will run Prisma migrations on container startup.
+Notes:
 
-### Compose And Portainer Credential Rules
-
-- Treat `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` as the source of truth for the self-hosted stack.
-- The custom PostgreSQL container startup reconciles `POSTGRES_PASSWORD` back onto the database role on every boot, so reused volumes do not keep stale credentials after a password change.
-- The app service derives its internal `DATABASE_URL` from those same Compose variables, which keeps Prisma and PostgreSQL aligned for registration, login, and migrations.
-- If you rotate the password in Portainer or `.env`, redeploy the stack. A volume reset is only required if you want to discard the database contents, not to apply the new password.
-
-### Existing Volume Recovery
-
-If an older deployment left the volume with different credentials, redeploy the stack with the desired `POSTGRES_PASSWORD`. The database container now repairs the role password during startup before the app begins serving traffic.
+- Compose derives the app `DATABASE_URL` from `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`.
+- The bundled PostgreSQL image reconciles `POSTGRES_PASSWORD` onto the persisted role during startup, which helps avoid stale-password issues on reused volumes.
+- This setup is intended to be self-hosting friendly and Portainer-friendly, but the README does not claim production hardening beyond the shipped health checks and container wiring.
 
 ## Verification
 
-Use the baseline verification commands:
+Run the baseline checks with:
 
 ```bash
 npm run lint
@@ -54,37 +105,55 @@ npm run test
 npm run build
 ```
 
-## Operations Surface
+Browser-level coverage is available via:
 
-The V1 operations layer now includes:
+```bash
+npm run test:e2e
+```
 
-- reminder task APIs under `/api/v1/tasks`
-- unified timeline reads under `/api/v1/timeline`
-- workspace JSON export via `/api/v1/exports/workspace`
-- backup metadata via `/api/v1/backups/summary`
-- admin API token management under `/api/v1/admin/api-tokens`
-- generated OpenAPI output at `/api/v1/openapi.json`
+## API Surface
 
-For database backups, run:
+Selected shipped endpoints:
+
+- `/api/health`
+- `/api/v1/auth/*`
+- `/api/v1/species`
+- `/api/v1/varieties`
+- `/api/v1/seed-batches`
+- `/api/v1/seed-batches/:id/germination-tests`
+- `/api/v1/seed-batches/:id/transactions`
+- `/api/v1/profiles`
+- `/api/v1/profiles/:id/phenology`
+- `/api/v1/cultivation-rules`
+- `/api/v1/calendar`
+- `/api/v1/plantings`
+- `/api/v1/journal`
+- `/api/v1/tasks`
+- `/api/v1/timeline`
+- `/api/v1/exports/workspace`
+- `/api/v1/backups/summary`
+- `/api/v1/admin/api-tokens`
+- `/api/v1/openapi.json`
+- `/api/v1/mcp`
+
+## Operations
+
+Create a PostgreSQL dump with:
 
 ```bash
 npm run backup:db
 ```
 
-This writes timestamped PostgreSQL dumps to `backups/`.
+Backups are written to `backups/`.
 
-## Current MVP Surface
+## Environment Notes
 
-The web app now includes:
+Important variables in `.env.example`:
 
-- registration and login with cookie-based sessions
-- authenticated app shell with responsive navigation
-- species and variety creation
-- seed batch entry and stock visibility
-- growing profile creation with active-profile selection
-- cultivation rule entry for frost-relative planning
-- 14-day calendar list fed by the backend calendar service
-- planting event capture with optional seed stock deduction
-- journal entries, reminder task APIs, timeline reads, exports, and tokenized API access
-
-The remaining work is deeper refinement, not initial UI scaffolding.
+- `DATABASE_URL`: direct local development database connection
+- `AUTH_SECRET`: session and auth signing secret
+- `APP_URL`: app origin for local runtime behavior
+- `API_RATE_LIMIT_PER_MINUTE`: baseline per-minute rate limit
+- `API_TOKEN_DEFAULT_RATE_LIMIT_PER_MINUTE`: default rate limit for issued API tokens
+- `MCP_ALLOWED_ORIGINS`: allowed browser origins for the MCP HTTP endpoint
+- `POSTGRES_*` and `APP_PORT`: Compose-oriented runtime settings
