@@ -740,7 +740,7 @@ export function SaatgutApp() {
               title={t.auth.heroTitle}
               subtitle={t.auth.heroSubtitle}
               supportingCopy={t.auth.heroCopy}
-              titleClassName="max-w-[12ch] md:max-w-[13ch]"
+              titleClassName="max-w-[18ch] md:max-w-[19ch]"
             />
           </section>
 
@@ -960,7 +960,7 @@ export function SaatgutApp() {
                 eyebrow={t.dashboard.heroEyebrow}
                 title={t.dashboard.heroTitle}
                 subtitle={t.dashboard.heroSubtitle}
-                titleClassName="max-w-[24ch]"
+                titleClassName="max-w-[28ch]"
                 compact
               />
               <button
@@ -1126,7 +1126,7 @@ export function SaatgutApp() {
                   eyebrow={t.catalog.eyebrow}
                   title={t.catalog.heroTitle}
                   subtitle={t.catalog.heroSubtitle}
-                  titleClassName="max-w-[16ch]"
+                  titleClassName="max-w-[22ch]"
                 />
               </section>
               <div className="grid gap-4 xl:grid-cols-[0.72fr_1.28fr]">
@@ -1641,7 +1641,7 @@ export function SaatgutApp() {
                   eyebrow={t.profiles.eyebrow}
                   title={t.profiles.heroTitle}
                   subtitle={t.profiles.heroSubtitle}
-                  titleClassName="max-w-[24ch]"
+                  titleClassName="max-w-[26ch]"
                 />
               </section>
               <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
@@ -1810,7 +1810,7 @@ export function SaatgutApp() {
                   eyebrow={t.rules.eyebrow}
                   title={t.rules.heroTitle}
                   subtitle={t.rules.heroSubtitle}
-                  titleClassName="max-w-[16ch]"
+                  titleClassName="max-w-[22ch]"
                 />
               </section>
               <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
@@ -1872,7 +1872,7 @@ export function SaatgutApp() {
                   eyebrow={t.plantings.eyebrow}
                   title={t.plantings.heroTitle}
                   subtitle={t.plantings.heroSubtitle}
-                  titleClassName="max-w-[16ch]"
+                  titleClassName="max-w-[22ch]"
                 />
               </section>
               <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
@@ -2080,8 +2080,8 @@ function ScreenHeader({
       <h2
         className={classNames(
           compact
-            ? "mt-1.5 max-w-[22ch] text-2xl font-semibold tracking-tight text-balance md:text-[2rem]"
-            : "mt-2 max-w-[15ch] text-3xl font-semibold tracking-tight text-balance md:text-4xl",
+            ? "mt-1.5 max-w-[24ch] text-[1.75rem] font-semibold tracking-tight text-balance leading-tight md:text-[2rem]"
+            : "mt-2 max-w-[18ch] text-[2.2rem] font-semibold tracking-tight text-balance leading-[1.05] md:text-[2.85rem]",
           titleClassName,
         )}
       >
