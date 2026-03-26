@@ -745,7 +745,7 @@ export function SaatgutApp() {
 
             {authMode === "register" ? (
               <form className="mt-6 grid gap-4" onSubmit={handleRegister}>
-                <Field label={t.auth.email} name="email" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional}>
+                <Field label={t.auth.email} name="email" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional} tone="inverse">
                   <input
                     className="field-input-dark"
                     type="email"
@@ -755,7 +755,7 @@ export function SaatgutApp() {
                     }
                   />
                 </Field>
-                <Field label={t.auth.password} name="password" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional}>
+                <Field label={t.auth.password} name="password" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional} tone="inverse">
                   <input
                     className="field-input-dark"
                     type="password"
@@ -765,7 +765,7 @@ export function SaatgutApp() {
                     }
                   />
                 </Field>
-                <Field label={t.auth.workspaceName} name="workspaceName" fieldErrors={authState.fieldErrors} optional optionalLabel={t.common.optional}>
+                <Field label={t.auth.workspaceName} name="workspaceName" fieldErrors={authState.fieldErrors} optional optionalLabel={t.common.optional} tone="inverse">
                   <input
                     className="field-input-dark"
                     type="text"
@@ -784,7 +784,7 @@ export function SaatgutApp() {
               </form>
             ) : (
               <form className="mt-6 grid gap-4" onSubmit={handleLogin}>
-                <Field label={t.auth.email} name="email" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional}>
+                <Field label={t.auth.email} name="email" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional} tone="inverse">
                   <input
                     className="field-input-dark"
                     type="email"
@@ -794,7 +794,7 @@ export function SaatgutApp() {
                     }
                   />
                 </Field>
-                <Field label={t.auth.password} name="password" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional}>
+                <Field label={t.auth.password} name="password" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional} tone="inverse">
                   <input
                     className="field-input-dark"
                     type="password"
@@ -1900,6 +1900,7 @@ function Field({
   fieldErrors,
   optional = false,
   optionalLabel,
+  tone = "default",
   children,
 }: {
   label: string;
@@ -1907,17 +1908,34 @@ function Field({
   fieldErrors: Record<string, string[] | undefined>;
   optional?: boolean;
   optionalLabel: string;
+  tone?: "default" | "inverse";
   children: React.ReactNode;
 }) {
   return (
-    <label className="grid gap-2 text-sm font-medium text-[var(--foreground)]">
+    <label
+      className={classNames(
+        "grid gap-2 text-sm font-medium",
+        tone === "inverse" ? "text-white" : "text-[var(--foreground)]",
+      )}
+    >
       <span className="flex items-center gap-2">
         {label}
-        {optional ? <span className="text-xs font-normal text-[color:rgba(24,49,40,0.56)]">{optionalLabel}</span> : null}
+        {optional ? (
+          <span
+            className={classNames(
+              "text-xs font-normal",
+              tone === "inverse" ? "text-white/72" : "text-[color:rgba(24,49,40,0.56)]",
+            )}
+          >
+            {optionalLabel}
+          </span>
+        ) : null}
       </span>
       {children}
       {fieldErrors[name]?.[0] ? (
-        <span className="text-sm text-red-700">{fieldErrors[name]?.[0]}</span>
+        <span className={classNames("text-sm", tone === "inverse" ? "text-rose-200" : "text-red-700")}>
+          {fieldErrors[name]?.[0]}
+        </span>
       ) : null}
     </label>
   );
