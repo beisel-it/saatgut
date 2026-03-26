@@ -30,3 +30,41 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.field-input,
+.field-input-dark {
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  padding: 0.85rem 1rem;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.field-input {
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--foreground);
+}
+
+.field-input-dark {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+
+.field-input:focus,
+.field-input-dark:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(127, 155, 71, 0.16);
+}
+
+.field-input-dark::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}

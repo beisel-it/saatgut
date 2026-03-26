@@ -43,14 +43,17 @@ npm run test
 npm run build
 ```
 
-## Current Scaffold Scope
+## Current MVP Surface
 
-This baseline includes:
+The web app now includes:
 
-- a Next.js 15 App Router shell
-- Prisma schema for the MVP seed-bank domain
-- PostgreSQL container orchestration
-- `/api/health` for runtime checks
-- GitHub Actions CI for install, Prisma generation, migration deploy, lint, test, and build
+- registration and login with cookie-based sessions
+- authenticated app shell with responsive navigation
+- species and variety creation
+- seed batch entry and stock visibility
+- growing profile creation with active-profile selection
+- cultivation rule entry for frost-relative planning
+- 14-day calendar list fed by the backend calendar service
+- planting event capture with optional seed stock deduction
 
-Application feature work such as auth flows, CRUD screens, and calendar logic remains to be implemented on top of this scaffold.
+The remaining work is deeper refinement, not initial UI scaffolding.

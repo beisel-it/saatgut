@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Saatgut",
-  description: "Self-hosted seed-bank and cultivation journal MVP scaffold.",
+  description: "Self-hosted seed-bank and cultivation journal MVP.",
 };
 
 export default function RootLayout({
