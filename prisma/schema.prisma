@@ -105,6 +105,12 @@ enum PasskeyDeviceType {
   MULTI_DEVICE
 }
 
+enum MediaAssetKind {
+  VARIETY_REPRESENTATIVE
+  SEED_BATCH_PACKET
+  SEED_BATCH_REFERENCE
+}
+
 model User {
   id           String        @id @default(cuid())
   email        String        @unique
@@ -140,6 +146,7 @@ model Workspace {
   apiTokens       ApiToken[]
   invites         UserInvite[]
   auditLogs       AuditLog[]
+  mediaAssets     MediaAsset[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 }
@@ -192,6 +199,7 @@ model Variety {
   plantingEvents        PlantingEvent[]
   journalEntries        PlantingJournalEntry[]
   reminderTasks         ReminderTask[]
+  mediaAssets           MediaAsset[]
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
@@ -231,10 +239,34 @@ model SeedBatch {
   germinationTests GerminationTest[]
   stockTransactions SeedBatchTransaction[]
   reminderTasks   ReminderTask[]
+  mediaAssets     MediaAsset[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
   @@index([workspaceId, varietyId])
+}
+
+model MediaAsset {
+  id               String         @id @default(cuid())
+  workspaceId      String
+  varietyId        String?
+  seedBatchId      String?
+  kind             MediaAssetKind
+  originalFilename String
+  storageKey       String         @unique
+  mimeType         String
+  byteSize         Int
+  altText          String?
+  caption          String?
+  workspace        Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  variety          Variety?       @relation(fields: [varietyId], references: [id], onDelete: Cascade)
+  seedBatch        SeedBatch?     @relation(fields: [seedBatchId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([varietyId, kind])
+  @@index([workspaceId, kind, createdAt])
+  @@index([seedBatchId, kind, createdAt])
 }
 
 model GrowingProfile {

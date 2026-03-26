@@ -1,6 +1,7 @@
 import {
   ApiTokenScope,
   GerminationTest,
+  MediaAssetKind,
   MembershipRole,
   PlantingEventType,
   ReminderTaskSource,
@@ -163,6 +164,17 @@ export function serializeVariety(variety: {
     companionPlantingNotes?: string | null;
   };
   synonyms?: Array<{ id: string; name: string; createdAt: Date }>;
+  mediaAssets?: Array<{
+    id: string;
+    kind: MediaAssetKind;
+    originalFilename: string;
+    mimeType: string;
+    byteSize: number;
+    altText: string | null;
+    caption: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
   cultivationRule?: {
     id: string;
     sowIndoorsStartWeeks: number | null;
@@ -179,10 +191,15 @@ export function serializeVariety(variety: {
     updatedAt: Date;
   } | null;
 }) {
+  const representativeImage = variety.mediaAssets?.find(
+    (asset) => asset.kind === "VARIETY_REPRESENTATIVE",
+  );
+
   return {
     ...variety,
     createdAt: variety.createdAt.toISOString(),
     updatedAt: variety.updatedAt.toISOString(),
+    representativeImage: representativeImage ? serializeMediaAsset(representativeImage) : null,
     synonyms: variety.synonyms?.map((synonym) => ({
       ...synonym,
       createdAt: synonym.createdAt.toISOString(),
@@ -213,6 +230,17 @@ export function serializeSeedBatch(seedBatch: {
   storageContainer?: string | null;
   storageQualityCheckedAt?: Date | null;
   notes: string | null;
+  mediaAssets?: Array<{
+    id: string;
+    kind: MediaAssetKind;
+    originalFilename: string;
+    mimeType: string;
+    byteSize: number;
+    altText: string | null;
+    caption: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
   germinationTests?: GerminationTest[];
   stockTransactions?: Array<{
     id: string;
@@ -237,10 +265,36 @@ export function serializeSeedBatch(seedBatch: {
     quantity: serializeDecimal(seedBatch.quantity),
     storageTemperatureC: serializeDecimal(seedBatch.storageTemperatureC ?? null),
     storageQualityCheckedAt: seedBatch.storageQualityCheckedAt?.toISOString() ?? null,
+    photos: seedBatch.mediaAssets?.map(serializeMediaAsset),
     germinationTests: seedBatch.germinationTests?.map(serializeGerminationTest),
     stockTransactions: seedBatch.stockTransactions?.map(serializeSeedBatchTransaction),
     createdAt: seedBatch.createdAt.toISOString(),
     updatedAt: seedBatch.updatedAt.toISOString(),
+  };
+}
+
+export function serializeMediaAsset(asset: {
+  id: string;
+  kind: MediaAssetKind;
+  originalFilename: string;
+  mimeType: string;
+  byteSize: number;
+  altText: string | null;
+  caption: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: asset.id,
+    kind: asset.kind,
+    originalFilename: asset.originalFilename,
+    mimeType: asset.mimeType,
+    byteSize: asset.byteSize,
+    altText: asset.altText,
+    caption: asset.caption,
+    contentUrl: `/api/v1/media/${asset.id}/content`,
+    createdAt: asset.createdAt.toISOString(),
+    updatedAt: asset.updatedAt.toISOString(),
   };
 }
 

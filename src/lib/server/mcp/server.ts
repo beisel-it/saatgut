@@ -351,6 +351,11 @@ const mcpTools: McpTool[] = [
         include: {
           species: true,
           synonyms: true,
+          mediaAssets: {
+            where: {
+              kind: "VARIETY_REPRESENTATIVE",
+            },
+          },
           cultivationRule: true,
         },
       });

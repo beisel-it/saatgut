@@ -33,6 +33,18 @@ export function handleApiError(error: unknown): NextResponse {
     );
   }
 
+  if (error instanceof Error && error.message === "MEDIA_FILE_MISSING") {
+    return NextResponse.json(
+      {
+        error: {
+          code: "MEDIA_FILE_MISSING",
+          message: "An image file is required for this upload.",
+        },
+      },
+      { status: 400 },
+    );
+  }
+
   if (error instanceof ZodError) {
     return NextResponse.json(
       {

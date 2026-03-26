@@ -32,6 +32,15 @@ export const passkeyResponseSchema = z.object({
   response: z.unknown(),
 });
 
+export const mediaMetadataSchema = z.object({
+  altText: z.string().trim().max(300).optional().nullable(),
+  caption: z.string().trim().max(1000).optional().nullable(),
+});
+
+export const seedBatchPhotoMetadataSchema = mediaMetadataSchema.extend({
+  kind: z.enum(["SEED_BATCH_PACKET", "SEED_BATCH_REFERENCE"]),
+});
+
 export const speciesCreateSchema = z.object({
   commonName: z.string().trim().min(1).max(120),
   latinName: z.string().trim().min(1).max(160).optional().nullable(),

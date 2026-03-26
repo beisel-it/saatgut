@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   serializeApiToken,
+  serializeMediaAsset,
   serializePasskeyCredential,
   serializeSpecies,
   serializeVariety,
@@ -76,6 +77,26 @@ describe("guidance serializers", () => {
     expect(species.preferredLocation).toBe("Full sun with shelter from wind.");
     expect(variety.companionPlantingNotes).toBe("Avoid potatoes nearby.");
     expect(variety.species?.companionPlantingNotes).toBe("Works well with basil and tagetes.");
+  });
+});
+
+describe("serializeMediaAsset", () => {
+  it("emits same-origin content URLs for stored media", () => {
+    const asset = serializeMediaAsset({
+      id: "media_1",
+      kind: "SEED_BATCH_PACKET",
+      originalFilename: "packet.jpg",
+      mimeType: "image/jpeg",
+      byteSize: 1024,
+      altText: "Packet front",
+      caption: "Harvest 2025",
+      createdAt: new Date("2026-03-26T00:00:00.000Z"),
+      updatedAt: new Date("2026-03-26T00:00:00.000Z"),
+    });
+
+    expect(asset.contentUrl).toBe("/api/v1/media/media_1/content");
+    expect(asset.mimeType).toBe("image/jpeg");
+    expect(asset.byteSize).toBe(1024);
   });
 });
 

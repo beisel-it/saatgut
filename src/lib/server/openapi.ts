@@ -152,6 +152,18 @@ export function getOpenApiDocument() {
           responses: { "204": { description: "Deleted" } },
         },
       },
+      "/varieties/{varietyId}/image": {
+        post: {
+          summary: "Upload or replace the representative image for a variety",
+          parameters: [{ name: "varietyId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Uploaded" } },
+        },
+        delete: {
+          summary: "Delete the representative image for a variety",
+          parameters: [{ name: "varietyId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "204": { description: "Deleted" } },
+        },
+      },
       "/seed-batches": {
         get: { summary: "List seed batches", responses: { "200": { description: "Seed batch list" } } },
         post: { summary: "Create a seed batch", responses: { "201": { description: "Created" } } },
@@ -166,6 +178,35 @@ export function getOpenApiDocument() {
           summary: "Delete a seed batch when it has no quality or operational history",
           parameters: [{ name: "seedBatchId", in: "path", required: true, schema: { type: "string" } }],
           responses: { "204": { description: "Deleted" } },
+        },
+      },
+      "/seed-batches/{seedBatchId}/photos": {
+        get: {
+          summary: "List packet and reference photos attached to a seed batch",
+          parameters: [{ name: "seedBatchId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Photo list" } },
+        },
+        post: {
+          summary: "Upload a packet or reference photo for a seed batch",
+          parameters: [{ name: "seedBatchId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "201": { description: "Uploaded" } },
+        },
+      },
+      "/seed-batches/{seedBatchId}/photos/{photoId}": {
+        delete: {
+          summary: "Delete an attached packet or reference photo from a seed batch",
+          parameters: [
+            { name: "seedBatchId", in: "path", required: true, schema: { type: "string" } },
+            { name: "photoId", in: "path", required: true, schema: { type: "string" } },
+          ],
+          responses: { "204": { description: "Deleted" } },
+        },
+      },
+      "/media/{mediaId}/content": {
+        get: {
+          summary: "Serve stored image content for an authenticated workspace user",
+          parameters: [{ name: "mediaId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Binary content" } },
         },
       },
       "/profiles": {

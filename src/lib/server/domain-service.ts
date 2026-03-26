@@ -1,9 +1,10 @@
-import { MembershipRole, Prisma, PrismaClient, SeedBatchTransactionType } from "@prisma/client";
+import { MediaAssetKind, MembershipRole, Prisma, PrismaClient, SeedBatchTransactionType } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { ApiError } from "@/lib/server/api-error";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import type { AuthContext } from "@/lib/server/auth-context";
+import { deleteStoredMedia } from "@/lib/server/media-storage";
 import { buildSeedBatchWarnings, calculateGerminationRate } from "@/lib/server/seed-batch-quality";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
@@ -221,6 +222,11 @@ export async function listVarieties(auth: AuthContext) {
     include: {
       species: true,
       synonyms: true,
+      mediaAssets: {
+        where: {
+          kind: MediaAssetKind.VARIETY_REPRESENTATIVE,
+        },
+      },
       cultivationRule: true,
     },
     orderBy: { name: "asc" },
@@ -262,6 +268,11 @@ export async function searchVarieties(
     include: {
       species: true,
       synonyms: true,
+      mediaAssets: {
+        where: {
+          kind: MediaAssetKind.VARIETY_REPRESENTATIVE,
+        },
+      },
       cultivationRule: true,
     },
     orderBy: { name: "asc" },
@@ -309,6 +320,11 @@ export async function createVariety(
       include: {
         species: true,
         synonyms: true,
+        mediaAssets: {
+          where: {
+            kind: MediaAssetKind.VARIETY_REPRESENTATIVE,
+          },
+        },
         cultivationRule: true,
       },
     });
@@ -370,6 +386,11 @@ export async function updateVariety(
       include: {
         species: true,
         synonyms: true,
+        mediaAssets: {
+          where: {
+            kind: MediaAssetKind.VARIETY_REPRESENTATIVE,
+          },
+        },
         cultivationRule: true,
       },
     });
@@ -385,7 +406,15 @@ export async function updateVariety(
 export async function deleteVariety(auth: AuthContext, varietyId: string) {
   requireWriteAccess(auth);
 
-  return prisma.$transaction(async (tx) => {
+  const mediaAssets = await prisma.mediaAsset.findMany({
+    where: {
+      workspaceId: auth.workspaceId,
+      varietyId,
+    },
+    select: { storageKey: true },
+  });
+
+  await prisma.$transaction(async (tx) => {
     await assertVarietyInWorkspace(tx, auth.workspaceId, varietyId);
 
     const [seedBatchCount, plantingEventCount, journalEntryCount, reminderTaskCount] =
@@ -408,12 +437,22 @@ export async function deleteVariety(auth: AuthContext, varietyId: string) {
     await tx.variety.delete({ where: { id: varietyId } });
     await writeAuditLog(tx, auth, "variety.delete", "Variety", varietyId, {});
   });
+
+  await Promise.all(mediaAssets.map((asset) => deleteStoredMedia(asset.storageKey)));
 }
 
 export async function listSeedBatches(auth: AuthContext) {
   const seedBatches = await prisma.seedBatch.findMany({
     where: { workspaceId: auth.workspaceId },
     include: {
+      mediaAssets: {
+        where: {
+          kind: {
+            in: [MediaAssetKind.SEED_BATCH_PACKET, MediaAssetKind.SEED_BATCH_REFERENCE],
+          },
+        },
+        orderBy: [{ kind: "asc" }, { createdAt: "desc" }],
+      },
       germinationTests: {
         orderBy: { testedAt: "desc" },
       },
@@ -485,6 +524,14 @@ export async function createSeedBatch(
         notes: input.notes ?? null,
       },
       include: {
+        mediaAssets: {
+          where: {
+            kind: {
+              in: [MediaAssetKind.SEED_BATCH_PACKET, MediaAssetKind.SEED_BATCH_REFERENCE],
+            },
+          },
+          orderBy: [{ kind: "asc" }, { createdAt: "desc" }],
+        },
         germinationTests: true,
         stockTransactions: true,
       },
@@ -565,6 +612,14 @@ export async function updateSeedBatch(
         notes: input.notes,
       },
       include: {
+        mediaAssets: {
+          where: {
+            kind: {
+              in: [MediaAssetKind.SEED_BATCH_PACKET, MediaAssetKind.SEED_BATCH_REFERENCE],
+            },
+          },
+          orderBy: [{ kind: "asc" }, { createdAt: "desc" }],
+        },
         germinationTests: { orderBy: { testedAt: "desc" } },
         stockTransactions: { orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }] },
       },
@@ -593,7 +648,15 @@ export async function updateSeedBatch(
 export async function deleteSeedBatch(auth: AuthContext, seedBatchId: string) {
   requireWriteAccess(auth);
 
-  return prisma.$transaction(async (tx) => {
+  const mediaAssets = await prisma.mediaAsset.findMany({
+    where: {
+      workspaceId: auth.workspaceId,
+      seedBatchId,
+    },
+    select: { storageKey: true },
+  });
+
+  await prisma.$transaction(async (tx) => {
     await assertSeedBatchInWorkspace(tx, auth.workspaceId, seedBatchId);
 
     const [germinationTestCount, plantingEventCount, journalEntryCount, reminderTaskCount, stockTransactions] =
@@ -630,6 +693,8 @@ export async function deleteSeedBatch(auth: AuthContext, seedBatchId: string) {
     await tx.seedBatch.delete({ where: { id: seedBatchId } });
     await writeAuditLog(tx, auth, "seedBatch.delete", "SeedBatch", seedBatchId, {});
   });
+
+  await Promise.all(mediaAssets.map((asset) => deleteStoredMedia(asset.storageKey)));
 }
 
 export async function listGrowingProfiles(auth: AuthContext) {

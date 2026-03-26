@@ -277,12 +277,28 @@ export async function exportWorkspaceData(auth: AuthContext) {
     prisma.species.findMany({ where: { workspaceId: auth.workspaceId }, orderBy: { commonName: "asc" } }),
     prisma.variety.findMany({
       where: { workspaceId: auth.workspaceId },
-      include: { species: true, synonyms: true, cultivationRule: true },
+      include: {
+        species: true,
+        synonyms: true,
+        cultivationRule: true,
+        mediaAssets: {
+          where: { kind: "VARIETY_REPRESENTATIVE" },
+        },
+      },
       orderBy: { name: "asc" },
     }),
     prisma.seedBatch.findMany({
       where: { workspaceId: auth.workspaceId },
-      include: { germinationTests: true, stockTransactions: true },
+      include: {
+        germinationTests: true,
+        stockTransactions: true,
+        mediaAssets: {
+          where: {
+            kind: { in: ["SEED_BATCH_PACKET", "SEED_BATCH_REFERENCE"] },
+          },
+          orderBy: [{ kind: "asc" }, { createdAt: "desc" }],
+        },
+      },
       orderBy: [{ harvestYear: "desc" }, { createdAt: "desc" }],
     }),
     prisma.growingProfile.findMany({ where: { workspaceId: auth.workspaceId }, orderBy: { createdAt: "asc" } }),

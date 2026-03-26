@@ -55,6 +55,19 @@ export type PasskeyListResponse = {
   totalPasskeys: number;
 };
 
+export type MediaAsset = {
+  id: string;
+  kind: "VARIETY_REPRESENTATIVE" | "SEED_BATCH_PACKET" | "SEED_BATCH_REFERENCE";
+  originalFilename: string;
+  mimeType: string;
+  byteSize: number;
+  altText: string | null;
+  caption: string | null;
+  contentUrl: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Species = {
   id: string;
   workspaceId: string;
@@ -64,6 +77,7 @@ export type Species = {
   germinationNotes: string | null;
   preferredLocation: string | null;
   companionPlantingNotes: string | null;
+  representativeImage?: MediaAsset | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -132,6 +146,7 @@ export type SeedBatch = {
   storageMoistureLevel?: "DRY" | "MODERATE" | "HUMID" | null;
   storageContainer?: string | null;
   storageQualityCheckedAt?: string | null;
+  photos?: MediaAsset[];
   storageWarnings?: SeedBatchWarning[];
   germinationTests?: GerminationTest[];
   stockTransactions?: SeedBatchTransaction[];

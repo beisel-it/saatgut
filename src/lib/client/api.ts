@@ -7,6 +7,7 @@ import type {
   GrowingProfile,
   GerminationTest,
   JournalEntry,
+  MediaAsset,
   Membership,
   McpEndpointMetadata,
   PasskeyCredential,
@@ -52,6 +53,35 @@ async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      "Accept-Language": getRequestLocale(),
+      "X-Saatgut-Locale": getRequestLocale(),
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as ApiErrorPayload | null;
+
+    if (payload?.error) {
+      throw new ApiClientError(payload, response.status);
+    }
+
+    throw new Error(`Request failed with status ${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+
+async function requestForm<T>(input: RequestInfo, body: FormData, init?: Omit<RequestInit, "body">): Promise<T> {
+  const response = await fetch(input, {
+    ...init,
+    method: init?.method ?? "POST",
+    body,
+    headers: {
       "Accept-Language": getRequestLocale(),
       "X-Saatgut-Locale": getRequestLocale(),
       ...(init?.headers ?? {}),
@@ -154,6 +184,48 @@ export function completePasskeyEnrollment(input: { response: unknown }) {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function uploadVarietyRepresentativeImage(
+  varietyId: string,
+  input: { file: File; altText?: string | null; caption?: string | null },
+) {
+  const body = new FormData();
+  body.set("file", input.file);
+  if (input.altText !== undefined && input.altText !== null) body.set("altText", input.altText);
+  if (input.caption !== undefined && input.caption !== null) body.set("caption", input.caption);
+
+  return requestForm<{ image: MediaAsset }>(`/api/v1/varieties/${varietyId}/image`, body);
+}
+
+export function deleteVarietyRepresentativeImage(varietyId: string) {
+  return request<void>(`/api/v1/varieties/${varietyId}/image`, { method: "DELETE" });
+}
+
+export function listSeedBatchPhotos(seedBatchId: string) {
+  return request<{ items: MediaAsset[] }>(`/api/v1/seed-batches/${seedBatchId}/photos`, { method: "GET" });
+}
+
+export function uploadSeedBatchPhoto(
+  seedBatchId: string,
+  input: {
+    file: File;
+    kind: "SEED_BATCH_PACKET" | "SEED_BATCH_REFERENCE";
+    altText?: string | null;
+    caption?: string | null;
+  },
+) {
+  const body = new FormData();
+  body.set("file", input.file);
+  body.set("kind", input.kind);
+  if (input.altText !== undefined && input.altText !== null) body.set("altText", input.altText);
+  if (input.caption !== undefined && input.caption !== null) body.set("caption", input.caption);
+
+  return requestForm<{ photo: MediaAsset }>(`/api/v1/seed-batches/${seedBatchId}/photos`, body);
+}
+
+export function deleteSeedBatchPhoto(seedBatchId: string, photoId: string) {
+  return request<void>(`/api/v1/seed-batches/${seedBatchId}/photos/${photoId}`, { method: "DELETE" });
 }
 
 export function listPasskeys() {
