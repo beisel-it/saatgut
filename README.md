@@ -9,6 +9,10 @@
 
 Saatgut is a self-hosted seed-bank and cultivation journal web app for running a practical home-growing workflow: catalog varieties, track seed batches, define frost-date-based growing profiles, derive a 14-day calendar, record planting activity, and manage seed quality signals such as germination tests and stock corrections.
 
+## 📘 End-User Guide
+
+German-first end-user documentation with validated screenshots is available in [docs/benutzerhandbuch.md](docs/benutzerhandbuch.md).
+
 ## ✨ What Is Shipped
 
 The current implementation includes:
