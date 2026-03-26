@@ -323,6 +323,28 @@ export function createVariety(input: {
   });
 }
 
+export function listVarietyCompanions(varietyId: string) {
+  return getCollection<NonNullable<Variety["companionVarieties"]>[number]>(
+    `/api/v1/varieties/${varietyId}/companions`,
+  );
+}
+
+export function createVarietyCompanion(varietyId: string, companionVarietyId: string) {
+  return request<{ items: NonNullable<Variety["companionVarieties"]> }>(
+    `/api/v1/varieties/${varietyId}/companions`,
+    {
+      method: "POST",
+      body: JSON.stringify({ companionVarietyId }),
+    },
+  );
+}
+
+export function deleteVarietyCompanion(varietyId: string, companionVarietyId: string) {
+  return request<void>(`/api/v1/varieties/${varietyId}/companions/${companionVarietyId}`, {
+    method: "DELETE",
+  });
+}
+
 export function updateVariety(
   varietyId: string,
   input: {

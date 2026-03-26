@@ -9,10 +9,65 @@ import { buildSeedBatchWarnings, calculateGerminationRate } from "@/lib/server/s
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
+const representativeImageInclude = {
+  where: {
+    kind: MediaAssetKind.VARIETY_REPRESENTATIVE,
+  },
+} satisfies Prisma.MediaAssetFindManyArgs;
+
+const companionVarietyInclude = {
+  species: {
+    select: {
+      id: true,
+      commonName: true,
+      latinName: true,
+      category: true,
+    },
+  },
+  mediaAssets: representativeImageInclude,
+} satisfies Prisma.VarietyInclude;
+
+const varietyInclude = {
+  species: true,
+  synonyms: true,
+  mediaAssets: representativeImageInclude,
+  cultivationRule: true,
+  companionLinksAsPrimary: {
+    include: {
+      secondaryVariety: {
+        include: companionVarietyInclude,
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  },
+  companionLinksAsSecondary: {
+    include: {
+      primaryVariety: {
+        include: companionVarietyInclude,
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  },
+} satisfies Prisma.VarietyInclude;
+
 function requireWriteAccess(auth: AuthContext) {
   if (auth.membershipRole === MembershipRole.VIEWER) {
     throw new ApiError(403, "WRITE_ACCESS_DENIED", "This workspace membership is read-only.");
   }
+}
+
+function canonicalizeVarietyCompanionPair(varietyId: string, companionVarietyId: string) {
+  if (varietyId === companionVarietyId) {
+    throw new ApiError(
+      422,
+      "INVALID_COMPANION_LINK",
+      "A variety cannot be linked as its own companion.",
+    );
+  }
+
+  return varietyId < companionVarietyId
+    ? { primaryVarietyId: varietyId, secondaryVarietyId: companionVarietyId }
+    : { primaryVarietyId: companionVarietyId, secondaryVarietyId: varietyId };
 }
 
 async function assertSpeciesInWorkspace(db: DbClient, workspaceId: string, speciesId: string) {
@@ -219,16 +274,7 @@ export async function deleteSpecies(auth: AuthContext, speciesId: string) {
 export async function listVarieties(auth: AuthContext) {
   return prisma.variety.findMany({
     where: { workspaceId: auth.workspaceId },
-    include: {
-      species: true,
-      synonyms: true,
-      mediaAssets: {
-        where: {
-          kind: MediaAssetKind.VARIETY_REPRESENTATIVE,
-        },
-      },
-      cultivationRule: true,
-    },
+    include: varietyInclude,
     orderBy: { name: "asc" },
   });
 }
@@ -239,10 +285,37 @@ export async function searchVarieties(
     q?: string;
     speciesId?: string;
     category?: Prisma.SpeciesWhereInput["category"];
+    companionVarietyId?: string;
     heirloom?: boolean;
     tag?: string;
   },
 ) {
+  const filtersAnd: Prisma.VarietyWhereInput[] = [];
+
+  if (filters.q) {
+    filtersAnd.push({
+      OR: [
+        { name: { contains: filters.q, mode: "insensitive" } },
+        { description: { contains: filters.q, mode: "insensitive" } },
+        { germinationNotes: { contains: filters.q, mode: "insensitive" } },
+        { preferredLocation: { contains: filters.q, mode: "insensitive" } },
+        { companionPlantingNotes: { contains: filters.q, mode: "insensitive" } },
+        { notes: { contains: filters.q, mode: "insensitive" } },
+        { species: { commonName: { contains: filters.q, mode: "insensitive" } } },
+        { synonyms: { some: { name: { contains: filters.q, mode: "insensitive" } } } },
+      ],
+    });
+  }
+
+  if (filters.companionVarietyId) {
+    filtersAnd.push({
+      OR: [
+        { companionLinksAsPrimary: { some: { secondaryVarietyId: filters.companionVarietyId } } },
+        { companionLinksAsSecondary: { some: { primaryVarietyId: filters.companionVarietyId } } },
+      ],
+    });
+  }
+
   return prisma.variety.findMany({
     where: {
       workspaceId: auth.workspaceId,
@@ -252,29 +325,9 @@ export async function searchVarieties(
       species: {
         category: filters.category,
       },
-      OR: filters.q
-        ? [
-            { name: { contains: filters.q, mode: "insensitive" } },
-            { description: { contains: filters.q, mode: "insensitive" } },
-            { germinationNotes: { contains: filters.q, mode: "insensitive" } },
-            { preferredLocation: { contains: filters.q, mode: "insensitive" } },
-            { companionPlantingNotes: { contains: filters.q, mode: "insensitive" } },
-            { notes: { contains: filters.q, mode: "insensitive" } },
-            { species: { commonName: { contains: filters.q, mode: "insensitive" } } },
-            { synonyms: { some: { name: { contains: filters.q, mode: "insensitive" } } } },
-          ]
-        : undefined,
+      AND: filtersAnd.length ? filtersAnd : undefined,
     },
-    include: {
-      species: true,
-      synonyms: true,
-      mediaAssets: {
-        where: {
-          kind: MediaAssetKind.VARIETY_REPRESENTATIVE,
-        },
-      },
-      cultivationRule: true,
-    },
+    include: varietyInclude,
     orderBy: { name: "asc" },
   });
 }
@@ -317,16 +370,7 @@ export async function createVariety(
             }
           : undefined,
       },
-      include: {
-        species: true,
-        synonyms: true,
-        mediaAssets: {
-          where: {
-            kind: MediaAssetKind.VARIETY_REPRESENTATIVE,
-          },
-        },
-        cultivationRule: true,
-      },
+      include: varietyInclude,
     });
 
     await writeAuditLog(tx, auth, "variety.create", "Variety", variety.id, {
@@ -383,16 +427,7 @@ export async function updateVariety(
                 create: input.synonyms.map((synonym) => ({ name: synonym })),
               },
       },
-      include: {
-        species: true,
-        synonyms: true,
-        mediaAssets: {
-          where: {
-            kind: MediaAssetKind.VARIETY_REPRESENTATIVE,
-          },
-        },
-        cultivationRule: true,
-      },
+      include: varietyInclude,
     });
 
     await writeAuditLog(tx, auth, "variety.update", "Variety", variety.id, {
@@ -439,6 +474,109 @@ export async function deleteVariety(auth: AuthContext, varietyId: string) {
   });
 
   await Promise.all(mediaAssets.map((asset) => deleteStoredMedia(asset.storageKey)));
+}
+
+export async function listVarietyCompanions(auth: AuthContext, varietyId: string) {
+  const variety = await prisma.variety.findFirst({
+    where: {
+      id: varietyId,
+      workspaceId: auth.workspaceId,
+    },
+    include: varietyInclude,
+  });
+
+  if (!variety) {
+    throw new ApiError(404, "VARIETY_NOT_FOUND", "Variety was not found in this workspace.");
+  }
+
+  return variety;
+}
+
+export async function createVarietyCompanion(
+  auth: AuthContext,
+  varietyId: string,
+  companionVarietyId: string,
+) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    await assertVarietyInWorkspace(tx, auth.workspaceId, varietyId);
+    await assertVarietyInWorkspace(tx, auth.workspaceId, companionVarietyId);
+
+    const pair = canonicalizeVarietyCompanionPair(varietyId, companionVarietyId);
+    const existingLink = await tx.varietyCompanion.findFirst({
+      where: {
+        workspaceId: auth.workspaceId,
+        primaryVarietyId: pair.primaryVarietyId,
+        secondaryVarietyId: pair.secondaryVarietyId,
+      },
+    });
+
+    if (existingLink) {
+      throw new ApiError(
+        409,
+        "COMPANION_LINK_EXISTS",
+        "These varieties are already linked as companions.",
+      );
+    }
+
+    const link = await tx.varietyCompanion.create({
+      data: {
+        workspaceId: auth.workspaceId,
+        primaryVarietyId: pair.primaryVarietyId,
+        secondaryVarietyId: pair.secondaryVarietyId,
+      },
+    });
+
+    await writeAuditLog(tx, auth, "variety.companion.create", "VarietyCompanion", link.id, {
+      varietyId,
+      companionVarietyId,
+    });
+
+    return tx.variety.findUniqueOrThrow({
+      where: { id: varietyId },
+      include: varietyInclude,
+    });
+  });
+}
+
+export async function deleteVarietyCompanion(
+  auth: AuthContext,
+  varietyId: string,
+  companionVarietyId: string,
+) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    await assertVarietyInWorkspace(tx, auth.workspaceId, varietyId);
+    await assertVarietyInWorkspace(tx, auth.workspaceId, companionVarietyId);
+
+    const pair = canonicalizeVarietyCompanionPair(varietyId, companionVarietyId);
+    const link = await tx.varietyCompanion.findFirst({
+      where: {
+        workspaceId: auth.workspaceId,
+        primaryVarietyId: pair.primaryVarietyId,
+        secondaryVarietyId: pair.secondaryVarietyId,
+      },
+    });
+
+    if (!link) {
+      throw new ApiError(
+        404,
+        "COMPANION_LINK_NOT_FOUND",
+        "These varieties are not linked as companions.",
+      );
+    }
+
+    await tx.varietyCompanion.delete({
+      where: { id: link.id },
+    });
+
+    await writeAuditLog(tx, auth, "variety.companion.delete", "VarietyCompanion", link.id, {
+      varietyId,
+      companionVarietyId,
+    });
+  });
 }
 
 export async function listSeedBatches(auth: AuthContext) {

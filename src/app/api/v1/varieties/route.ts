@@ -15,6 +15,7 @@ export async function GET(request: Request) {
       q: url.searchParams.get("q") ?? undefined,
       category: url.searchParams.get("category") ?? undefined,
       speciesId: url.searchParams.get("speciesId") ?? undefined,
+      companionVarietyId: url.searchParams.get("companionVarietyId") ?? undefined,
       heirloom: url.searchParams.get("heirloom") ?? undefined,
       tag: url.searchParams.get("tag") ?? undefined,
     });

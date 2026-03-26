@@ -259,6 +259,7 @@ export async function exportWorkspaceData(auth: AuthContext) {
     memberships,
     species,
     varieties,
+    varietyCompanions,
     seedBatches,
     profiles,
     rules,
@@ -286,6 +287,10 @@ export async function exportWorkspaceData(auth: AuthContext) {
         },
       },
       orderBy: { name: "asc" },
+    }),
+    prisma.varietyCompanion.findMany({
+      where: { workspaceId: auth.workspaceId },
+      orderBy: [{ primaryVarietyId: "asc" }, { secondaryVarietyId: "asc" }],
     }),
     prisma.seedBatch.findMany({
       where: { workspaceId: auth.workspaceId },
@@ -331,6 +336,7 @@ export async function exportWorkspaceData(auth: AuthContext) {
       users: memberships.length,
       species: species.length,
       varieties: varieties.length,
+      varietyCompanions: varietyCompanions.length,
       seedBatches: seedBatches.length,
       profiles: profiles.length,
       rules: rules.length,
@@ -361,6 +367,11 @@ export async function exportWorkspaceData(auth: AuthContext) {
     })),
     species: species.map(serializeSpecies),
     varieties: varieties.map(serializeVariety),
+    varietyCompanions: varietyCompanions.map((link) => ({
+      ...link,
+      createdAt: link.createdAt.toISOString(),
+      updatedAt: link.updatedAt.toISOString(),
+    })),
     seedBatches: seedBatches.map(serializeSeedBatch),
     growingProfiles: profiles.map(serializeGrowingProfile),
     cultivationRules: rules.map(serializeCultivationRule),

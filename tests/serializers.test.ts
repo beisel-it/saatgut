@@ -71,12 +71,51 @@ describe("guidance serializers", () => {
         preferredLocation: "Full sun with shelter from wind.",
         companionPlantingNotes: "Works well with basil and tagetes.",
       },
+      companionLinksAsPrimary: [
+        {
+          primaryVarietyId: "variety_1",
+          secondaryVariety: {
+            id: "variety_2",
+            name: "Genovese",
+            speciesId: "species_2",
+            heirloom: false,
+            tags: ["herb"],
+            species: {
+              id: "species_2",
+              commonName: "Basilikum",
+              latinName: "Ocimum basilicum",
+              category: "HERB",
+            },
+            mediaAssets: [],
+          },
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: new Date("2026-03-27T12:00:00.000Z"),
+        },
+      ],
     });
 
     expect(species.germinationNotes).toBe("24C and evenly moist compost.");
     expect(species.preferredLocation).toBe("Full sun with shelter from wind.");
     expect(variety.companionPlantingNotes).toBe("Avoid potatoes nearby.");
     expect(variety.species?.companionPlantingNotes).toBe("Works well with basil and tagetes.");
+    expect(variety.companionVarieties).toEqual([
+      {
+        id: "variety_2",
+        name: "Genovese",
+        speciesId: "species_2",
+        heirloom: false,
+        tags: ["herb"],
+        representativeImage: null,
+        species: {
+          id: "species_2",
+          commonName: "Basilikum",
+          latinName: "Ocimum basilicum",
+          category: "HERB",
+        },
+        linkedAt: "2026-03-27T00:00:00.000Z",
+        updatedAt: "2026-03-27T12:00:00.000Z",
+      },
+    ]);
   });
 });
 

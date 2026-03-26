@@ -152,6 +152,28 @@ export function getOpenApiDocument() {
           responses: { "204": { description: "Deleted" } },
         },
       },
+      "/varieties/{varietyId}/companions": {
+        get: {
+          summary: "List structured companion varieties linked to a variety",
+          parameters: [{ name: "varietyId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Companion list" } },
+        },
+        post: {
+          summary: "Create a structured companion link between two varieties in the same workspace",
+          parameters: [{ name: "varietyId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "201": { description: "Link created" }, "409": { description: "Already linked" } },
+        },
+      },
+      "/varieties/{varietyId}/companions/{companionVarietyId}": {
+        delete: {
+          summary: "Remove a structured companion link between two varieties",
+          parameters: [
+            { name: "varietyId", in: "path", required: true, schema: { type: "string" } },
+            { name: "companionVarietyId", in: "path", required: true, schema: { type: "string" } },
+          ],
+          responses: { "204": { description: "Deleted" }, "404": { description: "Link not found" } },
+        },
+      },
       "/varieties/{varietyId}/image": {
         post: {
           summary: "Upload or replace the representative image for a variety",

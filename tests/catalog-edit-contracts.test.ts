@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   seedBatchUpdateSchema,
   speciesUpdateSchema,
+  varietyCompanionCreateSchema,
   varietyUpdateSchema,
 } from "@/lib/server/schemas";
 import { getOpenApiDocument } from "@/lib/server/openapi";
@@ -41,6 +42,16 @@ describe("catalog edit schemas", () => {
       }),
     ).toThrow();
   });
+
+  it("accepts structured companion link creation input", () => {
+    expect(
+      varietyCompanionCreateSchema.parse({
+        companionVarietyId: "ckprofile12345678901234567",
+      }),
+    ).toEqual({
+      companionVarietyId: "ckprofile12345678901234567",
+    });
+  });
 });
 
 describe("catalog edit OpenAPI paths", () => {
@@ -49,6 +60,8 @@ describe("catalog edit OpenAPI paths", () => {
 
     expect(document.paths["/species/{speciesId}"]).toBeDefined();
     expect(document.paths["/varieties/{varietyId}"]).toBeDefined();
+    expect(document.paths["/varieties/{varietyId}/companions"]).toBeDefined();
+    expect(document.paths["/varieties/{varietyId}/companions/{companionVarietyId}"]).toBeDefined();
     expect(document.paths["/seed-batches/{seedBatchId}"]).toBeDefined();
   });
 });

@@ -100,6 +100,23 @@ export type CultivationRule = {
   updatedAt: string;
 };
 
+export type VarietyCompanion = {
+  id: string;
+  name: string;
+  speciesId: string;
+  heirloom: boolean;
+  tags: string[];
+  representativeImage: MediaAsset | null;
+  species?: {
+    id: string;
+    commonName: string;
+    latinName: string | null;
+    category: Species["category"];
+  };
+  linkedAt: string;
+  updatedAt: string;
+};
+
 export type Variety = {
   id: string;
   workspaceId: string;
@@ -111,9 +128,11 @@ export type Variety = {
   germinationNotes: string | null;
   preferredLocation: string | null;
   companionPlantingNotes: string | null;
+  representativeImage?: MediaAsset | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  companionVarieties?: VarietyCompanion[];
   species?: {
     id: string;
     commonName: string;

@@ -154,6 +154,64 @@ export function serializeVariety(variety: {
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
+  companionLinksAsPrimary?: Array<{
+    primaryVarietyId: string;
+    secondaryVariety: {
+      id: string;
+      name: string;
+      speciesId: string;
+      heirloom: boolean;
+      tags: string[];
+      mediaAssets?: Array<{
+        id: string;
+        kind: MediaAssetKind;
+        originalFilename: string;
+        mimeType: string;
+        byteSize: number;
+        altText: string | null;
+        caption: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }>;
+      species?: {
+        id: string;
+        commonName: string;
+        latinName: string | null;
+        category: SpeciesCategory;
+      };
+    };
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  companionLinksAsSecondary?: Array<{
+    secondaryVarietyId: string;
+    primaryVariety: {
+      id: string;
+      name: string;
+      speciesId: string;
+      heirloom: boolean;
+      tags: string[];
+      mediaAssets?: Array<{
+        id: string;
+        kind: MediaAssetKind;
+        originalFilename: string;
+        mimeType: string;
+        byteSize: number;
+        altText: string | null;
+        caption: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }>;
+      species?: {
+        id: string;
+        commonName: string;
+        latinName: string | null;
+        category: SpeciesCategory;
+      };
+    };
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
   species?: {
     id: string;
     commonName: string;
@@ -191,26 +249,96 @@ export function serializeVariety(variety: {
     updatedAt: Date;
   } | null;
 }) {
+  const {
+    mediaAssets,
+    synonyms,
+    cultivationRule,
+    companionLinksAsPrimary,
+    companionLinksAsSecondary,
+    ...varietyRecord
+  } = variety;
+
+  const representativeImage = mediaAssets?.find(
+    (asset) => asset.kind === "VARIETY_REPRESENTATIVE",
+  );
+  const companionVarieties = [
+    ...(companionLinksAsPrimary ?? []).map((link) =>
+      serializeVarietyCompanionVariety(link.secondaryVariety, link.createdAt, link.updatedAt),
+    ),
+    ...(companionLinksAsSecondary ?? []).map((link) =>
+      serializeVarietyCompanionVariety(link.primaryVariety, link.createdAt, link.updatedAt),
+    ),
+  ].sort((left, right) => left.name.localeCompare(right.name));
+
+  return {
+    ...varietyRecord,
+    createdAt: varietyRecord.createdAt.toISOString(),
+    updatedAt: varietyRecord.updatedAt.toISOString(),
+    companionVarieties,
+    representativeImage: representativeImage ? serializeMediaAsset(representativeImage) : null,
+    synonyms: synonyms?.map((synonym) => ({
+      ...synonym,
+      createdAt: synonym.createdAt.toISOString(),
+    })),
+    cultivationRule: cultivationRule
+      ? {
+          ...cultivationRule,
+          createdAt: cultivationRule.createdAt.toISOString(),
+          updatedAt: cultivationRule.updatedAt.toISOString(),
+        }
+      : null,
+  };
+}
+
+function serializeVarietyCompanionVariety(
+  variety: {
+    id: string;
+    name: string;
+    speciesId: string;
+    heirloom: boolean;
+    tags: string[];
+    mediaAssets?: Array<{
+      id: string;
+      kind: MediaAssetKind;
+      originalFilename: string;
+      mimeType: string;
+      byteSize: number;
+      altText: string | null;
+      caption: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
+    species?: {
+      id: string;
+      commonName: string;
+      latinName: string | null;
+      category: SpeciesCategory;
+    };
+  },
+  linkedAt: Date,
+  updatedAt: Date,
+) {
   const representativeImage = variety.mediaAssets?.find(
     (asset) => asset.kind === "VARIETY_REPRESENTATIVE",
   );
 
   return {
-    ...variety,
-    createdAt: variety.createdAt.toISOString(),
-    updatedAt: variety.updatedAt.toISOString(),
+    id: variety.id,
+    name: variety.name,
+    speciesId: variety.speciesId,
+    heirloom: variety.heirloom,
+    tags: variety.tags,
     representativeImage: representativeImage ? serializeMediaAsset(representativeImage) : null,
-    synonyms: variety.synonyms?.map((synonym) => ({
-      ...synonym,
-      createdAt: synonym.createdAt.toISOString(),
-    })),
-    cultivationRule: variety.cultivationRule
+    species: variety.species
       ? {
-          ...variety.cultivationRule,
-          createdAt: variety.cultivationRule.createdAt.toISOString(),
-          updatedAt: variety.cultivationRule.updatedAt.toISOString(),
+          id: variety.species.id,
+          commonName: variety.species.commonName,
+          latinName: variety.species.latinName,
+          category: variety.species.category,
         }
-      : null,
+      : undefined,
+    linkedAt: linkedAt.toISOString(),
+    updatedAt: updatedAt.toISOString(),
   };
 }
 

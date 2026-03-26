@@ -147,6 +147,7 @@ model Workspace {
   invites         UserInvite[]
   auditLogs       AuditLog[]
   mediaAssets     MediaAsset[]
+  varietyCompanions VarietyCompanion[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 }
@@ -200,10 +201,28 @@ model Variety {
   journalEntries        PlantingJournalEntry[]
   reminderTasks         ReminderTask[]
   mediaAssets           MediaAsset[]
+  companionLinksAsPrimary VarietyCompanion[] @relation("VarietyCompanionPrimary")
+  companionLinksAsSecondary VarietyCompanion[] @relation("VarietyCompanionSecondary")
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
   @@index([workspaceId, name])
+}
+
+model VarietyCompanion {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  primaryVarietyId   String
+  secondaryVarietyId String
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  primaryVariety     Variety   @relation("VarietyCompanionPrimary", fields: [primaryVarietyId], references: [id], onDelete: Cascade)
+  secondaryVariety   Variety   @relation("VarietyCompanionSecondary", fields: [secondaryVarietyId], references: [id], onDelete: Cascade)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([workspaceId, primaryVarietyId, secondaryVarietyId])
+  @@index([workspaceId, primaryVarietyId])
+  @@index([workspaceId, secondaryVarietyId])
 }
 
 model VarietySynonym {

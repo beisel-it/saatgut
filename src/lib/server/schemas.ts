@@ -76,6 +76,10 @@ export const varietyUpdateSchema = varietyCreateSchema
     message: "At least one variety field must be provided.",
   });
 
+export const varietyCompanionCreateSchema = z.object({
+  companionVarietyId: z.string().cuid(),
+});
+
 export const seedBatchCreateSchema = z.object({
   varietyId: z.string().cuid(),
   source: z.string().trim().max(160).optional().nullable(),
@@ -192,6 +196,7 @@ export const catalogQuerySchema = z.object({
   q: z.string().trim().min(1).optional(),
   category: z.nativeEnum(SpeciesCategory).optional(),
   speciesId: z.string().cuid().optional(),
+  companionVarietyId: z.string().cuid().optional(),
   heirloom: z
     .enum(["true", "false"])
     .transform((value) => value === "true")
