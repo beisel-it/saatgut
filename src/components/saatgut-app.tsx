@@ -2234,8 +2234,8 @@ export function SaatgutApp() {
                   titleClassName="max-w-[26ch]"
                 />
               </section>
-              <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-              <Panel title={t.profiles.title} subtitle={t.profiles.subtitle}>
+              <div className="space-y-4">
+              <Panel title={t.profiles.title} subtitle={t.profiles.subtitle} className="max-w-5xl">
                 <DataForm state={profileState} onSubmit={submitProfile} submitLabel={t.profiles.saveProfile}>
                   <Field label={t.forms.profileName} name="name" fieldErrors={profileState.fieldErrors} optionalLabel={t.common.optional}>
                     <input
@@ -2290,7 +2290,7 @@ export function SaatgutApp() {
                 </DataForm>
               </Panel>
 
-              <div className="space-y-4">
+              <div className="grid gap-4 2xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
                 <Panel title={t.profiles.helperTitle} subtitle={t.profiles.helperSubtitle}>
                   <div className="grid gap-3 md:grid-cols-2">
                     {phenologyStageIds.map((stageId) => (
@@ -2403,8 +2403,8 @@ export function SaatgutApp() {
                   titleClassName="max-w-[22ch]"
                 />
               </section>
-              <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-              <Panel title={t.rules.title} subtitle={t.rules.subtitle}>
+              <div className="space-y-4">
+              <Panel title={t.rules.title} subtitle={t.rules.subtitle} className="max-w-5xl">
                 <DataForm state={ruleState} onSubmit={submitRule} submitLabel={t.rules.saveRule}>
                   <Field label={t.forms.variety} name="varietyId" fieldErrors={ruleState.fieldErrors} optionalLabel={t.common.optional}>
                     <select
@@ -2465,8 +2465,8 @@ export function SaatgutApp() {
                   titleClassName="max-w-[22ch]"
                 />
               </section>
-              <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-              <Panel title={t.plantings.title} subtitle={t.plantings.subtitle}>
+              <div className="space-y-4">
+              <Panel title={t.plantings.title} subtitle={t.plantings.subtitle} className="max-w-5xl">
                 <DataForm state={plantingState} onSubmit={submitPlanting} submitLabel={t.plantings.savePlanting}>
                   <Field label={t.forms.variety} name="varietyId" fieldErrors={plantingState.fieldErrors} optionalLabel={t.common.optional}>
                     <select
@@ -3356,14 +3356,16 @@ function CatalogVarietyCard({
 function Panel({
   title,
   subtitle,
+  className,
   children,
 }: {
   title: string;
   subtitle: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
+    <section className={classNames("rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6", className)}>
       <div className="mb-5">
         <h2 className="max-w-[20ch] text-xl font-semibold tracking-tight text-balance md:text-2xl">{title}</h2>
         <p className="mt-2 max-w-[40rem] text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{subtitle}</p>
