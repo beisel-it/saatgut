@@ -1,10 +1,44 @@
 {
   "name": "saatgut",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Saatgut seed-bank MVP workspace.",
-  "scripts": {},
-  "keywords": [],
-  "author": "",
-  "license": "UNLICENSED"
+  "scripts": {
+    "setup": "npm run db:generate",
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0",
+    "start:container": "sh -c 'npm run db:deploy && npm run start'",
+    "lint": "eslint src tests next.config.ts vitest.config.ts eslint.config.mjs --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.2",
+    "next": "15.5.14",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "zod": "^3.24.3"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@playwright/test": "^1.58.2",
+    "@tailwindcss/postcss": "^4.1.13",
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "eslint": "^9.31.0",
+    "eslint-config-next": "15.5.14",
+    "prisma": "6.19.2",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
 }

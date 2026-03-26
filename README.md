@@ -2,37 +2,55 @@
 
 Saatgut is a self-hosted seed-bank and cultivation journal web app for managing varieties, seed batches, frost-date-based growing profiles, cultivation rules, and a practical 14-day calendar of upcoming garden work.
 
-## MVP Scope
+## Stack
 
-The current build target is the seed-bank MVP defined in `reference.md` and [docs/roadmap/mvp-technical-spec.md](/home/florian/.openclaw/workspace/saatgut/docs/roadmap/mvp-technical-spec.md):
-
-- authentication
-- species and varieties
-- seed batches
-- growing profiles
-- cultivation rules
-- 14-day calendar view
-- planting events with stock deduction
-
-## Technical Direction
-
-The agreed runtime direction is:
-
-- Next.js 15
+- Next.js 15 with App Router
 - TypeScript
 - Prisma
-- PostgreSQL
-- Vitest and Playwright
-- Docker Compose for local and Portainer-friendly deployment
+- PostgreSQL 16
+- Tailwind CSS v4
+- Vitest
+- Docker Compose
 
-## Current Status
+## Quick Start
 
-The previous waitlist prototype is obsolete and should not be extended or merged back into the product. Current implementation work should follow only the seed-bank roadmap and task graph.
+1. Copy `.env.example` to `.env.local` for local app development or `.env` for Docker Compose.
+2. Install dependencies and generate Prisma client with `npm install && npm run setup`.
+3. Start PostgreSQL with `docker compose up db -d`.
+4. Apply migrations with `npm run db:deploy`.
+5. Start the web app with `npm run dev`.
 
-## Key Docs
+Open `http://localhost:3000`.
 
-- [docs/roadmap/project-context.md](/home/florian/.openclaw/workspace/saatgut/docs/roadmap/project-context.md)
-- [docs/roadmap/initial-backlog.md](/home/florian/.openclaw/workspace/saatgut/docs/roadmap/initial-backlog.md)
-- [docs/roadmap/mvp-technical-spec.md](/home/florian/.openclaw/workspace/saatgut/docs/roadmap/mvp-technical-spec.md)
-- [docs/roadmap/qa-baseline-first-slice.md](/home/florian/.openclaw/workspace/saatgut/docs/roadmap/qa-baseline-first-slice.md)
-- [reference.md](/home/florian/.openclaw/workspace/saatgut/reference.md)
+## Full Stack With Docker Compose
+
+Run the full stack with:
+
+```bash
+docker compose up --build
+```
+
+The web app will be available on `http://localhost:3000` and will run Prisma migrations on container startup.
+
+## Verification
+
+Use the baseline verification commands:
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
+
+## Current Scaffold Scope
+
+This baseline includes:
+
+- a Next.js 15 App Router shell
+- Prisma schema for the MVP seed-bank domain
+- PostgreSQL container orchestration
+- `/api/health` for runtime checks
+- GitHub Actions CI for install, Prisma generation, migration deploy, lint, test, and build
+
+Application feature work such as auth flows, CRUD screens, and calendar logic remains to be implemented on top of this scaffold.
