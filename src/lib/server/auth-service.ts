@@ -89,7 +89,7 @@ export async function loginUser(input: { email: string; password: string }) {
     },
   });
 
-  if (!user || !(await verifyPassword(input.password, user.passwordHash))) {
+  if (!user || !user.passwordHash || !(await verifyPassword(input.password, user.passwordHash))) {
     throw new ApiError(401, "INVALID_CREDENTIALS", "Email or password is incorrect.");
   }
 

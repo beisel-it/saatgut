@@ -23,6 +23,15 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+export const passkeySignupStartSchema = z.object({
+  email: z.string().email(),
+  workspaceName: z.string().trim().min(1).max(120).optional(),
+});
+
+export const passkeyResponseSchema = z.object({
+  response: z.unknown(),
+});
+
 export const speciesCreateSchema = z.object({
   commonName: z.string().trim().min(1).max(120),
   latinName: z.string().trim().min(1).max(160).optional().nullable(),

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { createInviteToken, hashInviteToken } from "@/lib/auth/invite";
+import {
+  createPasskeyAuthenticationCeremonyToken,
+  createPasskeyRegistrationCeremonyToken,
+  verifyPasskeyAuthenticationCeremonyToken,
+  verifyPasskeyRegistrationCeremonyToken,
+} from "@/lib/auth/passkey-ceremony";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSessionToken, verifySessionToken } from "@/lib/auth/session";
 
@@ -55,5 +61,37 @@ describe("invite token helpers", () => {
 
     expect(token.length).toBeGreaterThan(20);
     expect(hashInviteToken(token)).toBe(hashInviteToken(token));
+  });
+});
+
+describe("passkey ceremony helpers", () => {
+  it("round-trips a passkey registration ceremony token", () => {
+    const token = createPasskeyRegistrationCeremonyToken({
+      mode: "signup",
+      challenge: "challenge_123",
+      email: "grower@example.com",
+      workspaceName: "Saatgut",
+      webauthnUserId: "webauthn_123",
+    });
+
+    expect(verifyPasskeyRegistrationCeremonyToken(token)).toMatchObject({
+      mode: "signup",
+      challenge: "challenge_123",
+      email: "grower@example.com",
+      workspaceName: "Saatgut",
+      webauthnUserId: "webauthn_123",
+    });
+  });
+
+  it("round-trips a passkey authentication ceremony token", () => {
+    const token = createPasskeyAuthenticationCeremonyToken({
+      mode: "authenticate",
+      challenge: "challenge_456",
+    });
+
+    expect(verifyPasskeyAuthenticationCeremonyToken(token)).toMatchObject({
+      mode: "authenticate",
+      challenge: "challenge_456",
+    });
   });
 });

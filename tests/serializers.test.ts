@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   serializeApiToken,
+  serializePasskeyCredential,
   serializeSeedBatch,
   serializeUser,
   serializeWorkspaceMember,
@@ -79,5 +80,23 @@ describe("serializeWorkspaceMember", () => {
 
     expect(member.createdAt).toBe("2026-03-26T00:00:00.000Z");
     expect(member.user).not.toHaveProperty("passwordHash");
+  });
+});
+
+describe("serializePasskeyCredential", () => {
+  it("serializes passkey metadata without exposing public keys", () => {
+    const passkey = serializePasskeyCredential({
+      id: "passkey_1",
+      deviceType: "MULTI_DEVICE",
+      backedUp: true,
+      transports: ["internal"],
+      lastUsedAt: new Date("2026-03-26T12:00:00.000Z"),
+      createdAt: new Date("2026-03-26T00:00:00.000Z"),
+      updatedAt: new Date("2026-03-26T00:00:00.000Z"),
+      publicKey: Buffer.from("secret"),
+    } as never);
+
+    expect(passkey.lastUsedAt).toBe("2026-03-26T12:00:00.000Z");
+    expect(passkey).not.toHaveProperty("publicKey");
   });
 });

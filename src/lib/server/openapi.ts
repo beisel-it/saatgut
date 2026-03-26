@@ -88,6 +88,24 @@ export function getOpenApiDocument() {
           responses: { "200": { description: "Logged in" }, "401": { description: "Invalid credentials" } },
         },
       },
+      "/auth/passkeys/register/options": {
+        post: { summary: "Begin passkey-first signup", security: [], responses: { "200": { description: "Registration options" } } },
+      },
+      "/auth/passkeys/register/verify": {
+        post: { summary: "Verify passkey signup and create the initial workspace", security: [], responses: { "201": { description: "Registered" } } },
+      },
+      "/auth/passkeys/login/options": {
+        post: { summary: "Begin passkey authentication", security: [], responses: { "200": { description: "Authentication options" } } },
+      },
+      "/auth/passkeys/login/verify": {
+        post: { summary: "Verify passkey authentication and create a session", security: [], responses: { "200": { description: "Logged in" } } },
+      },
+      "/auth/passkeys/enroll/options": {
+        post: { summary: "Begin passkey enrollment for an authenticated user", responses: { "200": { description: "Registration options" } } },
+      },
+      "/auth/passkeys/enroll/verify": {
+        post: { summary: "Verify passkey enrollment for an authenticated user", responses: { "200": { description: "Passkey enrolled" } } },
+      },
       "/auth/session": {
         get: { summary: "Fetch the authenticated session snapshot", responses: { "200": { description: "Session" } } },
         delete: { summary: "Clear the current session cookie", responses: { "200": { description: "Logged out" } } },

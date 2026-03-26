@@ -21,6 +21,18 @@ export function handleApiError(error: unknown): NextResponse {
     );
   }
 
+  if (error instanceof Error && error.message === "PASSKEY_CEREMONY_MISSING") {
+    return NextResponse.json(
+      {
+        error: {
+          code: "PASSKEY_CEREMONY_MISSING",
+          message: "The passkey ceremony state is missing or expired.",
+        },
+      },
+      { status: 400 },
+    );
+  }
+
   if (error instanceof ZodError) {
     return NextResponse.json(
       {

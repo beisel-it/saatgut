@@ -78,7 +78,7 @@ export async function changePassword(
     where: { id: auth.userId },
   });
 
-  if (!user || !(await verifyPassword(input.currentPassword, user.passwordHash))) {
+  if (!user?.passwordHash || !(await verifyPassword(input.currentPassword, user.passwordHash))) {
     throw new ApiError(401, "INVALID_CREDENTIALS", "Current password is incorrect.");
   }
 

@@ -100,13 +100,20 @@ enum ApiTokenScope {
   ADMIN
 }
 
+enum PasskeyDeviceType {
+  SINGLE_DEVICE
+  MULTI_DEVICE
+}
+
 model User {
   id           String        @id @default(cuid())
   email        String        @unique
-  passwordHash String
+  passwordHash String?
+  webauthnUserId String?     @unique
   isActive     Boolean       @default(true)
   role         UserRole      @default(MEMBER)
   memberships  Membership[]
+  passkeys      PasskeyCredential[]
   auditLogs    AuditLog[]
   sentInvites  UserInvite[]  @relation("SentInvites")
   createdReminderTasks ReminderTask[] @relation("CreatedReminderTasks")
@@ -365,6 +372,23 @@ model UserInvite {
   updatedAt       DateTime       @updatedAt
 
   @@index([workspaceId, email, status])
+}
+
+model PasskeyCredential {
+  id           String            @id @default(cuid())
+  userId       String
+  credentialId String            @unique
+  publicKey    Bytes
+  counter      Int
+  transports   String[]          @default([])
+  deviceType   PasskeyDeviceType
+  backedUp     Boolean           @default(false)
+  lastUsedAt   DateTime?
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([userId, createdAt])
 }
 
 model ReminderTask {

@@ -143,7 +143,7 @@ export async function acceptWorkspaceInvite(
       });
 
       if (user) {
-        if (!input.password || !(await verifyPassword(input.password, user.passwordHash))) {
+        if (!user.passwordHash || !input.password || !(await verifyPassword(input.password, user.passwordHash))) {
           throw new ApiError(401, "INVALID_CREDENTIALS", "Email or password is incorrect.");
         }
       } else {

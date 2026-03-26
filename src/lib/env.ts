@@ -3,6 +3,9 @@ import { z } from "zod";
 const envSchema = z.object({
   APP_URL: z.string().url().default("http://localhost:3000"),
   AUTH_SECRET: z.string().min(16).default("replace-with-local-dev-secret"),
+  WEBAUTHN_RP_NAME: z.string().min(1).default("Saatgut"),
+  WEBAUTHN_RP_ID: z.string().min(1).optional(),
+  WEBAUTHN_ALLOWED_ORIGINS: z.string().default("http://localhost:3000"),
   DATABASE_URL: z
     .string()
     .min(1)
@@ -16,6 +19,9 @@ const envSchema = z.object({
 export const env = envSchema.parse({
   APP_URL: process.env.APP_URL,
   AUTH_SECRET: process.env.AUTH_SECRET,
+  WEBAUTHN_RP_NAME: process.env.WEBAUTHN_RP_NAME,
+  WEBAUTHN_RP_ID: process.env.WEBAUTHN_RP_ID,
+  WEBAUTHN_ALLOWED_ORIGINS: process.env.WEBAUTHN_ALLOWED_ORIGINS,
   DATABASE_URL: process.env.DATABASE_URL,
   API_RATE_LIMIT_PER_MINUTE: process.env.API_RATE_LIMIT_PER_MINUTE,
   API_TOKEN_DEFAULT_RATE_LIMIT_PER_MINUTE: process.env.API_TOKEN_DEFAULT_RATE_LIMIT_PER_MINUTE,
