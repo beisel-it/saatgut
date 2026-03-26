@@ -942,7 +942,7 @@ export function SaatgutApp() {
     return (
       <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(127,155,71,0.18),transparent_30%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-6 py-10">
         <div className="mx-auto max-w-5xl rounded-xl border border-[var(--border)] bg-white/70 p-10 shadow-[var(--shadow)]">
-          <BrandLockup className="h-12 w-auto" priority />
+          <BrandLockup variant="transparent" className="h-12 w-auto" priority />
           <h1 className="mt-4 text-4xl font-semibold tracking-tight">{t.common.loadingWorkspace}</h1>
         </div>
       </main>
@@ -955,7 +955,7 @@ export function SaatgutApp() {
         <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-8 shadow-[var(--shadow)] md:p-10">
             <div className="space-y-6">
-              <BrandLockup className="h-14 w-auto md:h-16" priority />
+              <BrandLockup variant="transparent" className="h-14 w-auto md:h-16" priority />
               <ScreenHeader
                 eyebrow=""
                 title={t.auth.heroTitle}
@@ -1134,8 +1134,7 @@ export function SaatgutApp() {
       <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="print-hide hidden rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-5 text-white shadow-[var(--shadow)] lg:sticky lg:top-4 lg:block lg:self-start">
           <div className="flex items-center gap-3">
-            <BrandMark className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-white/92 p-1.5" />
-            <BrandLockup className="h-9 w-auto brightness-0 invert" />
+            <BrandLockup variant="inverted" className="h-11 w-auto" />
           </div>
           <h1 className="mt-4 max-w-full break-words text-2xl font-semibold tracking-tight md:text-3xl">{session.membership.workspace.name}</h1>
           <p className="mt-2 break-all text-sm text-white/70">
@@ -1182,9 +1181,11 @@ export function SaatgutApp() {
           <div className="print-hide rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-3 text-white shadow-[var(--shadow)] lg:hidden">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <BrandMark className="h-11 w-11 shrink-0 overflow-hidden rounded-md bg-white/92 p-1.5" />
+                <BrandIcon className="h-10 w-10 shrink-0 overflow-hidden rounded-md" />
                 <div className="min-w-0">
-                  <BrandLockup className="h-6 w-auto brightness-0 invert" />
+                  <p className="text-sm font-semibold uppercase tracking-[0.16em] text-white/78">
+                    Saatgut
+                  </p>
                   <h1 className="mt-1 truncate text-lg font-semibold tracking-tight">{session.membership.workspace.name}</h1>
                 </div>
               </div>
@@ -2667,29 +2668,44 @@ function ScreenHeader({
 function BrandLockup({
   className,
   priority = false,
+  variant = "transparent",
 }: {
   className?: string;
   priority?: boolean;
+  variant?: "transparent" | "inverted";
 }) {
+  const asset =
+    variant === "inverted"
+      ? {
+          src: "/brand/logo-inverted.png",
+          width: 688,
+          height: 320,
+        }
+      : {
+          src: "/brand/logo-transparent.png",
+          width: 850,
+          height: 242,
+        };
+
   return (
     <Image
-      src="/brand/logo-lockup.png"
+      src={asset.src}
       alt="Saatgut"
-      width={920}
-      height={450}
+      width={asset.width}
+      height={asset.height}
       priority={priority}
       className={className}
     />
   );
 }
 
-function BrandMark({ className }: { className?: string }) {
+function BrandIcon({ className }: { className?: string }) {
   return (
     <Image
-      src="/brand/logo-mark.png"
-      alt="Saatgut Mark"
-      width={420}
-      height={420}
+      src="/brand/logo-icon.png"
+      alt="Saatgut Icon"
+      width={229}
+      height={242}
       className={className}
     />
   );
