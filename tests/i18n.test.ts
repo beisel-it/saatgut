@@ -59,7 +59,7 @@ describe("i18n foundation", () => {
     expect(messages.de.nav.dashboard).toBe("Übersicht");
     expect(messages.de.nav.catalog).toBe("Katalog");
     expect(messages.de.dashboard.calendarTitle).toBe("14-Tage-Kalender");
-    expect(messages.de.catalog.seedBatchesTitle).toBe("Chargen");
-    expect(messages.de.plantings.title).toBe("Pflanzereignisse");
+    expect(messages.de.catalog.seedBatchesTitle).toBe("Chargen und Prüfungen");
+    expect(messages.de.plantings.title).toBe("Ereignis erfassen");
   });
 });
