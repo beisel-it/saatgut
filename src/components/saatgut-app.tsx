@@ -1128,10 +1128,11 @@ export function SaatgutApp() {
     ["plantings", t.nav.plantings],
     ["sheets", t.nav.sheets],
   ];
+  const showDashboardHero = view === "dashboard";
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(127,155,71,0.18),transparent_28%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-4 py-4 md:px-6 md:py-6 print:bg-white print:px-0 print:py-0">
-      <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+    <main className="min-h-screen overflow-x-clip bg-[radial-gradient(circle_at_top_left,_rgba(127,155,71,0.18),transparent_28%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-4 py-4 md:px-6 md:py-6 print:bg-white print:px-0 print:py-0">
+      <div className="mx-auto grid min-w-0 max-w-7xl gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="print-hide hidden rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-5 text-white shadow-[var(--shadow)] lg:sticky lg:top-4 lg:block lg:self-start">
           <div className="flex items-center gap-3">
             <BrandLockup variant="inverted" className="h-11 w-auto" />
@@ -1177,104 +1178,110 @@ export function SaatgutApp() {
           </button>
         </aside>
 
-        <section className="space-y-4">
-          <div className="print-hide rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-3 text-white shadow-[var(--shadow)] lg:hidden">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <BrandIcon className="h-10 w-10 shrink-0 overflow-hidden rounded-md" />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold uppercase tracking-[0.16em] text-white/78">
-                    Saatgut
-                  </p>
-                  <h1 className="mt-1 truncate text-lg font-semibold tracking-tight">{session.membership.workspace.name}</h1>
+        <section className="min-w-0 space-y-4">
+          <div className="print-hide sticky top-3 z-30 lg:hidden">
+            <div className="relative rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-3 text-white shadow-[var(--shadow)]">
+              <div className="flex items-center justify-between gap-3 pr-1">
+                <div className="flex min-w-0 items-center gap-3">
+                  <BrandIcon className="h-10 w-10 shrink-0 overflow-hidden rounded-md" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold uppercase tracking-[0.16em] text-white/78">
+                      Saatgut
+                    </p>
+                    <h1 className="mt-1 truncate text-lg font-semibold tracking-tight">{session.membership.workspace.name}</h1>
+                  </div>
                 </div>
-              </div>
-              <button
-                type="button"
-                aria-expanded={mobileNavOpen}
-                aria-label={mobileNavOpen ? t.common.closeNavigation : t.common.openNavigation}
-                onClick={() => setMobileNavOpen((current) => !current)}
-                className="shrink-0 rounded-md border border-white/14 bg-white/8 px-3 py-2 text-sm font-semibold text-white"
-              >
-                {mobileNavOpen ? t.common.closeNavigation : t.common.menu}
-              </button>
-            </div>
-
-            {mobileNavOpen ? (
-              <div className="mt-3 border-t border-white/10 pt-3">
-                <p className="truncate text-sm text-white/68">
-                  {session.user.email} · {labelMembershipRole(session.membership.role, t)}
-                </p>
-
-                <nav className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {navigationItems.map(([id, label]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => handleSelectView(id)}
-                      className={classNames(
-                        "rounded-md px-3 py-2.5 text-left text-sm font-medium transition",
-                        view === id
-                          ? "bg-white text-[var(--foreground)]"
-                          : "bg-white/6 text-white/84 hover:bg-white/10",
-                      )}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </nav>
-
-                <div className="mt-3 rounded-md border border-white/10 bg-white/6 p-3">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-white/52">{t.dashboard.activeProfile}</p>
-                  <p className="mt-1 text-sm font-semibold">
-                    {activeProfile ? activeProfile.name : t.dashboard.noActiveProfile}
-                  </p>
-                  <p className="mt-1 text-sm text-white/68">
-                    {activeProfile
-                      ? `${t.dashboard.lastFrost} ${formatDate(activeProfile.lastFrostDate, locale, t.common.notSet)}`
-                      : t.dashboard.createActiveProfile}
-                  </p>
-                </div>
-
                 <button
                   type="button"
-                  onClick={handleLogout}
-                  className="mt-3 w-full rounded-md border border-white/14 px-4 py-2.5 text-sm font-semibold text-white/88"
-                  disabled={authPending}
+                  aria-expanded={mobileNavOpen}
+                  aria-label={mobileNavOpen ? t.common.closeNavigation : t.common.openNavigation}
+                  onClick={() => setMobileNavOpen((current) => !current)}
+                  className="shrink-0 rounded-md border border-white/14 bg-white/8 px-3 py-2 text-sm font-semibold text-white"
                 >
-                  {authPending ? t.common.signingOut : t.common.signOut}
+                  {mobileNavOpen ? t.common.closeNavigation : t.common.menu}
                 </button>
               </div>
-            ) : null}
+
+              {mobileNavOpen ? (
+                <div className="absolute inset-x-0 top-full mt-3 rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.98)] p-3 shadow-[var(--shadow)]">
+                  <p className="truncate text-sm text-white/68">
+                    {session.user.email} · {labelMembershipRole(session.membership.role, t)}
+                  </p>
+
+                  <nav className="mt-3 grid grid-cols-2 gap-2">
+                    {navigationItems.map(([id, label]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => handleSelectView(id)}
+                        className={classNames(
+                          "rounded-md px-3 py-2.5 text-left text-sm font-medium transition",
+                          view === id
+                            ? "bg-white text-[var(--foreground)]"
+                            : "bg-white/6 text-white/84 hover:bg-white/10",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </nav>
+
+                  <div className="mt-3 rounded-md border border-white/10 bg-white/6 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-white/52">{t.dashboard.activeProfile}</p>
+                    <p className="mt-1 text-sm font-semibold">
+                      {activeProfile ? activeProfile.name : t.dashboard.noActiveProfile}
+                    </p>
+                    <p className="mt-1 text-sm text-white/68">
+                      {activeProfile
+                        ? `${t.dashboard.lastFrost} ${formatDate(activeProfile.lastFrostDate, locale, t.common.notSet)}`
+                        : t.dashboard.createActiveProfile}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="mt-3 w-full rounded-md border border-white/14 px-4 py-2.5 text-sm font-semibold text-white/88"
+                    disabled={authPending}
+                  >
+                    {authPending ? t.common.signingOut : t.common.signOut}
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
 
-          <header className="print-hide rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-4 shadow-[var(--shadow)] md:p-5">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <ScreenHeader
-                eyebrow={t.dashboard.heroEyebrow}
-                title={t.dashboard.heroTitle}
-                subtitle={t.dashboard.heroSubtitle}
-                titleClassName="max-w-[28ch]"
-                compact
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  startRefreshTransition(() => {
-                    void loadDashboard().catch((error) => {
-                      setSessionError(error instanceof Error ? error.message : t.statuses.refreshFailed);
-                    });
-                  })
-                }
-                className="w-full rounded-lg border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold md:w-auto"
-                disabled={refreshPending}
-              >
-                {refreshPending ? t.common.refreshing : t.common.refreshWorkspace}
-              </button>
-            </div>
+          {showDashboardHero ? (
+            <header className="print-hide rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-4 shadow-[var(--shadow)] md:p-5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <ScreenHeader
+                  eyebrow={t.dashboard.heroEyebrow}
+                  title={t.dashboard.heroTitle}
+                  subtitle={t.dashboard.heroSubtitle}
+                  titleClassName="max-w-[28ch]"
+                  compact
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    startRefreshTransition(() => {
+                      void loadDashboard().catch((error) => {
+                        setSessionError(error instanceof Error ? error.message : t.statuses.refreshFailed);
+                      });
+                    })
+                  }
+                  className="w-full rounded-lg border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold md:w-auto"
+                  disabled={refreshPending}
+                >
+                  {refreshPending ? t.common.refreshing : t.common.refreshWorkspace}
+                </button>
+              </div>
 
-            {sessionError ? <Alert tone="danger">{sessionError}</Alert> : null}
-          </header>
+              {sessionError ? <Alert tone="danger">{sessionError}</Alert> : null}
+            </header>
+          ) : sessionError ? (
+            <Alert tone="danger">{sessionError}</Alert>
+          ) : null}
 
           {view === "dashboard" ? (
             <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
