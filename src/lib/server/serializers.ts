@@ -1,11 +1,17 @@
 import {
+  GerminationTest,
   MembershipRole,
   PlantingEventType,
+  SeedBatchTransactionType,
   SeedQuantityUnit,
   SpeciesCategory,
+  StorageLightExposure,
+  StorageMoistureLevel,
   UserRole,
   WorkspaceVisibility,
 } from "@prisma/client";
+
+import type { SeedBatchWarning } from "@/lib/server/seed-batch-quality";
 
 type Decimalish = { toString(): string } | null;
 
@@ -136,13 +142,39 @@ export function serializeSeedBatch(seedBatch: {
   quantity: Decimalish;
   unit: SeedQuantityUnit;
   storageLocation: string | null;
+  storageTemperatureC?: Decimalish;
+  storageHumidityPercent?: number | null;
+  storageLightExposure?: StorageLightExposure | null;
+  storageMoistureLevel?: StorageMoistureLevel | null;
+  storageContainer?: string | null;
+  storageQualityCheckedAt?: Date | null;
   notes: string | null;
+  germinationTests?: GerminationTest[];
+  stockTransactions?: Array<{
+    id: string;
+    seedBatchId: string;
+    workspaceId: string;
+    plantingEventId: string | null;
+    type: SeedBatchTransactionType;
+    quantityDelta: Decimalish;
+    quantityBefore: Decimalish;
+    quantityAfter: Decimalish;
+    effectiveDate: Date;
+    reason: string | null;
+    reversalOfId: string | null;
+    createdAt: Date;
+  }>;
+  storageWarnings?: SeedBatchWarning[];
   createdAt: Date;
   updatedAt: Date;
 }) {
   return {
     ...seedBatch,
     quantity: serializeDecimal(seedBatch.quantity),
+    storageTemperatureC: serializeDecimal(seedBatch.storageTemperatureC ?? null),
+    storageQualityCheckedAt: seedBatch.storageQualityCheckedAt?.toISOString() ?? null,
+    germinationTests: seedBatch.germinationTests?.map(serializeGerminationTest),
+    stockTransactions: seedBatch.stockTransactions?.map(serializeSeedBatchTransaction),
     createdAt: seedBatch.createdAt.toISOString(),
     updatedAt: seedBatch.updatedAt.toISOString(),
   };
@@ -154,6 +186,9 @@ export function serializeGrowingProfile(profile: {
   name: string;
   lastFrostDate: Date;
   firstFrostDate: Date;
+  phenologyStage: string | null;
+  phenologyObservedAt: Date | null;
+  phenologyNotes: string | null;
   notes: string | null;
   isActive: boolean;
   createdAt: Date;
@@ -163,6 +198,7 @@ export function serializeGrowingProfile(profile: {
     ...profile,
     lastFrostDate: profile.lastFrostDate.toISOString(),
     firstFrostDate: profile.firstFrostDate.toISOString(),
+    phenologyObservedAt: profile.phenologyObservedAt?.toISOString() ?? null,
     createdAt: profile.createdAt.toISOString(),
     updatedAt: profile.updatedAt.toISOString(),
   };
@@ -274,5 +310,50 @@ export function serializeInvite(invite: {
     acceptedAt: invite.acceptedAt?.toISOString() ?? null,
     createdAt: invite.createdAt.toISOString(),
     updatedAt: invite.updatedAt.toISOString(),
+  };
+}
+
+export function serializeGerminationTest(test: {
+  id: string;
+  workspaceId: string;
+  seedBatchId: string;
+  testedAt: Date;
+  sampleSize: number;
+  germinatedCount: number;
+  germinationRate: Decimalish;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    ...test,
+    germinationRate: serializeDecimal(test.germinationRate),
+    testedAt: test.testedAt.toISOString(),
+    createdAt: test.createdAt.toISOString(),
+    updatedAt: test.updatedAt.toISOString(),
+  };
+}
+
+export function serializeSeedBatchTransaction(transaction: {
+  id: string;
+  workspaceId: string;
+  seedBatchId: string;
+  plantingEventId: string | null;
+  type: SeedBatchTransactionType;
+  quantityDelta: Decimalish;
+  quantityBefore: Decimalish;
+  quantityAfter: Decimalish;
+  effectiveDate: Date;
+  reason: string | null;
+  reversalOfId: string | null;
+  createdAt: Date;
+}) {
+  return {
+    ...transaction,
+    quantityDelta: serializeDecimal(transaction.quantityDelta),
+    quantityBefore: serializeDecimal(transaction.quantityBefore),
+    quantityAfter: serializeDecimal(transaction.quantityAfter),
+    effectiveDate: transaction.effectiveDate.toISOString(),
+    createdAt: transaction.createdAt.toISOString(),
   };
 }

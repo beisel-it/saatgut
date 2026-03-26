@@ -43,11 +43,30 @@ enum SeedQuantityUnit {
   GRAMS
 }
 
+enum StorageLightExposure {
+  DARK
+  INDIRECT
+  BRIGHT
+}
+
+enum StorageMoistureLevel {
+  DRY
+  MODERATE
+  HUMID
+}
+
 enum PlantingEventType {
   SOW_INDOORS
   SOW_OUTDOORS
   TRANSPLANT
   HARVEST
+}
+
+enum SeedBatchTransactionType {
+  INITIAL_STOCK
+  PLANTING_CONSUMPTION
+  MANUAL_CORRECTION
+  REVERSAL
 }
 
 enum PlantingJournalEntryType {
@@ -80,6 +99,8 @@ model Workspace {
   species         Species[]
   varieties       Variety[]
   seedBatches     SeedBatch[]
+  germinationTests GerminationTest[]
+  seedBatchTransactions SeedBatchTransaction[]
   growingProfiles GrowingProfile[]
   plantingEvents  PlantingEvent[]
   journalEntries  PlantingJournalEntry[]
@@ -155,11 +176,19 @@ model SeedBatch {
   quantity        Decimal          @db.Decimal(10, 2)
   unit            SeedQuantityUnit @default(SEEDS)
   storageLocation String?
+  storageTemperatureC Decimal?     @db.Decimal(4, 1)
+  storageHumidityPercent Int?
+  storageLightExposure StorageLightExposure?
+  storageMoistureLevel StorageMoistureLevel?
+  storageContainer String?
+  storageQualityCheckedAt DateTime?
   notes           String?
   workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   variety         Variety          @relation(fields: [varietyId], references: [id], onDelete: Cascade)
   plantingEvents  PlantingEvent[]
   journalEntries  PlantingJournalEntry[]
+  germinationTests GerminationTest[]
+  stockTransactions SeedBatchTransaction[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -172,6 +201,9 @@ model GrowingProfile {
   name           String
   lastFrostDate  DateTime
   firstFrostDate DateTime
+  phenologyStage String?
+  phenologyObservedAt DateTime?
+  phenologyNotes String?
   notes          String?
   isActive       Boolean         @default(false)
   workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -217,10 +249,51 @@ model PlantingEvent {
   seedBatch       SeedBatch?        @relation(fields: [seedBatchId], references: [id], onDelete: SetNull)
   growingProfile  GrowingProfile?   @relation(fields: [growingProfileId], references: [id], onDelete: SetNull)
   journalEntries  PlantingJournalEntry[]
+  stockTransactions SeedBatchTransaction[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
   @@index([workspaceId, plannedDate])
+}
+
+model GerminationTest {
+  id              String           @id @default(cuid())
+  workspaceId     String
+  seedBatchId     String
+  testedAt        DateTime
+  sampleSize      Int
+  germinatedCount Int
+  germinationRate Decimal          @db.Decimal(5, 2)
+  notes           String?
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  seedBatch       SeedBatch        @relation(fields: [seedBatchId], references: [id], onDelete: Cascade)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([workspaceId, testedAt])
+  @@index([seedBatchId, testedAt])
+}
+
+model SeedBatchTransaction {
+  id                String                    @id @default(cuid())
+  workspaceId       String
+  seedBatchId       String
+  plantingEventId   String?
+  type              SeedBatchTransactionType
+  quantityDelta     Decimal                   @db.Decimal(10, 2)
+  quantityBefore    Decimal                   @db.Decimal(10, 2)
+  quantityAfter     Decimal                   @db.Decimal(10, 2)
+  effectiveDate     DateTime
+  reason            String?
+  reversalOfId      String?
+  workspace         Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  seedBatch         SeedBatch                 @relation(fields: [seedBatchId], references: [id], onDelete: Cascade)
+  plantingEvent     PlantingEvent?            @relation(fields: [plantingEventId], references: [id], onDelete: SetNull)
+  createdAt         DateTime                  @default(now())
+
+  @@index([workspaceId, effectiveDate])
+  @@index([seedBatchId, effectiveDate])
+  @@index([reversalOfId])
 }
 
 model PlantingJournalEntry {

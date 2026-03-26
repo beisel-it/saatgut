@@ -2,6 +2,8 @@ import {
   MembershipRole,
   PlantingEventType,
   PlantingJournalEntryType,
+  StorageLightExposure,
+  StorageMoistureLevel,
   SeedQuantityUnit,
   SpeciesCategory,
 } from "@prisma/client";
@@ -42,6 +44,12 @@ export const seedBatchCreateSchema = z.object({
   quantity: z.number().positive(),
   unit: z.nativeEnum(SeedQuantityUnit).default(SeedQuantityUnit.SEEDS),
   storageLocation: z.string().trim().max(160).optional().nullable(),
+  storageTemperatureC: z.number().min(-30).max(60).optional().nullable(),
+  storageHumidityPercent: z.number().int().min(0).max(100).optional().nullable(),
+  storageLightExposure: z.nativeEnum(StorageLightExposure).optional().nullable(),
+  storageMoistureLevel: z.nativeEnum(StorageMoistureLevel).optional().nullable(),
+  storageContainer: z.string().trim().max(160).optional().nullable(),
+  storageQualityCheckedAt: z.string().datetime().optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
 });
 
@@ -49,6 +57,9 @@ export const growingProfileCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
   lastFrostDate: z.string().datetime(),
   firstFrostDate: z.string().datetime(),
+  phenologyStage: z.string().trim().min(1).max(40).optional().nullable(),
+  phenologyObservedAt: z.string().datetime().optional().nullable(),
+  phenologyNotes: z.string().trim().max(1000).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
   isActive: z.boolean().default(false),
 });
@@ -130,4 +141,32 @@ export const journalQuerySchema = z.object({
   seedBatchId: z.string().cuid().optional(),
   entryType: z.nativeEnum(PlantingJournalEntryType).optional(),
   tag: z.string().trim().min(1).optional(),
+});
+
+export const germinationTestCreateSchema = z.object({
+  testedAt: z.string().datetime(),
+  sampleSize: z.number().int().positive(),
+  germinatedCount: z.number().int().min(0),
+  notes: z.string().trim().max(2000).optional().nullable(),
+}).refine((value) => value.germinatedCount <= value.sampleSize, {
+  message: "Germinated count cannot exceed sample size.",
+  path: ["germinatedCount"],
+});
+
+export const seedBatchAdjustmentCreateSchema = z.object({
+  mode: z.enum(["SET_ABSOLUTE", "ADJUST_DELTA"]),
+  quantity: z.number().positive(),
+  reason: z.string().trim().min(1).max(500),
+  effectiveDate: z.string().datetime(),
+});
+
+export const seedBatchReversalCreateSchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+  effectiveDate: z.string().datetime(),
+});
+
+export const phenologyUpdateSchema = z.object({
+  phenologyStage: z.string().trim().min(1).max(40).nullable(),
+  phenologyObservedAt: z.string().datetime().optional().nullable(),
+  phenologyNotes: z.string().trim().max(1000).optional().nullable(),
 });

@@ -4,9 +4,12 @@ import type {
   CultivationRule,
   DashboardData,
   GrowingProfile,
+  GerminationTest,
+  JournalEntry,
   Membership,
   PlantingEvent,
   SeedBatch,
+  SeedBatchTransaction,
   SessionSnapshot,
   Species,
   User,
@@ -94,7 +97,7 @@ export async function fetchDashboardData(days = 14): Promise<DashboardData> {
     },
   );
 
-  const [species, varieties, seedBatches, profiles, rules, calendar, plantings] =
+  const [species, varieties, seedBatches, profiles, rules, calendar, plantings, journal] =
     await Promise.all([
       getCollection<Species>("/api/v1/species"),
       getCollection<Variety>("/api/v1/varieties"),
@@ -103,9 +106,10 @@ export async function fetchDashboardData(days = 14): Promise<DashboardData> {
       getCollection<DashboardData["rules"][number]>("/api/v1/cultivation-rules"),
       calendarPromise,
       getCollection<PlantingEvent>("/api/v1/plantings"),
+      getCollection<JournalEntry>("/api/v1/journal"),
     ]);
 
-  return { species, varieties, seedBatches, profiles, rules, calendar, plantings };
+  return { species, varieties, seedBatches, profiles, rules, calendar, plantings, journal };
 }
 
 export function createSpecies(input: {
@@ -125,6 +129,7 @@ export function createVariety(input: {
   name: string;
   description?: string | null;
   heirloom: boolean;
+  tags: string[];
   notes?: string | null;
   synonyms: string[];
 }) {
@@ -141,6 +146,12 @@ export function createSeedBatch(input: {
   quantity: number;
   unit: SeedBatch["unit"];
   storageLocation?: string | null;
+  storageTemperatureC?: number | null;
+  storageHumidityPercent?: number | null;
+  storageLightExposure?: SeedBatch["storageLightExposure"];
+  storageMoistureLevel?: SeedBatch["storageMoistureLevel"];
+  storageContainer?: string | null;
+  storageQualityCheckedAt?: string | null;
   notes?: string | null;
 }) {
   return request<SeedBatch>("/api/v1/seed-batches", {
@@ -153,6 +164,9 @@ export function createGrowingProfile(input: {
   name: string;
   lastFrostDate: string;
   firstFrostDate: string;
+  phenologyStage?: string | null;
+  phenologyObservedAt?: string | null;
+  phenologyNotes?: string | null;
   notes?: string | null;
   isActive: boolean;
 }) {
@@ -194,6 +208,92 @@ export function createPlantingEvent(input: {
 }) {
   return request<PlantingEvent>("/api/v1/plantings", {
     method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function createJournalEntry(input: {
+  varietyId?: string | null;
+  seedBatchId?: string | null;
+  plantingEventId?: string | null;
+  entryType: JournalEntry["entryType"];
+  title: string;
+  details?: string | null;
+  entryDate: string;
+  quantity?: number | null;
+  unit?: SeedBatch["unit"] | null;
+  tags: string[];
+}) {
+  return request<JournalEntry>("/api/v1/journal", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function createGerminationTest(
+  seedBatchId: string,
+  input: {
+    testedAt: string;
+    sampleSize: number;
+    germinatedCount: number;
+    notes?: string | null;
+  },
+) {
+  return request<GerminationTest>(`/api/v1/seed-batches/${seedBatchId}/germination-tests`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchSeedBatchTransactions(seedBatchId: string) {
+  return getCollection<SeedBatchTransaction>(`/api/v1/seed-batches/${seedBatchId}/transactions`);
+}
+
+export function adjustSeedBatchStock(
+  seedBatchId: string,
+  input: {
+    mode: "SET_ABSOLUTE" | "ADJUST_DELTA";
+    quantity: number;
+    reason: string;
+    effectiveDate: string;
+  },
+) {
+  return request<{ seedBatch: SeedBatch; transaction: SeedBatchTransaction }>(
+    `/api/v1/seed-batches/${seedBatchId}/transactions`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function reverseSeedBatchTransaction(
+  seedBatchId: string,
+  transactionId: string,
+  input: {
+    reason: string;
+    effectiveDate: string;
+  },
+) {
+  return request<{ seedBatch: SeedBatch; transaction: SeedBatchTransaction }>(
+    `/api/v1/seed-batches/${seedBatchId}/transactions/${transactionId}/reverse`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function updateProfilePhenology(
+  profileId: string,
+  input: {
+    phenologyStage: string | null;
+    phenologyObservedAt?: string | null;
+    phenologyNotes?: string | null;
+  },
+) {
+  return request<GrowingProfile>(`/api/v1/profiles/${profileId}/phenology`, {
+    method: "PATCH",
     body: JSON.stringify(input),
   });
 }

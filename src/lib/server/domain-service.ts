@@ -1,9 +1,10 @@
-import { MembershipRole, Prisma, PrismaClient } from "@prisma/client";
+import { MembershipRole, Prisma, PrismaClient, SeedBatchTransactionType } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { ApiError } from "@/lib/server/api-error";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import type { AuthContext } from "@/lib/server/auth-context";
+import { buildSeedBatchWarnings, calculateGerminationRate } from "@/lib/server/seed-batch-quality";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
@@ -222,10 +223,32 @@ export async function createVariety(
 }
 
 export async function listSeedBatches(auth: AuthContext) {
-  return prisma.seedBatch.findMany({
+  const seedBatches = await prisma.seedBatch.findMany({
     where: { workspaceId: auth.workspaceId },
+    include: {
+      germinationTests: {
+        orderBy: { testedAt: "desc" },
+      },
+      stockTransactions: {
+        orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }],
+      },
+    },
     orderBy: [{ harvestYear: "desc" }, { createdAt: "desc" }],
   });
+
+  return seedBatches.map((seedBatch) => ({
+    ...seedBatch,
+    storageWarnings: buildSeedBatchWarnings({
+      harvestYear: seedBatch.harvestYear,
+      storageLocation: seedBatch.storageLocation,
+      storageTemperatureC: seedBatch.storageTemperatureC,
+      storageHumidityPercent: seedBatch.storageHumidityPercent,
+      storageLightExposure: seedBatch.storageLightExposure,
+      storageMoistureLevel: seedBatch.storageMoistureLevel,
+      latestGerminationRate: seedBatch.germinationTests[0]?.germinationRate ?? null,
+      latestGerminationTestedAt: seedBatch.germinationTests[0]?.testedAt ?? null,
+    }),
+  }));
 }
 
 export async function createSeedBatch(
@@ -237,6 +260,12 @@ export async function createSeedBatch(
     quantity: number;
     unit: Prisma.SeedBatchCreateInput["unit"];
     storageLocation?: string | null;
+    storageTemperatureC?: number | null;
+    storageHumidityPercent?: number | null;
+    storageLightExposure?: Prisma.SeedBatchCreateInput["storageLightExposure"];
+    storageMoistureLevel?: Prisma.SeedBatchCreateInput["storageMoistureLevel"];
+    storageContainer?: string | null;
+    storageQualityCheckedAt?: string | null;
     notes?: string | null;
   },
 ) {
@@ -254,7 +283,35 @@ export async function createSeedBatch(
         quantity: new Prisma.Decimal(input.quantity),
         unit: input.unit,
         storageLocation: input.storageLocation ?? null,
+        storageTemperatureC:
+          input.storageTemperatureC === undefined || input.storageTemperatureC === null
+            ? null
+            : new Prisma.Decimal(input.storageTemperatureC),
+        storageHumidityPercent: input.storageHumidityPercent ?? null,
+        storageLightExposure: input.storageLightExposure ?? null,
+        storageMoistureLevel: input.storageMoistureLevel ?? null,
+        storageContainer: input.storageContainer ?? null,
+        storageQualityCheckedAt: input.storageQualityCheckedAt
+          ? new Date(input.storageQualityCheckedAt)
+          : null,
         notes: input.notes ?? null,
+      },
+      include: {
+        germinationTests: true,
+        stockTransactions: true,
+      },
+    });
+
+    await tx.seedBatchTransaction.create({
+      data: {
+        workspaceId: auth.workspaceId,
+        seedBatchId: seedBatch.id,
+        type: SeedBatchTransactionType.INITIAL_STOCK,
+        quantityDelta: seedBatch.quantity,
+        quantityBefore: new Prisma.Decimal(0),
+        quantityAfter: seedBatch.quantity,
+        effectiveDate: new Date(),
+        reason: "Initial stock recorded on batch creation.",
       },
     });
 
@@ -281,6 +338,9 @@ export async function createGrowingProfile(
     name: string;
     lastFrostDate: string;
     firstFrostDate: string;
+    phenologyStage?: string | null;
+    phenologyObservedAt?: string | null;
+    phenologyNotes?: string | null;
     notes?: string | null;
     isActive: boolean;
   },
@@ -306,6 +366,9 @@ export async function createGrowingProfile(
         name: input.name,
         lastFrostDate: new Date(input.lastFrostDate),
         firstFrostDate: new Date(input.firstFrostDate),
+        phenologyStage: input.phenologyStage ?? null,
+        phenologyObservedAt: input.phenologyObservedAt ? new Date(input.phenologyObservedAt) : null,
+        phenologyNotes: input.phenologyNotes ?? null,
         notes: input.notes ?? null,
         isActive: input.isActive,
       },
@@ -408,12 +471,14 @@ export async function createPlantingEvent(
     }
 
     let nextQuantity: Prisma.Decimal | null = null;
+    let quantityBefore: Prisma.Decimal | null = null;
 
     if (input.seedBatchId) {
       const seedBatch = await assertSeedBatchInWorkspace(tx, auth.workspaceId, input.seedBatchId);
 
       if (input.quantityUsed) {
-        const remainingQuantity = new Prisma.Decimal(seedBatch.quantity).minus(input.quantityUsed);
+        quantityBefore = new Prisma.Decimal(seedBatch.quantity);
+        const remainingQuantity = quantityBefore.minus(input.quantityUsed);
 
         if (remainingQuantity.isNegative()) {
           throw new ApiError(
@@ -451,6 +516,26 @@ export async function createPlantingEvent(
       },
     });
 
+    if (input.seedBatchId && input.quantityUsed && quantityBefore && nextQuantity) {
+      await tx.seedBatchTransaction.create({
+        data: {
+          workspaceId: auth.workspaceId,
+          seedBatchId: input.seedBatchId,
+          plantingEventId: plantingEvent.id,
+          type: SeedBatchTransactionType.PLANTING_CONSUMPTION,
+          quantityDelta: new Prisma.Decimal(input.quantityUsed).negated(),
+          quantityBefore,
+          quantityAfter: nextQuantity,
+          effectiveDate: input.actualDate
+            ? new Date(input.actualDate)
+            : input.plannedDate
+              ? new Date(input.plannedDate)
+              : new Date(),
+          reason: `Stock consumed by planting event ${plantingEvent.id}.`,
+        },
+      });
+    }
+
     await writeAuditLog(tx, auth, "plantingEvent.create", "PlantingEvent", plantingEvent.id, {
       type: plantingEvent.type,
       varietyId: plantingEvent.varietyId,
@@ -468,5 +553,264 @@ export async function listAuditLogs(auth: AuthContext) {
     where: { workspaceId: auth.workspaceId },
     orderBy: { createdAt: "desc" },
     take: 100,
+  });
+}
+
+export async function listGerminationTests(auth: AuthContext, seedBatchId: string) {
+  await assertSeedBatchInWorkspace(prisma, auth.workspaceId, seedBatchId);
+
+  return prisma.germinationTest.findMany({
+    where: {
+      workspaceId: auth.workspaceId,
+      seedBatchId,
+    },
+    orderBy: { testedAt: "desc" },
+  });
+}
+
+export async function createGerminationTest(
+  auth: AuthContext,
+  seedBatchId: string,
+  input: {
+    testedAt: string;
+    sampleSize: number;
+    germinatedCount: number;
+    notes?: string | null;
+  },
+) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    await assertSeedBatchInWorkspace(tx, auth.workspaceId, seedBatchId);
+
+    const germinationRate = calculateGerminationRate(input.sampleSize, input.germinatedCount);
+    const test = await tx.germinationTest.create({
+      data: {
+        workspaceId: auth.workspaceId,
+        seedBatchId,
+        testedAt: new Date(input.testedAt),
+        sampleSize: input.sampleSize,
+        germinatedCount: input.germinatedCount,
+        germinationRate,
+        notes: input.notes ?? null,
+      },
+    });
+
+    await writeAuditLog(tx, auth, "germinationTest.create", "GerminationTest", test.id, {
+      seedBatchId,
+      germinationRate: germinationRate.toString(),
+    });
+
+    return test;
+  });
+}
+
+export async function listSeedBatchTransactions(auth: AuthContext, seedBatchId: string) {
+  await assertSeedBatchInWorkspace(prisma, auth.workspaceId, seedBatchId);
+
+  return prisma.seedBatchTransaction.findMany({
+    where: {
+      workspaceId: auth.workspaceId,
+      seedBatchId,
+    },
+    orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }],
+  });
+}
+
+export async function adjustSeedBatchStock(
+  auth: AuthContext,
+  seedBatchId: string,
+  input: {
+    mode: "SET_ABSOLUTE" | "ADJUST_DELTA";
+    quantity: number;
+    reason: string;
+    effectiveDate: string;
+  },
+) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    const seedBatch = await assertSeedBatchInWorkspace(tx, auth.workspaceId, seedBatchId);
+    const quantityBefore = new Prisma.Decimal(seedBatch.quantity);
+    const quantityDelta =
+      input.mode === "SET_ABSOLUTE"
+        ? new Prisma.Decimal(input.quantity).minus(quantityBefore)
+        : new Prisma.Decimal(input.quantity);
+    const quantityAfter = quantityBefore.plus(quantityDelta);
+
+    if (quantityAfter.isNegative()) {
+      throw new ApiError(409, "INSUFFICIENT_SEED_STOCK", "Stock correction would make quantity negative.");
+    }
+
+    const updatedBatch = await tx.seedBatch.update({
+      where: { id: seedBatch.id },
+      data: { quantity: quantityAfter },
+      include: {
+        germinationTests: { orderBy: { testedAt: "desc" } },
+        stockTransactions: { orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }] },
+      },
+    });
+
+    const transaction = await tx.seedBatchTransaction.create({
+      data: {
+        workspaceId: auth.workspaceId,
+        seedBatchId,
+        type: SeedBatchTransactionType.MANUAL_CORRECTION,
+        quantityDelta,
+        quantityBefore,
+        quantityAfter,
+        effectiveDate: new Date(input.effectiveDate),
+        reason: input.reason,
+      },
+    });
+
+    await writeAuditLog(tx, auth, "seedBatch.adjust", "SeedBatchTransaction", transaction.id, {
+      seedBatchId,
+      mode: input.mode,
+      quantityDelta: quantityDelta.toString(),
+      quantityAfter: quantityAfter.toString(),
+    });
+
+    return {
+      seedBatch: {
+        ...updatedBatch,
+        storageWarnings: buildSeedBatchWarnings({
+          harvestYear: updatedBatch.harvestYear,
+          storageLocation: updatedBatch.storageLocation,
+          storageTemperatureC: updatedBatch.storageTemperatureC,
+          storageHumidityPercent: updatedBatch.storageHumidityPercent,
+          storageLightExposure: updatedBatch.storageLightExposure,
+          storageMoistureLevel: updatedBatch.storageMoistureLevel,
+          latestGerminationRate: updatedBatch.germinationTests[0]?.germinationRate ?? null,
+          latestGerminationTestedAt: updatedBatch.germinationTests[0]?.testedAt ?? null,
+        }),
+      },
+      transaction,
+    };
+  });
+}
+
+export async function reverseSeedBatchTransaction(
+  auth: AuthContext,
+  seedBatchId: string,
+  transactionId: string,
+  input: { reason: string; effectiveDate: string },
+) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    const seedBatch = await assertSeedBatchInWorkspace(tx, auth.workspaceId, seedBatchId);
+    const transaction = await tx.seedBatchTransaction.findFirst({
+      where: {
+        id: transactionId,
+        workspaceId: auth.workspaceId,
+        seedBatchId,
+      },
+    });
+
+    if (!transaction) {
+      throw new ApiError(404, "STOCK_TRANSACTION_NOT_FOUND", "Stock transaction was not found.");
+    }
+
+    if (transaction.type === SeedBatchTransactionType.REVERSAL) {
+      throw new ApiError(409, "REVERSAL_NOT_ALLOWED", "A reversal transaction cannot be reversed again.");
+    }
+
+    const existingReversal = await tx.seedBatchTransaction.findFirst({
+      where: {
+        workspaceId: auth.workspaceId,
+        seedBatchId,
+        reversalOfId: transaction.id,
+      },
+    });
+
+    if (existingReversal) {
+      throw new ApiError(409, "TRANSACTION_ALREADY_REVERSED", "This stock transaction has already been reversed.");
+    }
+
+    const quantityBefore = new Prisma.Decimal(seedBatch.quantity);
+    const quantityDelta = new Prisma.Decimal(transaction.quantityDelta).negated();
+    const quantityAfter = quantityBefore.plus(quantityDelta);
+
+    if (quantityAfter.isNegative()) {
+      throw new ApiError(409, "INSUFFICIENT_SEED_STOCK", "Reversal would make quantity negative.");
+    }
+
+    const updatedBatch = await tx.seedBatch.update({
+      where: { id: seedBatch.id },
+      data: { quantity: quantityAfter },
+      include: {
+        germinationTests: { orderBy: { testedAt: "desc" } },
+        stockTransactions: { orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }] },
+      },
+    });
+
+    const reversal = await tx.seedBatchTransaction.create({
+      data: {
+        workspaceId: auth.workspaceId,
+        seedBatchId,
+        type: SeedBatchTransactionType.REVERSAL,
+        quantityDelta,
+        quantityBefore,
+        quantityAfter,
+        effectiveDate: new Date(input.effectiveDate),
+        reason: input.reason,
+        reversalOfId: transaction.id,
+      },
+    });
+
+    await writeAuditLog(tx, auth, "seedBatch.reverseTransaction", "SeedBatchTransaction", reversal.id, {
+      seedBatchId,
+      reversalOfId: transaction.id,
+      quantityDelta: quantityDelta.toString(),
+    });
+
+    return {
+      seedBatch: {
+        ...updatedBatch,
+        storageWarnings: buildSeedBatchWarnings({
+          harvestYear: updatedBatch.harvestYear,
+          storageLocation: updatedBatch.storageLocation,
+          storageTemperatureC: updatedBatch.storageTemperatureC,
+          storageHumidityPercent: updatedBatch.storageHumidityPercent,
+          storageLightExposure: updatedBatch.storageLightExposure,
+          storageMoistureLevel: updatedBatch.storageMoistureLevel,
+          latestGerminationRate: updatedBatch.germinationTests[0]?.germinationRate ?? null,
+          latestGerminationTestedAt: updatedBatch.germinationTests[0]?.testedAt ?? null,
+        }),
+      },
+      transaction: reversal,
+    };
+  });
+}
+
+export async function updateProfilePhenology(
+  auth: AuthContext,
+  profileId: string,
+  input: {
+    phenologyStage: string | null;
+    phenologyObservedAt?: string | null;
+    phenologyNotes?: string | null;
+  },
+) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    await assertGrowingProfileInWorkspace(tx, auth.workspaceId, profileId);
+
+    const profile = await tx.growingProfile.update({
+      where: { id: profileId },
+      data: {
+        phenologyStage: input.phenologyStage,
+        phenologyObservedAt: input.phenologyObservedAt ? new Date(input.phenologyObservedAt) : null,
+        phenologyNotes: input.phenologyNotes ?? null,
+      },
+    });
+
+    await writeAuditLog(tx, auth, "growingProfile.updatePhenology", "GrowingProfile", profile.id, {
+      phenologyStage: profile.phenologyStage,
+    });
+
+    return profile;
   });
 }

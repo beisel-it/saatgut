@@ -98,6 +98,15 @@ export type SeedBatch = {
   quantity: string | null;
   unit: "SEEDS" | "PACKETS" | "GRAMS";
   storageLocation: string | null;
+  storageTemperatureC?: string | null;
+  storageHumidityPercent?: number | null;
+  storageLightExposure?: "DARK" | "INDIRECT" | "BRIGHT" | null;
+  storageMoistureLevel?: "DRY" | "MODERATE" | "HUMID" | null;
+  storageContainer?: string | null;
+  storageQualityCheckedAt?: string | null;
+  storageWarnings?: SeedBatchWarning[];
+  germinationTests?: GerminationTest[];
+  stockTransactions?: SeedBatchTransaction[];
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -111,6 +120,9 @@ export type GrowingProfile = {
   firstFrostDate: string;
   notes: string | null;
   isActive: boolean;
+  phenologyStage?: string | null;
+  phenologyObservedAt?: string | null;
+  phenologyNotes?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -175,6 +187,7 @@ export type DashboardData = {
   >;
   calendar: CalendarItem[];
   plantings: PlantingEvent[];
+  journal: JournalEntry[];
 };
 
 export type JournalEntry = {
@@ -204,4 +217,39 @@ export type UserInvite = {
   acceptedAt: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type GerminationTest = {
+  id: string;
+  workspaceId: string;
+  seedBatchId: string;
+  testedAt: string;
+  sampleSize: number;
+  germinatedCount: number;
+  germinationRate: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SeedBatchTransaction = {
+  id: string;
+  workspaceId: string;
+  seedBatchId: string;
+  plantingEventId: string | null;
+  type: "INITIAL_STOCK" | "PLANTING_CONSUMPTION" | "MANUAL_CORRECTION" | "REVERSAL";
+  quantityDelta: string | null;
+  quantityBefore: string | null;
+  quantityAfter: string | null;
+  effectiveDate: string;
+  reason: string | null;
+  reversalOfId: string | null;
+  createdAt: string;
+};
+
+export type SeedBatchWarning = {
+  level: "info" | "warning" | "critical";
+  code: string;
+  title: string;
+  detail: string;
 };
