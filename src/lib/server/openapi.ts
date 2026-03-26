@@ -144,9 +144,33 @@ export function getOpenApiDocument() {
         get: { summary: "List growing profiles", responses: { "200": { description: "Profile list" } } },
         post: { summary: "Create a growing profile", responses: { "201": { description: "Created" } } },
       },
+      "/profiles/{profileId}": {
+        patch: {
+          summary: "Update a growing profile",
+          parameters: [{ name: "profileId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Updated" } },
+        },
+        delete: {
+          summary: "Delete a growing profile",
+          parameters: [{ name: "profileId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "204": { description: "Deleted" } },
+        },
+      },
       "/cultivation-rules": {
         get: { summary: "List cultivation rules", responses: { "200": { description: "Rule list" } } },
         post: { summary: "Upsert a cultivation rule", responses: { "200": { description: "Upserted" } } },
+      },
+      "/cultivation-rules/{ruleId}": {
+        patch: {
+          summary: "Update a cultivation rule",
+          parameters: [{ name: "ruleId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Updated" } },
+        },
+        delete: {
+          summary: "Delete a cultivation rule",
+          parameters: [{ name: "ruleId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "204": { description: "Deleted" } },
+        },
       },
       "/calendar": {
         get: { summary: "List calendar items", responses: { "200": { description: "Calendar list" } } },
@@ -154,6 +178,18 @@ export function getOpenApiDocument() {
       "/plantings": {
         get: { summary: "List planting events", responses: { "200": { description: "Planting list" } } },
         post: { summary: "Create a planting event", responses: { "201": { description: "Created" } } },
+      },
+      "/plantings/{plantingId}": {
+        patch: {
+          summary: "Update a planting event and reconcile linked stock consumption if present",
+          parameters: [{ name: "plantingId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Updated" } },
+        },
+        delete: {
+          summary: "Delete a planting event and restore linked stock consumption if present",
+          parameters: [{ name: "plantingId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "204": { description: "Deleted" } },
+        },
       },
       "/journal": {
         get: { summary: "List journal entries", responses: { "200": { description: "Journal list" } } },

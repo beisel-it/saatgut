@@ -95,6 +95,12 @@ export const growingProfileCreateSchema = z.object({
   isActive: z.boolean().default(false),
 });
 
+export const growingProfileUpdateSchema = growingProfileCreateSchema
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one profile field must be provided.",
+  });
+
 export const cultivationRuleUpsertSchema = z.object({
   varietyId: z.string().cuid(),
   sowIndoorsStartWeeks: z.number().int().min(0).max(52).optional().nullable(),
@@ -109,6 +115,12 @@ export const cultivationRuleUpsertSchema = z.object({
   successionIntervalDays: z.number().int().min(0).max(365).optional().nullable(),
 });
 
+export const cultivationRuleUpdateSchema = cultivationRuleUpsertSchema
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one cultivation rule field must be provided.",
+  });
+
 export const plantingEventCreateSchema = z.object({
   varietyId: z.string().cuid(),
   seedBatchId: z.string().cuid().optional().nullable(),
@@ -120,6 +132,12 @@ export const plantingEventCreateSchema = z.object({
   locationNote: z.string().trim().max(160).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
 });
+
+export const plantingEventUpdateSchema = plantingEventCreateSchema
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one planting field must be provided.",
+  });
 
 export const calendarQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(60).default(14),

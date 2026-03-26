@@ -264,6 +264,31 @@ export function createGrowingProfile(input: {
   });
 }
 
+export function updateGrowingProfile(
+  profileId: string,
+  input: {
+    name?: string;
+    lastFrostDate?: string;
+    firstFrostDate?: string;
+    phenologyStage?: string | null;
+    phenologyObservedAt?: string | null;
+    phenologyNotes?: string | null;
+    notes?: string | null;
+    isActive?: boolean;
+  },
+) {
+  return request<GrowingProfile>(`/api/v1/profiles/${profileId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteGrowingProfile(profileId: string) {
+  return request<void>(`/api/v1/profiles/${profileId}`, {
+    method: "DELETE",
+  });
+}
+
 export function upsertCultivationRule(input: {
   varietyId: string;
   sowIndoorsStartWeeks?: number | null;
@@ -283,6 +308,34 @@ export function upsertCultivationRule(input: {
   });
 }
 
+export function updateCultivationRule(
+  ruleId: string,
+  input: {
+    varietyId?: string;
+    sowIndoorsStartWeeks?: number | null;
+    sowIndoorsEndWeeks?: number | null;
+    sowOutdoorsStartWeeks?: number | null;
+    sowOutdoorsEndWeeks?: number | null;
+    transplantStartWeeks?: number | null;
+    transplantEndWeeks?: number | null;
+    harvestStartDays?: number | null;
+    harvestEndDays?: number | null;
+    spacingCm?: number | null;
+    successionIntervalDays?: number | null;
+  },
+) {
+  return request<CultivationRule>(`/api/v1/cultivation-rules/${ruleId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteCultivationRule(ruleId: string) {
+  return request<void>(`/api/v1/cultivation-rules/${ruleId}`, {
+    method: "DELETE",
+  });
+}
+
 export function createPlantingEvent(input: {
   varietyId: string;
   seedBatchId?: string | null;
@@ -297,6 +350,32 @@ export function createPlantingEvent(input: {
   return request<PlantingEvent>("/api/v1/plantings", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export function updatePlantingEvent(
+  plantingId: string,
+  input: {
+    varietyId?: string;
+    seedBatchId?: string | null;
+    growingProfileId?: string | null;
+    type?: PlantingEvent["type"];
+    plannedDate?: string | null;
+    actualDate?: string | null;
+    quantityUsed?: number | null;
+    locationNote?: string | null;
+    notes?: string | null;
+  },
+) {
+  return request<PlantingEvent>(`/api/v1/plantings/${plantingId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deletePlantingEvent(plantingId: string) {
+  return request<void>(`/api/v1/plantings/${plantingId}`, {
+    method: "DELETE",
   });
 }
 

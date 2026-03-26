@@ -74,6 +74,21 @@ async function assertSeedBatchInWorkspace(db: DbClient, workspaceId: string, see
   return seedBatch;
 }
 
+async function assertPlantingEventInWorkspace(db: DbClient, workspaceId: string, plantingEventId: string) {
+  const plantingEvent = await db.plantingEvent.findFirst({
+    where: {
+      id: plantingEventId,
+      workspaceId,
+    },
+  });
+
+  if (!plantingEvent) {
+    throw new ApiError(404, "PLANTING_EVENT_NOT_FOUND", "Planting event was not found in this workspace.");
+  }
+
+  return plantingEvent;
+}
+
 export async function listSpecies(
   auth: AuthContext,
   filters: { q?: string; category?: Prisma.SpeciesWhereInput["category"] } = {},
@@ -644,6 +659,76 @@ export async function createGrowingProfile(
   });
 }
 
+export async function updateGrowingProfile(
+  auth: AuthContext,
+  profileId: string,
+  input: {
+    name?: string;
+    lastFrostDate?: string;
+    firstFrostDate?: string;
+    phenologyStage?: string | null;
+    phenologyObservedAt?: string | null;
+    phenologyNotes?: string | null;
+    notes?: string | null;
+    isActive?: boolean;
+  },
+) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    await assertGrowingProfileInWorkspace(tx, auth.workspaceId, profileId);
+
+    if (input.isActive) {
+      await tx.growingProfile.updateMany({
+        where: {
+          workspaceId: auth.workspaceId,
+          isActive: true,
+          NOT: { id: profileId },
+        },
+        data: {
+          isActive: false,
+        },
+      });
+    }
+
+    const profile = await tx.growingProfile.update({
+      where: { id: profileId },
+      data: {
+        name: input.name,
+        lastFrostDate: input.lastFrostDate ? new Date(input.lastFrostDate) : undefined,
+        firstFrostDate: input.firstFrostDate ? new Date(input.firstFrostDate) : undefined,
+        phenologyStage: input.phenologyStage,
+        phenologyObservedAt:
+          input.phenologyObservedAt === undefined
+            ? undefined
+            : input.phenologyObservedAt === null
+              ? null
+              : new Date(input.phenologyObservedAt),
+        phenologyNotes: input.phenologyNotes,
+        notes: input.notes,
+        isActive: input.isActive,
+      },
+    });
+
+    await writeAuditLog(tx, auth, "growingProfile.update", "GrowingProfile", profile.id, {
+      fields: Object.keys(input),
+      isActive: profile.isActive,
+    });
+
+    return profile;
+  });
+}
+
+export async function deleteGrowingProfile(auth: AuthContext, profileId: string) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    await assertGrowingProfileInWorkspace(tx, auth.workspaceId, profileId);
+    await tx.growingProfile.delete({ where: { id: profileId } });
+    await writeAuditLog(tx, auth, "growingProfile.delete", "GrowingProfile", profileId, {});
+  });
+}
+
 export async function listCultivationRules(auth: AuthContext) {
   return prisma.cultivationRule.findMany({
     where: {
@@ -698,6 +783,109 @@ export async function upsertCultivationRule(
     });
 
     return rule;
+  });
+}
+
+export async function updateCultivationRule(
+  auth: AuthContext,
+  ruleId: string,
+  input: {
+    varietyId?: string;
+    sowIndoorsStartWeeks?: number | null;
+    sowIndoorsEndWeeks?: number | null;
+    sowOutdoorsStartWeeks?: number | null;
+    sowOutdoorsEndWeeks?: number | null;
+    transplantStartWeeks?: number | null;
+    transplantEndWeeks?: number | null;
+    harvestStartDays?: number | null;
+    harvestEndDays?: number | null;
+    spacingCm?: number | null;
+    successionIntervalDays?: number | null;
+  },
+) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    const existingRule = await tx.cultivationRule.findFirst({
+      where: {
+        id: ruleId,
+        variety: {
+          workspaceId: auth.workspaceId,
+        },
+      },
+    });
+
+    if (!existingRule) {
+      throw new ApiError(404, "CULTIVATION_RULE_NOT_FOUND", "Cultivation rule was not found in this workspace.");
+    }
+
+    if (input.varietyId) {
+      await assertVarietyInWorkspace(tx, auth.workspaceId, input.varietyId);
+
+      const conflictingRule = await tx.cultivationRule.findFirst({
+        where: {
+          varietyId: input.varietyId,
+          NOT: { id: ruleId },
+        },
+      });
+
+      if (conflictingRule) {
+        throw new ApiError(
+          409,
+          "CULTIVATION_RULE_VARIETY_CONFLICT",
+          "This variety already has a cultivation rule.",
+          { varietyId: input.varietyId },
+        );
+      }
+    }
+
+    const rule = await tx.cultivationRule.update({
+      where: { id: ruleId },
+      data: {
+        varietyId: input.varietyId,
+        sowIndoorsStartWeeks: input.sowIndoorsStartWeeks,
+        sowIndoorsEndWeeks: input.sowIndoorsEndWeeks,
+        sowOutdoorsStartWeeks: input.sowOutdoorsStartWeeks,
+        sowOutdoorsEndWeeks: input.sowOutdoorsEndWeeks,
+        transplantStartWeeks: input.transplantStartWeeks,
+        transplantEndWeeks: input.transplantEndWeeks,
+        harvestStartDays: input.harvestStartDays,
+        harvestEndDays: input.harvestEndDays,
+        spacingCm: input.spacingCm,
+        successionIntervalDays: input.successionIntervalDays,
+      },
+    });
+
+    await writeAuditLog(tx, auth, "cultivationRule.update", "CultivationRule", rule.id, {
+      fields: Object.keys(input),
+      varietyId: rule.varietyId,
+    });
+
+    return rule;
+  });
+}
+
+export async function deleteCultivationRule(auth: AuthContext, ruleId: string) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    const existingRule = await tx.cultivationRule.findFirst({
+      where: {
+        id: ruleId,
+        variety: {
+          workspaceId: auth.workspaceId,
+        },
+      },
+    });
+
+    if (!existingRule) {
+      throw new ApiError(404, "CULTIVATION_RULE_NOT_FOUND", "Cultivation rule was not found in this workspace.");
+    }
+
+    await tx.cultivationRule.delete({ where: { id: ruleId } });
+    await writeAuditLog(tx, auth, "cultivationRule.delete", "CultivationRule", ruleId, {
+      varietyId: existingRule.varietyId,
+    });
   });
 }
 
@@ -806,6 +994,190 @@ export async function createPlantingEvent(
     });
 
     return plantingEvent;
+  });
+}
+
+async function restorePlantingConsumptionStock(
+  tx: Prisma.TransactionClient,
+  auth: AuthContext,
+  plantingEventId: string,
+) {
+  const linkedTransactions = await tx.seedBatchTransaction.findMany({
+    where: {
+      workspaceId: auth.workspaceId,
+      plantingEventId,
+      type: SeedBatchTransactionType.PLANTING_CONSUMPTION,
+    },
+  });
+
+  if (linkedTransactions.length > 1) {
+    throw new ApiError(
+      409,
+      "PLANTING_EVENT_UPDATE_BLOCKED",
+      "Planting event has multiple stock transactions and cannot be edited safely.",
+      { plantingEventId },
+    );
+  }
+
+  const linkedTransaction = linkedTransactions[0];
+
+  if (!linkedTransaction) {
+    return null;
+  }
+
+  const seedBatch = await assertSeedBatchInWorkspace(tx, auth.workspaceId, linkedTransaction.seedBatchId);
+  const quantityAfterRestore = new Prisma.Decimal(seedBatch.quantity).minus(linkedTransaction.quantityDelta);
+
+  await tx.seedBatch.update({
+    where: { id: seedBatch.id },
+    data: {
+      quantity: quantityAfterRestore,
+    },
+  });
+
+  await tx.seedBatchTransaction.delete({
+    where: { id: linkedTransaction.id },
+  });
+
+  return linkedTransaction;
+}
+
+async function applyPlantingConsumptionStock(
+  tx: Prisma.TransactionClient,
+  auth: AuthContext,
+  plantingEventId: string,
+  input: {
+    seedBatchId?: string | null;
+    quantityUsed?: number | null;
+    actualDate?: string | null;
+    plannedDate?: string | null;
+  },
+) {
+  if (!input.seedBatchId || !input.quantityUsed) {
+    return null;
+  }
+
+  const seedBatch = await assertSeedBatchInWorkspace(tx, auth.workspaceId, input.seedBatchId);
+  const quantityBefore = new Prisma.Decimal(seedBatch.quantity);
+  const quantityAfter = quantityBefore.minus(input.quantityUsed);
+
+  if (quantityAfter.isNegative()) {
+    throw new ApiError(
+      409,
+      "INSUFFICIENT_SEED_STOCK",
+      "Seed batch quantity would fall below zero.",
+    );
+  }
+
+  await tx.seedBatch.update({
+    where: { id: seedBatch.id },
+    data: {
+      quantity: quantityAfter,
+    },
+  });
+
+  return tx.seedBatchTransaction.create({
+    data: {
+      workspaceId: auth.workspaceId,
+      seedBatchId: input.seedBatchId,
+      plantingEventId,
+      type: SeedBatchTransactionType.PLANTING_CONSUMPTION,
+      quantityDelta: new Prisma.Decimal(input.quantityUsed).negated(),
+      quantityBefore,
+      quantityAfter,
+      effectiveDate: input.actualDate
+        ? new Date(input.actualDate)
+        : input.plannedDate
+          ? new Date(input.plannedDate)
+          : new Date(),
+      reason: `Stock consumed by planting event ${plantingEventId}.`,
+    },
+  });
+}
+
+export async function updatePlantingEvent(
+  auth: AuthContext,
+  plantingEventId: string,
+  input: {
+    varietyId?: string;
+    seedBatchId?: string | null;
+    growingProfileId?: string | null;
+    type?: Prisma.PlantingEventUpdateInput["type"];
+    plannedDate?: string | null;
+    actualDate?: string | null;
+    quantityUsed?: number | null;
+    locationNote?: string | null;
+    notes?: string | null;
+  },
+) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    const existingEvent = await assertPlantingEventInWorkspace(tx, auth.workspaceId, plantingEventId);
+
+    if (input.varietyId) {
+      await assertVarietyInWorkspace(tx, auth.workspaceId, input.varietyId);
+    }
+
+    if (input.growingProfileId) {
+      await assertGrowingProfileInWorkspace(tx, auth.workspaceId, input.growingProfileId);
+    }
+
+    if (input.seedBatchId) {
+      await assertSeedBatchInWorkspace(tx, auth.workspaceId, input.seedBatchId);
+    }
+
+    await restorePlantingConsumptionStock(tx, auth, plantingEventId);
+
+    const nextEventValues = {
+      varietyId: input.varietyId ?? existingEvent.varietyId,
+      seedBatchId: input.seedBatchId === undefined ? existingEvent.seedBatchId : input.seedBatchId,
+      growingProfileId:
+        input.growingProfileId === undefined ? existingEvent.growingProfileId : input.growingProfileId,
+      type: input.type ?? existingEvent.type,
+      plannedDate: input.plannedDate === undefined ? existingEvent.plannedDate : input.plannedDate ? new Date(input.plannedDate) : null,
+      actualDate: input.actualDate === undefined ? existingEvent.actualDate : input.actualDate ? new Date(input.actualDate) : null,
+      quantityUsed:
+        input.quantityUsed === undefined
+          ? existingEvent.quantityUsed
+          : input.quantityUsed === null
+            ? null
+            : new Prisma.Decimal(input.quantityUsed),
+      locationNote: input.locationNote === undefined ? existingEvent.locationNote : input.locationNote,
+      notes: input.notes === undefined ? existingEvent.notes : input.notes,
+    };
+
+    const plantingEvent = await tx.plantingEvent.update({
+      where: { id: plantingEventId },
+      data: nextEventValues,
+    });
+
+    const stockTransaction = await applyPlantingConsumptionStock(tx, auth, plantingEventId, {
+      seedBatchId: plantingEvent.seedBatchId,
+      quantityUsed: plantingEvent.quantityUsed ? Number(plantingEvent.quantityUsed.toString()) : null,
+      actualDate: plantingEvent.actualDate?.toISOString() ?? null,
+      plannedDate: plantingEvent.plannedDate?.toISOString() ?? null,
+    });
+
+    await writeAuditLog(tx, auth, "plantingEvent.update", "PlantingEvent", plantingEvent.id, {
+      fields: Object.keys(input),
+      seedBatchId: plantingEvent.seedBatchId,
+      quantityUsed: plantingEvent.quantityUsed?.toString() ?? null,
+      stockTransactionId: stockTransaction?.id ?? null,
+    });
+
+    return plantingEvent;
+  });
+}
+
+export async function deletePlantingEvent(auth: AuthContext, plantingEventId: string) {
+  requireWriteAccess(auth);
+
+  return prisma.$transaction(async (tx) => {
+    await assertPlantingEventInWorkspace(tx, auth.workspaceId, plantingEventId);
+    await restorePlantingConsumptionStock(tx, auth, plantingEventId);
+    await tx.plantingEvent.delete({ where: { id: plantingEventId } });
+    await writeAuditLog(tx, auth, "plantingEvent.delete", "PlantingEvent", plantingEventId, {});
   });
 }
 
