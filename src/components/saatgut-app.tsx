@@ -3977,28 +3977,6 @@ export function SaatgutApp() {
                 />
               </section>
               <div className="space-y-4">
-              <Panel title={t.rules.title} subtitle={t.rules.subtitle}>
-                <DataForm state={ruleState} onSubmit={submitRule} submitLabel={t.rules.saveRule}>
-                  <Field label={t.forms.variety} name="varietyId" fieldErrors={ruleState.fieldErrors} optionalLabel={t.common.optional}>
-                    <select
-                      className="field-input"
-                      value={ruleForm.varietyId}
-                      onChange={(event) =>
-                        setRuleForm((current) => ({ ...current, varietyId: event.target.value }))
-                      }
-                    >
-                      <option value="">{t.common.selectVariety}</option>
-                      {(dashboard?.varieties ?? []).map((variety) => (
-                        <option key={variety.id} value={variety.id}>
-                          {variety.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <RuleGrid form={ruleForm} setForm={setRuleForm} t={t} />
-                </DataForm>
-              </Panel>
-
               <Panel title={t.rules.currentTitle} subtitle={t.rules.currentSubtitle}>
                 {dashboard?.rules.length ? (
                   <div className="grid gap-3">
@@ -4051,6 +4029,28 @@ export function SaatgutApp() {
                     copy={t.rules.noRulesCopy}
                   />
                 )}
+              </Panel>
+
+              <Panel title={t.rules.title} subtitle={t.rules.subtitle}>
+                <DataForm state={ruleState} onSubmit={submitRule} submitLabel={t.rules.saveRule}>
+                  <Field label={t.forms.variety} name="varietyId" fieldErrors={ruleState.fieldErrors} optionalLabel={t.common.optional}>
+                    <select
+                      className="field-input"
+                      value={ruleForm.varietyId}
+                      onChange={(event) =>
+                        setRuleForm((current) => ({ ...current, varietyId: event.target.value }))
+                      }
+                    >
+                      <option value="">{t.common.selectVariety}</option>
+                      {(dashboard?.varieties ?? []).map((variety) => (
+                        <option key={variety.id} value={variety.id}>
+                          {variety.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <RuleGrid form={ruleForm} setForm={setRuleForm} t={t} />
+                </DataForm>
               </Panel>
               </div>
             </div>
