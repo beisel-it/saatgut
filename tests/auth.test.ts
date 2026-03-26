@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { createInviteToken, hashInviteToken } from "@/lib/auth/invite";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSessionToken, verifySessionToken } from "@/lib/auth/session";
 
@@ -45,5 +46,14 @@ describe("session token helpers", () => {
     );
 
     expect(verifySessionToken(token, 1000 * 60 * 60 * 24 * 8)).toBeNull();
+  });
+});
+
+describe("invite token helpers", () => {
+  it("creates opaque invite tokens and hashes them deterministically", () => {
+    const token = createInviteToken();
+
+    expect(token.length).toBeGreaterThan(20);
+    expect(hashInviteToken(token)).toBe(hashInviteToken(token));
   });
 });

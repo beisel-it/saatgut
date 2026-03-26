@@ -93,6 +93,10 @@ export async function loginUser(input: { email: string; password: string }) {
     throw new ApiError(401, "INVALID_CREDENTIALS", "Email or password is incorrect.");
   }
 
+  if (!user.isActive) {
+    throw new ApiError(403, "USER_DEACTIVATED", "This user account has been deactivated.");
+  }
+
   const membership = user.memberships[0];
 
   if (!membership) {

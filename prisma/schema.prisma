@@ -23,6 +23,12 @@ enum MembershipRole {
   VIEWER
 }
 
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
 enum SpeciesCategory {
   VEGETABLE
   FRUIT
@@ -44,13 +50,24 @@ enum PlantingEventType {
   HARVEST
 }
 
+enum PlantingJournalEntryType {
+  OBSERVATION
+  TASK_NOTE
+  PEST_NOTE
+  WEATHER_NOTE
+  HARVEST_NOTE
+  SEED_SAVED
+}
+
 model User {
   id           String        @id @default(cuid())
   email        String        @unique
   passwordHash String
+  isActive     Boolean       @default(true)
   role         UserRole      @default(MEMBER)
   memberships  Membership[]
   auditLogs    AuditLog[]
+  sentInvites  UserInvite[]  @relation("SentInvites")
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 }
@@ -65,6 +82,8 @@ model Workspace {
   seedBatches     SeedBatch[]
   growingProfiles GrowingProfile[]
   plantingEvents  PlantingEvent[]
+  journalEntries  PlantingJournalEntry[]
+  invites         UserInvite[]
   auditLogs       AuditLog[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
@@ -102,6 +121,7 @@ model Variety {
   name            String
   description     String?
   heirloom        Boolean           @default(false)
+  tags            String[]          @default([])
   notes           String?
   workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   species         Species           @relation(fields: [speciesId], references: [id], onDelete: Restrict)
@@ -109,6 +129,7 @@ model Variety {
   seedBatches     SeedBatch[]
   cultivationRule CultivationRule?
   plantingEvents  PlantingEvent[]
+  journalEntries  PlantingJournalEntry[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -138,6 +159,7 @@ model SeedBatch {
   workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   variety         Variety          @relation(fields: [varietyId], references: [id], onDelete: Cascade)
   plantingEvents  PlantingEvent[]
+  journalEntries  PlantingJournalEntry[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -194,10 +216,52 @@ model PlantingEvent {
   variety         Variety           @relation(fields: [varietyId], references: [id], onDelete: Cascade)
   seedBatch       SeedBatch?        @relation(fields: [seedBatchId], references: [id], onDelete: SetNull)
   growingProfile  GrowingProfile?   @relation(fields: [growingProfileId], references: [id], onDelete: SetNull)
+  journalEntries  PlantingJournalEntry[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
   @@index([workspaceId, plannedDate])
+}
+
+model PlantingJournalEntry {
+  id              String                   @id @default(cuid())
+  workspaceId     String
+  varietyId       String?
+  seedBatchId     String?
+  plantingEventId String?
+  entryType       PlantingJournalEntryType
+  title           String
+  details         String?
+  entryDate       DateTime
+  quantity        Decimal?                 @db.Decimal(10, 2)
+  unit            SeedQuantityUnit?
+  tags            String[]                 @default([])
+  workspace       Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  variety         Variety?                 @relation(fields: [varietyId], references: [id], onDelete: SetNull)
+  seedBatch       SeedBatch?               @relation(fields: [seedBatchId], references: [id], onDelete: SetNull)
+  plantingEvent   PlantingEvent?           @relation(fields: [plantingEventId], references: [id], onDelete: SetNull)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@index([workspaceId, entryDate])
+}
+
+model UserInvite {
+  id              String         @id @default(cuid())
+  workspaceId     String
+  email           String
+  role            MembershipRole @default(MEMBER)
+  invitedByUserId String
+  tokenHash       String         @unique
+  status          InviteStatus   @default(PENDING)
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedByUser   User           @relation("SentInvites", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([workspaceId, email, status])
 }
 
 model AuditLog {

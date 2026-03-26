@@ -47,6 +47,10 @@ export async function requireAuth(request: Request): Promise<AuthContext> {
     throw new ApiError(403, "WORKSPACE_ACCESS_DENIED", "Workspace access was not found.");
   }
 
+  if (!membership.user.isActive) {
+    throw new ApiError(403, "USER_DEACTIVATED", "This user account has been deactivated.");
+  }
+
   return {
     userId: membership.userId,
     workspaceId: membership.workspaceId,

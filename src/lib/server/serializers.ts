@@ -16,6 +16,7 @@ export function serializeDecimal(value: Decimalish): string | null {
 export function serializeUser(user: {
   id: string;
   email: string;
+  isActive: boolean;
   role: UserRole;
   createdAt: Date;
   updatedAt: Date;
@@ -81,6 +82,7 @@ export function serializeVariety(variety: {
   name: string;
   description: string | null;
   heirloom: boolean;
+  tags: string[];
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -227,5 +229,50 @@ export function serializeAuditLog(log: {
   return {
     ...log,
     createdAt: log.createdAt.toISOString(),
+  };
+}
+
+export function serializeJournalEntry(entry: {
+  id: string;
+  workspaceId: string;
+  varietyId: string | null;
+  seedBatchId: string | null;
+  plantingEventId: string | null;
+  entryType: string;
+  title: string;
+  details: string | null;
+  entryDate: Date;
+  quantity: Decimalish;
+  unit: SeedQuantityUnit | null;
+  tags: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    ...entry,
+    quantity: serializeDecimal(entry.quantity),
+    entryDate: entry.entryDate.toISOString(),
+    createdAt: entry.createdAt.toISOString(),
+    updatedAt: entry.updatedAt.toISOString(),
+  };
+}
+
+export function serializeInvite(invite: {
+  id: string;
+  workspaceId: string;
+  email: string;
+  role: MembershipRole;
+  status: string;
+  expiresAt: Date;
+  acceptedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    ...invite,
+    expiresAt: invite.expiresAt.toISOString(),
+    acceptedAt: invite.acceptedAt?.toISOString() ?? null,
+    createdAt: invite.createdAt.toISOString(),
+    updatedAt: invite.updatedAt.toISOString(),
   };
 }

@@ -12,6 +12,7 @@ export type ApiErrorPayload = {
 export type User = {
   id: string;
   email: string;
+  isActive: boolean;
   role: "ADMIN" | "MEMBER";
   createdAt: string;
   updatedAt: string;
@@ -70,6 +71,7 @@ export type Variety = {
   name: string;
   description: string | null;
   heirloom: boolean;
+  tags: string[];
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -173,4 +175,33 @@ export type DashboardData = {
   >;
   calendar: CalendarItem[];
   plantings: PlantingEvent[];
+};
+
+export type JournalEntry = {
+  id: string;
+  workspaceId: string;
+  varietyId: string | null;
+  seedBatchId: string | null;
+  plantingEventId: string | null;
+  entryType: "OBSERVATION" | "TASK_NOTE" | "PEST_NOTE" | "WEATHER_NOTE" | "HARVEST_NOTE" | "SEED_SAVED";
+  title: string;
+  details: string | null;
+  entryDate: string;
+  quantity: string | null;
+  unit: SeedBatch["unit"] | null;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UserInvite = {
+  id: string;
+  workspaceId: string;
+  email: string;
+  role: Membership["role"];
+  status: "PENDING" | "ACCEPTED" | "REVOKED";
+  expiresAt: string;
+  acceptedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 };

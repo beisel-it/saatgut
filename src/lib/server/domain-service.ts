@@ -73,9 +73,21 @@ async function assertSeedBatchInWorkspace(db: DbClient, workspaceId: string, see
   return seedBatch;
 }
 
-export async function listSpecies(auth: AuthContext) {
+export async function listSpecies(
+  auth: AuthContext,
+  filters: { q?: string; category?: Prisma.SpeciesWhereInput["category"] } = {},
+) {
   return prisma.species.findMany({
-    where: { workspaceId: auth.workspaceId },
+    where: {
+      workspaceId: auth.workspaceId,
+      category: filters.category,
+      OR: filters.q
+        ? [
+            { commonName: { contains: filters.q, mode: "insensitive" } },
+            { latinName: { contains: filters.q, mode: "insensitive" } },
+          ]
+        : undefined,
+    },
     orderBy: { commonName: "asc" },
   });
 }
@@ -123,6 +135,44 @@ export async function listVarieties(auth: AuthContext) {
   });
 }
 
+export async function searchVarieties(
+  auth: AuthContext,
+  filters: {
+    q?: string;
+    speciesId?: string;
+    category?: Prisma.SpeciesWhereInput["category"];
+    heirloom?: boolean;
+    tag?: string;
+  },
+) {
+  return prisma.variety.findMany({
+    where: {
+      workspaceId: auth.workspaceId,
+      speciesId: filters.speciesId,
+      heirloom: filters.heirloom,
+      tags: filters.tag ? { has: filters.tag } : undefined,
+      species: {
+        category: filters.category,
+      },
+      OR: filters.q
+        ? [
+            { name: { contains: filters.q, mode: "insensitive" } },
+            { description: { contains: filters.q, mode: "insensitive" } },
+            { notes: { contains: filters.q, mode: "insensitive" } },
+            { species: { commonName: { contains: filters.q, mode: "insensitive" } } },
+            { synonyms: { some: { name: { contains: filters.q, mode: "insensitive" } } } },
+          ]
+        : undefined,
+    },
+    include: {
+      species: true,
+      synonyms: true,
+      cultivationRule: true,
+    },
+    orderBy: { name: "asc" },
+  });
+}
+
 export async function createVariety(
   auth: AuthContext,
   input: {
@@ -130,6 +180,7 @@ export async function createVariety(
     name: string;
     description?: string | null;
     heirloom: boolean;
+    tags: string[];
     notes?: string | null;
     synonyms: string[];
   },
@@ -146,6 +197,7 @@ export async function createVariety(
         name: input.name,
         description: input.description ?? null,
         heirloom: input.heirloom,
+        tags: input.tags,
         notes: input.notes ?? null,
         synonyms: input.synonyms.length
           ? {
