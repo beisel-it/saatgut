@@ -10,7 +10,7 @@ These test cases cover Saatgut's agreed first runnable slice:
 4. waitlist submission with `email` and `interest`
 5. in-place success confirmation
 
-This document is intentionally stack-agnostic until the implementation and test runner exist.
+This document remains mostly stack-agnostic until the implementation exists, even though a JavaScript toolchain has now been initialized.
 
 ## Preconditions
 
@@ -180,4 +180,4 @@ When the implementation lands, automation should map to these minimum checks:
 
 ## Current Blocker
 
-The repository currently has no application code, no selected runtime, and no test runner. These cases define what QA will verify once the frontend and backend slices exist.
+The repository now includes a runtime manifest, but it still has no application source files and no configured automated test flow beyond a placeholder `npm test`. These cases define what QA will verify once the frontend and backend slices exist.
