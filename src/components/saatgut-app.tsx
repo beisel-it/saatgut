@@ -13,7 +13,10 @@ import {
   createSeedBatch,
   createSpecies,
   createVariety,
+  deleteCultivationRule,
   deleteSeedBatch,
+  deleteGrowingProfile,
+  deletePlantingEvent,
   deleteSpecies,
   deleteVariety,
   fetchDashboardData,
@@ -22,6 +25,9 @@ import {
   logoutUser,
   registerUser,
   reverseSeedBatchTransaction,
+  updateCultivationRule,
+  updateGrowingProfile,
+  updatePlantingEvent,
   updateSeedBatch,
   updateSpecies,
   updateVariety,
@@ -33,6 +39,7 @@ import type {
   CalendarItem,
   DashboardData,
   GrowingProfile,
+  PlantingEvent,
   SeedBatch,
   SeedBatchTransaction,
   SeedBatchWarning,
@@ -76,6 +83,12 @@ type PacketIntakeFormValues = {
 
 type CatalogDeleteTarget = {
   type: "species" | "variety" | "seedBatch";
+  id: string;
+  label: string;
+};
+
+type AppDeleteTarget = CatalogDeleteTarget | {
+  type: "profile" | "rule" | "planting";
   id: string;
   label: string;
 };
@@ -279,8 +292,11 @@ export function SaatgutApp() {
   const [seedBatchEditState, setSeedBatchEditState] = useState<FormState>(initialFormState);
   const [catalogDeleteState, setCatalogDeleteState] = useState<FormState>(initialFormState);
   const [profileState, setProfileState] = useState<FormState>(initialFormState);
+  const [profileEditState, setProfileEditState] = useState<FormState>(initialFormState);
   const [ruleState, setRuleState] = useState<FormState>(initialFormState);
+  const [ruleEditState, setRuleEditState] = useState<FormState>(initialFormState);
   const [plantingState, setPlantingState] = useState<FormState>(initialFormState);
+  const [plantingEditState, setPlantingEditState] = useState<FormState>(initialFormState);
   const [germinationState, setGerminationState] = useState<FormState>(initialFormState);
   const [correctionState, setCorrectionState] = useState<FormState>(initialFormState);
 
@@ -348,8 +364,16 @@ export function SaatgutApp() {
     storageLocation: "",
     notes: "",
   });
-  const [catalogDeleteTarget, setCatalogDeleteTarget] = useState<CatalogDeleteTarget | null>(null);
+  const [catalogDeleteTarget, setCatalogDeleteTarget] = useState<AppDeleteTarget | null>(null);
   const [profileForm, setProfileForm] = useState({
+    name: "",
+    lastFrostDate: "",
+    firstFrostDate: "",
+    notes: "",
+    isActive: true,
+  });
+  const [profileEditId, setProfileEditId] = useState("");
+  const [profileEditForm, setProfileEditForm] = useState({
     name: "",
     lastFrostDate: "",
     firstFrostDate: "",
@@ -369,7 +393,34 @@ export function SaatgutApp() {
     spacingCm: "",
     successionIntervalDays: "",
   });
+  const [ruleEditId, setRuleEditId] = useState("");
+  const [ruleEditForm, setRuleEditForm] = useState<RuleFormValues>({
+    varietyId: "",
+    sowIndoorsStartWeeks: "",
+    sowIndoorsEndWeeks: "",
+    sowOutdoorsStartWeeks: "",
+    sowOutdoorsEndWeeks: "",
+    transplantStartWeeks: "",
+    transplantEndWeeks: "",
+    harvestStartDays: "",
+    harvestEndDays: "",
+    spacingCm: "",
+    successionIntervalDays: "",
+  });
   const [plantingForm, setPlantingForm] = useState({
+    varietyId: "",
+    seedBatchId: "",
+    growingProfileId: "",
+    type: "SOW_INDOORS" as (typeof plantingTypes)[number],
+    plannedDate: "",
+    actualDate: "",
+    quantityUsed: "",
+    locationNote: "",
+    notes: "",
+  });
+  const [plantingEditId, setPlantingEditId] = useState("");
+  const [plantingEditOpen, setPlantingEditOpen] = useState(false);
+  const [plantingEditForm, setPlantingEditForm] = useState({
     varietyId: "",
     seedBatchId: "",
     growingProfileId: "",
@@ -864,7 +915,144 @@ export function SaatgutApp() {
     }
   }
 
-  function openCatalogDelete(target: CatalogDeleteTarget) {
+  function startProfileEdit(profile: GrowingProfile) {
+    setProfileEditId(profile.id);
+    setProfileEditState(initialFormState);
+    setProfileEditForm({
+      name: profile.name,
+      lastFrostDate: profile.lastFrostDate.slice(0, 10),
+      firstFrostDate: profile.firstFrostDate.slice(0, 10),
+      notes: profile.notes ?? "",
+      isActive: profile.isActive,
+    });
+  }
+
+  function cancelProfileEdit() {
+    setProfileEditId("");
+    setProfileEditState(initialFormState);
+  }
+
+  async function submitProfileEdit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!profileEditId) return;
+    setProfileEditState(initialFormState);
+
+    try {
+      await updateGrowingProfile(profileEditId, {
+        name: profileEditForm.name,
+        lastFrostDate: toIsoDate(profileEditForm.lastFrostDate),
+        firstFrostDate: toIsoDate(profileEditForm.firstFrostDate),
+        notes: profileEditForm.notes || null,
+        isActive: profileEditForm.isActive,
+      });
+      setProfileEditState({ error: null, success: t.statuses.profileUpdated, fieldErrors: {} });
+      setProfileEditId("");
+      await loadDashboard();
+    } catch (error) {
+      setProfileEditState(toFormState(error, t));
+    }
+  }
+
+  function startRuleEdit(rule: DashboardData["rules"][number]) {
+    setRuleEditId(rule.id);
+    setRuleEditState(initialFormState);
+    setRuleEditForm({
+      varietyId: rule.varietyId,
+      sowIndoorsStartWeeks: rule.sowIndoorsStartWeeks?.toString() ?? "",
+      sowIndoorsEndWeeks: rule.sowIndoorsEndWeeks?.toString() ?? "",
+      sowOutdoorsStartWeeks: rule.sowOutdoorsStartWeeks?.toString() ?? "",
+      sowOutdoorsEndWeeks: rule.sowOutdoorsEndWeeks?.toString() ?? "",
+      transplantStartWeeks: rule.transplantStartWeeks?.toString() ?? "",
+      transplantEndWeeks: rule.transplantEndWeeks?.toString() ?? "",
+      harvestStartDays: rule.harvestStartDays?.toString() ?? "",
+      harvestEndDays: rule.harvestEndDays?.toString() ?? "",
+      spacingCm: rule.spacingCm?.toString() ?? "",
+      successionIntervalDays: rule.successionIntervalDays?.toString() ?? "",
+    });
+  }
+
+  function cancelRuleEdit() {
+    setRuleEditId("");
+    setRuleEditState(initialFormState);
+  }
+
+  async function submitRuleEdit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!ruleEditId) return;
+    setRuleEditState(initialFormState);
+
+    try {
+      await updateCultivationRule(ruleEditId, {
+        varietyId: ruleEditForm.varietyId,
+        sowIndoorsStartWeeks: ruleEditForm.sowIndoorsStartWeeks ? Number(ruleEditForm.sowIndoorsStartWeeks) : null,
+        sowIndoorsEndWeeks: ruleEditForm.sowIndoorsEndWeeks ? Number(ruleEditForm.sowIndoorsEndWeeks) : null,
+        sowOutdoorsStartWeeks: ruleEditForm.sowOutdoorsStartWeeks ? Number(ruleEditForm.sowOutdoorsStartWeeks) : null,
+        sowOutdoorsEndWeeks: ruleEditForm.sowOutdoorsEndWeeks ? Number(ruleEditForm.sowOutdoorsEndWeeks) : null,
+        transplantStartWeeks: ruleEditForm.transplantStartWeeks ? Number(ruleEditForm.transplantStartWeeks) : null,
+        transplantEndWeeks: ruleEditForm.transplantEndWeeks ? Number(ruleEditForm.transplantEndWeeks) : null,
+        harvestStartDays: ruleEditForm.harvestStartDays ? Number(ruleEditForm.harvestStartDays) : null,
+        harvestEndDays: ruleEditForm.harvestEndDays ? Number(ruleEditForm.harvestEndDays) : null,
+        spacingCm: ruleEditForm.spacingCm ? Number(ruleEditForm.spacingCm) : null,
+        successionIntervalDays: ruleEditForm.successionIntervalDays ? Number(ruleEditForm.successionIntervalDays) : null,
+      });
+      setRuleEditState({ error: null, success: t.statuses.ruleUpdated, fieldErrors: {} });
+      setRuleEditId("");
+      await loadDashboard();
+    } catch (error) {
+      setRuleEditState(toFormState(error, t));
+    }
+  }
+
+  function openPlantingEdit(event: PlantingEvent) {
+    setPlantingEditId(event.id);
+    setPlantingEditState(initialFormState);
+    setPlantingEditForm({
+      varietyId: event.varietyId,
+      seedBatchId: event.seedBatchId ?? "",
+      growingProfileId: event.growingProfileId ?? "",
+      type: event.type,
+      plannedDate: event.plannedDate?.slice(0, 10) ?? "",
+      actualDate: event.actualDate?.slice(0, 10) ?? "",
+      quantityUsed: event.quantityUsed ?? "",
+      locationNote: event.locationNote ?? "",
+      notes: event.notes ?? "",
+    });
+    setPlantingEditOpen(true);
+  }
+
+  function closePlantingEdit() {
+    setPlantingEditOpen(false);
+    setPlantingEditId("");
+    setPlantingEditState(initialFormState);
+  }
+
+  async function submitPlantingEdit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!plantingEditId) return;
+    setPlantingEditState(initialFormState);
+
+    try {
+      await updatePlantingEvent(plantingEditId, {
+        varietyId: plantingEditForm.varietyId,
+        seedBatchId: plantingEditForm.seedBatchId || null,
+        growingProfileId: plantingEditForm.growingProfileId || null,
+        type: plantingEditForm.type,
+        plannedDate: plantingEditForm.plannedDate ? toIsoDate(plantingEditForm.plannedDate) : null,
+        actualDate: plantingEditForm.actualDate ? toIsoDate(plantingEditForm.actualDate) : null,
+        quantityUsed: plantingEditForm.quantityUsed ? Number(plantingEditForm.quantityUsed) : null,
+        locationNote: plantingEditForm.locationNote || null,
+        notes: plantingEditForm.notes || null,
+      });
+      setPlantingEditState({ error: null, success: t.statuses.plantingUpdated, fieldErrors: {} });
+      setPlantingEditOpen(false);
+      setPlantingEditId("");
+      await loadDashboard();
+    } catch (error) {
+      setPlantingEditState(toFormState(error, t));
+    }
+  }
+
+  function openCatalogDelete(target: AppDeleteTarget) {
     setCatalogDeleteState(initialFormState);
     setCatalogDeleteTarget(target);
   }
@@ -883,14 +1071,23 @@ export function SaatgutApp() {
         await deleteSpecies(catalogDeleteTarget.id);
       } else if (catalogDeleteTarget.type === "variety") {
         await deleteVariety(catalogDeleteTarget.id);
-      } else {
+      } else if (catalogDeleteTarget.type === "seedBatch") {
         await deleteSeedBatch(catalogDeleteTarget.id);
+      } else if (catalogDeleteTarget.type === "profile") {
+        await deleteGrowingProfile(catalogDeleteTarget.id);
+      } else if (catalogDeleteTarget.type === "rule") {
+        await deleteCultivationRule(catalogDeleteTarget.id);
+      } else {
+        await deletePlantingEvent(catalogDeleteTarget.id);
       }
 
       setCatalogDeleteState({ error: null, success: t.statuses.catalogItemDeleted, fieldErrors: {} });
       if (catalogDeleteTarget.id === speciesEditId) setSpeciesEditId("");
       if (catalogDeleteTarget.id === varietyEditId) setVarietyEditId("");
       if (catalogDeleteTarget.id === seedBatchEditId) closeSeedBatchEdit();
+      if (catalogDeleteTarget.id === profileEditId) setProfileEditId("");
+      if (catalogDeleteTarget.id === ruleEditId) setRuleEditId("");
+      if (catalogDeleteTarget.id === plantingEditId) closePlantingEdit();
       await loadDashboard();
       setCatalogDeleteTarget(null);
     } catch (error) {
@@ -2792,6 +2989,139 @@ export function SaatgutApp() {
                 />
               </section>
               <div className="space-y-4">
+              <ResponsiveModal
+                open={plantingEditOpen}
+                title={t.plantings.editModalTitle}
+                subtitle={t.plantings.editModalSubtitle}
+                closeLabel={t.common.close}
+                onClose={closePlantingEdit}
+              >
+                <div className="rounded-lg border border-[var(--border)] bg-white/80 p-4 md:p-5">
+                  <DataForm state={plantingEditState} onSubmit={submitPlantingEdit} submitLabel={t.common.saveChanges}>
+                    <Field label={t.forms.variety} name="varietyId" fieldErrors={plantingEditState.fieldErrors} optionalLabel={t.common.optional}>
+                      <select
+                        className="field-input"
+                        value={plantingEditForm.varietyId}
+                        onChange={(event) =>
+                          setPlantingEditForm((current) => ({ ...current, varietyId: event.target.value, seedBatchId: "" }))
+                        }
+                      >
+                        <option value="">{t.common.selectVariety}</option>
+                        {(dashboard?.varieties ?? []).map((variety) => (
+                          <option key={variety.id} value={variety.id}>
+                            {variety.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label={t.forms.type} name="type" fieldErrors={plantingEditState.fieldErrors} optionalLabel={t.common.optional}>
+                        <select
+                          className="field-input"
+                          value={plantingEditForm.type}
+                          onChange={(event) =>
+                            setPlantingEditForm((current) => ({ ...current, type: event.target.value as (typeof plantingTypes)[number] }))
+                          }
+                        >
+                          {plantingTypes.map((type) => (
+                            <option key={type} value={type}>
+                              {labelPlantingType(type, t)}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label={t.forms.growingProfile} name="growingProfileId" fieldErrors={plantingEditState.fieldErrors} optional optionalLabel={t.common.optional}>
+                        <select
+                          className="field-input"
+                          value={plantingEditForm.growingProfileId}
+                          onChange={(event) =>
+                            setPlantingEditForm((current) => ({ ...current, growingProfileId: event.target.value }))
+                          }
+                        >
+                          <option value="">{t.common.none}</option>
+                          {(dashboard?.profiles ?? []).map((profile) => (
+                            <option key={profile.id} value={profile.id}>
+                              {profile.name}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label={t.forms.seedBatch} name="seedBatchId" fieldErrors={plantingEditState.fieldErrors} optional optionalLabel={t.common.optional}>
+                        <select
+                          className="field-input"
+                          value={plantingEditForm.seedBatchId}
+                          onChange={(event) =>
+                            setPlantingEditForm((current) => ({ ...current, seedBatchId: event.target.value }))
+                          }
+                        >
+                          <option value="">{t.common.none}</option>
+                          {(dashboard?.seedBatches ?? [])
+                            .filter((seedBatch) => !plantingEditForm.varietyId || seedBatch.varietyId === plantingEditForm.varietyId)
+                            .map((seedBatch) => (
+                              <option key={seedBatch.id} value={seedBatch.id}>
+                                {(varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback)} · {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()}
+                              </option>
+                            ))}
+                        </select>
+                      </Field>
+                      <Field label={t.forms.quantityUsed} name="quantityUsed" fieldErrors={plantingEditState.fieldErrors} optional optionalLabel={t.common.optional}>
+                        <input
+                          className="field-input"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={plantingEditForm.quantityUsed}
+                          onChange={(event) =>
+                            setPlantingEditForm((current) => ({ ...current, quantityUsed: event.target.value }))
+                          }
+                        />
+                      </Field>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label={t.forms.plannedDate} name="plannedDate" fieldErrors={plantingEditState.fieldErrors} optional optionalLabel={t.common.optional}>
+                        <input
+                          className="field-input"
+                          type="date"
+                          value={plantingEditForm.plannedDate}
+                          onChange={(event) =>
+                            setPlantingEditForm((current) => ({ ...current, plannedDate: event.target.value }))
+                          }
+                        />
+                      </Field>
+                      <Field label={t.forms.actualDate} name="actualDate" fieldErrors={plantingEditState.fieldErrors} optional optionalLabel={t.common.optional}>
+                        <input
+                          className="field-input"
+                          type="date"
+                          value={plantingEditForm.actualDate}
+                          onChange={(event) =>
+                            setPlantingEditForm((current) => ({ ...current, actualDate: event.target.value }))
+                          }
+                        />
+                      </Field>
+                    </div>
+                    <Field label={t.forms.locationNote} name="locationNote" fieldErrors={plantingEditState.fieldErrors} optional optionalLabel={t.common.optional}>
+                      <input
+                        className="field-input"
+                        value={plantingEditForm.locationNote}
+                        onChange={(event) =>
+                          setPlantingEditForm((current) => ({ ...current, locationNote: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <Field label={t.forms.notes} name="notes" fieldErrors={plantingEditState.fieldErrors} optional optionalLabel={t.common.optional}>
+                      <textarea
+                        className="field-input min-h-24"
+                        value={plantingEditForm.notes}
+                        onChange={(event) =>
+                          setPlantingEditForm((current) => ({ ...current, notes: event.target.value }))
+                        }
+                      />
+                    </Field>
+                  </DataForm>
+                </div>
+              </ResponsiveModal>
               <Panel title={t.profiles.title} subtitle={t.profiles.subtitle} className="max-w-5xl">
                 <DataForm state={profileState} onSubmit={submitProfile} submitLabel={t.profiles.saveProfile}>
                   <Field label={t.forms.profileName} name="name" fieldErrors={profileState.fieldErrors} optionalLabel={t.common.optional}>
@@ -2875,66 +3205,99 @@ export function SaatgutApp() {
                               : "border-[var(--border)] bg-[var(--muted)]",
                           )}
                         >
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <h3 className="text-lg font-semibold">{profile.name}</h3>
-                            {profile.isActive ? (
-                              <span className="rounded-md bg-[var(--foreground)] px-3 py-1 text-xs font-semibold text-white">
-                                {t.common.active}
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">
-                            {t.profiles.lastFrost} {formatDate(profile.lastFrostDate, locale, t.common.notSet)} · {t.profiles.firstFrost} {formatDate(profile.firstFrostDate, locale, t.common.notSet)}
-                          </p>
-                          <div className="mt-4 grid gap-2">
-                            <label className="grid gap-2 text-sm font-medium">
-                              <span>{t.profiles.observedStage}</span>
-                              <select
-                                className="field-input"
-                                value={profile.phenologyStage ?? ""}
-                                onChange={(event) => {
-                                  void updateProfilePhenology(profile.id, {
-                                    phenologyStage: event.target.value || null,
-                                    phenologyObservedAt: new Date().toISOString(),
-                                    phenologyNotes: profile.phenologyNotes ?? null,
-                                  }).then(loadDashboard).catch((error) => setProfileState(toFormState(error, t)));
-                                }}
-                              >
-                                <option value="">{t.profiles.none}</option>
-                                {phenologyStageIds.map((stageId) => (
-                                  <option key={stageId} value={stageId}>
-                                    {t.phenologyStages[stageId].label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
-                              {(profile.phenologyStage
-                                ? t.phenologyStages[profile.phenologyStage as keyof typeof t.phenologyStages]?.hint
-                                : undefined) || t.profiles.phenologyFallback}
-                            </p>
-                          </div>
-                          <div className="mt-3 grid gap-2">
-                            <label className="grid gap-2 text-sm font-medium">
-                              <span>{t.profiles.phenologyNotes}</span>
-                              <textarea
-                                className="field-input min-h-20"
-                                value={profile.phenologyNotes ?? ""}
-                                onChange={(event) => {
-                                  void updateProfilePhenology(profile.id, {
-                                    phenologyStage: profile.phenologyStage ?? null,
-                                    phenologyObservedAt: profile.phenologyObservedAt ?? new Date().toISOString(),
-                                    phenologyNotes: event.target.value || null,
-                                  }).then(loadDashboard).catch((error) => setProfileState(toFormState(error, t)));
-                                }}
-                              />
-                            </label>
-                          </div>
-                        {profile.notes ? (
-                            <p className="mt-3 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
-                              {profile.notes}
-                            </p>
-                          ) : null}
+                          {profileEditId === profile.id ? (
+                            <DataForm state={profileEditState} onSubmit={submitProfileEdit} submitLabel={t.common.saveChanges}>
+                              <Field label={t.forms.profileName} name="name" fieldErrors={profileEditState.fieldErrors} optionalLabel={t.common.optional}>
+                                <input className="field-input" value={profileEditForm.name} onChange={(event) => setProfileEditForm((current) => ({ ...current, name: event.target.value }))} />
+                              </Field>
+                              <div className="grid gap-4 md:grid-cols-2">
+                                <Field label={t.forms.lastFrostDate} name="lastFrostDate" fieldErrors={profileEditState.fieldErrors} optionalLabel={t.common.optional}>
+                                  <input className="field-input" type="date" value={profileEditForm.lastFrostDate} onChange={(event) => setProfileEditForm((current) => ({ ...current, lastFrostDate: event.target.value }))} />
+                                </Field>
+                                <Field label={t.forms.firstFrostDate} name="firstFrostDate" fieldErrors={profileEditState.fieldErrors} optionalLabel={t.common.optional}>
+                                  <input className="field-input" type="date" value={profileEditForm.firstFrostDate} onChange={(event) => setProfileEditForm((current) => ({ ...current, firstFrostDate: event.target.value }))} />
+                                </Field>
+                              </div>
+                              <label className="flex items-center gap-3 text-sm font-medium">
+                                <input type="checkbox" checked={profileEditForm.isActive} onChange={(event) => setProfileEditForm((current) => ({ ...current, isActive: event.target.checked }))} />
+                                {t.profiles.markActive}
+                              </label>
+                              <Field label={t.forms.notes} name="notes" fieldErrors={profileEditState.fieldErrors} optional optionalLabel={t.common.optional}>
+                                <textarea className="field-input min-h-24" value={profileEditForm.notes} onChange={(event) => setProfileEditForm((current) => ({ ...current, notes: event.target.value }))} />
+                              </Field>
+                              <div className="flex flex-wrap gap-3">
+                                <button className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit">{t.common.saveChanges}</button>
+                                <button type="button" onClick={cancelProfileEdit} className="w-full rounded-lg border border-[var(--border)] bg-white px-5 py-3 text-sm font-semibold sm:w-fit">{t.common.cancel}</button>
+                              </div>
+                            </DataForm>
+                          ) : (
+                            <>
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <h3 className="text-lg font-semibold">{profile.name}</h3>
+                                <div className="flex flex-wrap gap-2">
+                                  {profile.isActive ? (
+                                    <span className="rounded-md bg-[var(--foreground)] px-3 py-1 text-xs font-semibold text-white">
+                                      {t.common.active}
+                                    </span>
+                                  ) : null}
+                                  <button type="button" onClick={() => startProfileEdit(profile)} className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold">{t.common.edit}</button>
+                                  <button type="button" onClick={() => openCatalogDelete({ type: "profile", id: profile.id, label: profile.name })} className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{t.common.delete}</button>
+                                </div>
+                              </div>
+                              <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">
+                                {t.profiles.lastFrost} {formatDate(profile.lastFrostDate, locale, t.common.notSet)} · {t.profiles.firstFrost} {formatDate(profile.firstFrostDate, locale, t.common.notSet)}
+                              </p>
+                              <div className="mt-4 grid gap-2">
+                                <label className="grid gap-2 text-sm font-medium">
+                                  <span>{t.profiles.observedStage}</span>
+                                  <select
+                                    className="field-input"
+                                    value={profile.phenologyStage ?? ""}
+                                    onChange={(event) => {
+                                      void updateProfilePhenology(profile.id, {
+                                        phenologyStage: event.target.value || null,
+                                        phenologyObservedAt: new Date().toISOString(),
+                                        phenologyNotes: profile.phenologyNotes ?? null,
+                                      }).then(loadDashboard).catch((error) => setProfileState(toFormState(error, t)));
+                                    }}
+                                  >
+                                    <option value="">{t.profiles.none}</option>
+                                    {phenologyStageIds.map((stageId) => (
+                                      <option key={stageId} value={stageId}>
+                                        {t.phenologyStages[stageId].label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                                  {(profile.phenologyStage
+                                    ? t.phenologyStages[profile.phenologyStage as keyof typeof t.phenologyStages]?.hint
+                                    : undefined) || t.profiles.phenologyFallback}
+                                </p>
+                              </div>
+                              <div className="mt-3 grid gap-2">
+                                <label className="grid gap-2 text-sm font-medium">
+                                  <span>{t.profiles.phenologyNotes}</span>
+                                  <textarea
+                                    className="field-input min-h-20"
+                                    value={profile.phenologyNotes ?? ""}
+                                    onChange={(event) => {
+                                      void updateProfilePhenology(profile.id, {
+                                        phenologyStage: profile.phenologyStage ?? null,
+                                        phenologyObservedAt: profile.phenologyObservedAt ?? new Date().toISOString(),
+                                        phenologyNotes: event.target.value || null,
+                                      }).then(loadDashboard).catch((error) => setProfileState(toFormState(error, t)));
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                              {profile.notes ? (
+                                <p className="mt-3 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                                  {profile.notes}
+                                </p>
+                              ) : null}
+                            </>
+                          )}
                         </article>
                       ))}
                     </div>
@@ -2991,13 +3354,41 @@ export function SaatgutApp() {
                         key={rule.id}
                         className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
                       >
-                        <h3 className="text-lg font-semibold">{rule.variety.name}</h3>
-                        <div className="mt-3 grid gap-2 text-sm text-[color:rgba(24,49,40,0.72)] md:grid-cols-2">
-                          <p>{t.rules.indoorSowing}: {nullableRange(rule.sowIndoorsStartWeeks, rule.sowIndoorsEndWeeks, t.rules.weeksBefore, t.common.notDefined)}</p>
-                          <p>{t.rules.outdoorSowing}: {nullableRange(rule.sowOutdoorsStartWeeks, rule.sowOutdoorsEndWeeks, t.rules.weeksBefore, t.common.notDefined)}</p>
-                          <p>{t.rules.transplant}: {nullableRange(rule.transplantStartWeeks, rule.transplantEndWeeks, t.rules.weeksAfter, t.common.notDefined)}</p>
-                          <p>{t.rules.harvest}: {nullableRange(rule.harvestStartDays, rule.harvestEndDays, t.rules.daysAfter, t.common.notDefined)}</p>
-                        </div>
+                        {ruleEditId === rule.id ? (
+                          <DataForm state={ruleEditState} onSubmit={submitRuleEdit} submitLabel={t.common.saveChanges}>
+                            <Field label={t.forms.variety} name="varietyId" fieldErrors={ruleEditState.fieldErrors} optionalLabel={t.common.optional}>
+                              <select className="field-input" value={ruleEditForm.varietyId} onChange={(event) => setRuleEditForm((current) => ({ ...current, varietyId: event.target.value }))}>
+                                <option value="">{t.common.selectVariety}</option>
+                                {(dashboard?.varieties ?? []).map((variety) => (
+                                  <option key={variety.id} value={variety.id}>
+                                    {variety.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </Field>
+                            <RuleGrid form={ruleEditForm} setForm={setRuleEditForm} t={t} />
+                            <div className="flex flex-wrap gap-3">
+                              <button className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit">{t.common.saveChanges}</button>
+                              <button type="button" onClick={cancelRuleEdit} className="w-full rounded-lg border border-[var(--border)] bg-white px-5 py-3 text-sm font-semibold sm:w-fit">{t.common.cancel}</button>
+                            </div>
+                          </DataForm>
+                        ) : (
+                          <>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <h3 className="text-lg font-semibold">{rule.variety.name}</h3>
+                              <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => startRuleEdit(rule)} className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold">{t.common.edit}</button>
+                                <button type="button" onClick={() => openCatalogDelete({ type: "rule", id: rule.id, label: rule.variety.name })} className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{t.common.delete}</button>
+                              </div>
+                            </div>
+                            <div className="mt-3 grid gap-2 text-sm text-[color:rgba(24,49,40,0.72)] md:grid-cols-2">
+                              <p>{t.rules.indoorSowing}: {nullableRange(rule.sowIndoorsStartWeeks, rule.sowIndoorsEndWeeks, t.rules.weeksBefore, t.common.notDefined)}</p>
+                              <p>{t.rules.outdoorSowing}: {nullableRange(rule.sowOutdoorsStartWeeks, rule.sowOutdoorsEndWeeks, t.rules.weeksBefore, t.common.notDefined)}</p>
+                              <p>{t.rules.transplant}: {nullableRange(rule.transplantStartWeeks, rule.transplantEndWeeks, t.rules.weeksAfter, t.common.notDefined)}</p>
+                              <p>{t.rules.harvest}: {nullableRange(rule.harvestStartDays, rule.harvestEndDays, t.rules.daysAfter, t.common.notDefined)}</p>
+                            </div>
+                          </>
+                        )}
                       </article>
                     ))}
                   </div>
@@ -3166,12 +3557,18 @@ export function SaatgutApp() {
                         className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                          <h3 className="text-base font-semibold">
-                            {varietiesById.get(event.varietyId)?.name ?? t.common.unknownVariety}
-                          </h3>
-                          <span className="rounded-md bg-white px-3 py-1 text-xs font-semibold">
-                            {labelPlantingType(event.type, t)}
-                          </span>
+                          <div>
+                            <h3 className="text-base font-semibold">
+                              {varietiesById.get(event.varietyId)?.name ?? t.common.unknownVariety}
+                            </h3>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-md bg-white px-3 py-1 text-xs font-semibold">
+                              {labelPlantingType(event.type, t)}
+                            </span>
+                            <button type="button" onClick={() => openPlantingEdit(event)} className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold">{t.common.edit}</button>
+                            <button type="button" onClick={() => openCatalogDelete({ type: "planting", id: event.id, label: varietiesById.get(event.varietyId)?.name ?? t.common.unknownVariety })} className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{t.common.delete}</button>
+                          </div>
                         </div>
                         <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">
                           {event.actualDate ? `${t.plantings.actual} ${formatDate(event.actualDate, locale, t.common.notSet)}` : `${t.plantings.planned} ${formatDate(event.plannedDate, locale, t.common.notSet)}`}

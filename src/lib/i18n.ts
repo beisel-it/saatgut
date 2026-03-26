@@ -64,8 +64,11 @@ const de = {
     seedBatchUpdated: "Charge aktualisiert.",
     catalogItemDeleted: "Eintrag entfernt.",
     profileSaved: "Anbauprofil gespeichert.",
+    profileUpdated: "Anbauprofil aktualisiert.",
     cultivationRuleSaved: "Anbauregel gespeichert.",
+    ruleUpdated: "Anbauregel aktualisiert.",
     plantingSaved: "Pflanzereignis gespeichert.",
+    plantingUpdated: "Pflanzereignis aktualisiert.",
     germinationLogged: "Keimtest erfasst.",
     stockCorrectionApplied: "Bestandskorrektur übernommen.",
     stockReversalApplied: "Korrekturstorno übernommen.",
@@ -300,6 +303,9 @@ const de = {
     savePlanting: "Pflanzereignis speichern",
     ledgerTitle: "Letzte Einträge",
     ledgerSubtitle: "Letzte Einträge und mengenbezogene Pflanzhistorie.",
+    editModalTitle: "Pflanzereignis bearbeiten",
+    editModalSubtitle:
+      "Passe Sorte, Datum, verknüpfte Charge oder Mengenangaben an, ohne den Verlauf aus dem Blick zu verlieren.",
     noLedgerTitle: "Noch keine Pflanzprotokoll-Einträge",
     noLedgerCopy:
       "Erfasse ein Ereignis, um erledigte Arbeiten und relevante Saatgutabzüge nachzuverfolgen.",
@@ -566,8 +572,11 @@ const en: AppMessages = {
     seedBatchUpdated: "Seed batch updated.",
     catalogItemDeleted: "Item removed.",
     profileSaved: "Growing profile saved.",
+    profileUpdated: "Growing profile updated.",
     cultivationRuleSaved: "Cultivation rule saved.",
+    ruleUpdated: "Cultivation rule updated.",
     plantingSaved: "Planting event saved.",
+    plantingUpdated: "Planting event updated.",
     germinationLogged: "Germination test logged.",
     stockCorrectionApplied: "Stock correction applied.",
     stockReversalApplied: "Correction reversal applied.",
@@ -801,6 +810,9 @@ const en: AppMessages = {
     savePlanting: "Save planting event",
     ledgerTitle: "Recent entries",
     ledgerSubtitle: "Recent entries and quantity-aware planting history.",
+    editModalTitle: "Edit planting event",
+    editModalSubtitle:
+      "Adjust the variety, date, linked batch, or quantity details without losing the activity context.",
     noLedgerTitle: "No planting ledger entries",
     noLedgerCopy:
       "Log an event to track completed work and deduct seed stock where relevant.",
