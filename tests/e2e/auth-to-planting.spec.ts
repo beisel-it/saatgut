@@ -50,7 +50,7 @@ test("user can complete the seed-bank MVP flow from auth to planting", async ({ 
   await batchForm.getByRole("button", { name: "Save seed batch" }).click();
 
   await expect(page.getByText("Seed batch saved.")).toBeVisible();
-  await expect(page.getByText("100 seeds")).toBeVisible();
+  await expect(page.locator("body")).toContainText("100 seeds · Cold shelf");
 
   await page.getByRole("button", { name: "Profiles" }).click();
 
@@ -80,7 +80,7 @@ test("user can complete the seed-bank MVP flow from auth to planting", async ({ 
   await page.getByRole("button", { name: "Refresh workspace" }).click();
 
   await expect(page.getByText("14-day calendar")).toBeVisible();
-  await expect(page.getByText(varietyName)).toBeVisible();
+  await expect(page.getByRole("heading", { name: varietyName, exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Plantings" }).click();
 
@@ -107,5 +107,5 @@ test("user can complete the seed-bank MVP flow from auth to planting", async ({ 
   await expect(page.getByText("Greenhouse tray A")).toBeVisible();
 
   await page.getByRole("button", { name: "Catalog" }).click();
-  await expect(page.getByText("88 seeds")).toBeVisible();
+  await expect(page.locator("body")).toContainText("88 seeds · Cold shelf");
 });
