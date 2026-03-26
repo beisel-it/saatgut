@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 
 import { useI18n } from "@/components/i18n-provider";
@@ -941,9 +942,7 @@ export function SaatgutApp() {
     return (
       <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(127,155,71,0.18),transparent_30%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-6 py-10">
         <div className="mx-auto max-w-5xl rounded-xl border border-[var(--border)] bg-white/70 p-10 shadow-[var(--shadow)]">
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--accent-strong)]">
-            {t.common.brand}
-          </p>
+          <BrandLockup className="h-12 w-auto" priority />
           <h1 className="mt-4 text-4xl font-semibold tracking-tight">{t.common.loadingWorkspace}</h1>
         </div>
       </main>
@@ -955,13 +954,16 @@ export function SaatgutApp() {
       <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(127,155,71,0.22),transparent_32%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-5 py-8 md:px-10 md:py-12">
         <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-8 shadow-[var(--shadow)] md:p-10">
-            <ScreenHeader
-              eyebrow={t.common.brand}
-              title={t.auth.heroTitle}
-              subtitle={t.auth.heroSubtitle}
-              supportingCopy={t.auth.heroCopy}
-              titleClassName="max-w-[18ch] md:max-w-[19ch]"
-            />
+            <div className="space-y-6">
+              <BrandLockup className="h-14 w-auto md:h-16" priority />
+              <ScreenHeader
+                eyebrow=""
+                title={t.auth.heroTitle}
+                subtitle={t.auth.heroSubtitle}
+                supportingCopy={t.auth.heroCopy}
+                titleClassName="max-w-[18ch] md:max-w-[19ch]"
+              />
+            </div>
           </section>
 
           <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.94)] p-6 text-white shadow-[var(--shadow)] md:p-8">
@@ -1131,8 +1133,11 @@ export function SaatgutApp() {
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(127,155,71,0.18),transparent_28%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-4 py-4 md:px-6 md:py-6 print:bg-white print:px-0 print:py-0">
       <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="print-hide hidden rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-5 text-white shadow-[var(--shadow)] lg:sticky lg:top-4 lg:block lg:self-start">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-white/65">{t.common.brand}</p>
-          <h1 className="mt-3 max-w-full break-words text-2xl font-semibold tracking-tight md:text-3xl">{session.membership.workspace.name}</h1>
+          <div className="flex items-center gap-3">
+            <BrandMark className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-white/92 p-1.5" />
+            <BrandLockup className="h-9 w-auto brightness-0 invert" />
+          </div>
+          <h1 className="mt-4 max-w-full break-words text-2xl font-semibold tracking-tight md:text-3xl">{session.membership.workspace.name}</h1>
           <p className="mt-2 break-all text-sm text-white/70">
             {session.user.email} · {labelMembershipRole(session.membership.role, t)}
           </p>
@@ -1176,9 +1181,12 @@ export function SaatgutApp() {
         <section className="space-y-4">
           <div className="print-hide rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-3 text-white shadow-[var(--shadow)] lg:hidden">
             <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60">{t.common.brand}</p>
-                <h1 className="mt-1 truncate text-lg font-semibold tracking-tight">{session.membership.workspace.name}</h1>
+              <div className="flex min-w-0 items-center gap-3">
+                <BrandMark className="h-11 w-11 shrink-0 overflow-hidden rounded-md bg-white/92 p-1.5" />
+                <div className="min-w-0">
+                  <BrandLockup className="h-6 w-auto brightness-0 invert" />
+                  <h1 className="mt-1 truncate text-lg font-semibold tracking-tight">{session.membership.workspace.name}</h1>
+                </div>
               </div>
               <button
                 type="button"
@@ -2614,19 +2622,21 @@ function ScreenHeader({
 }) {
   return (
     <div>
-      <p
-        className={classNames(
-          "font-semibold uppercase tracking-[0.25em] text-[var(--accent-strong)]",
-          compact ? "text-xs" : "text-sm",
-        )}
-      >
-        {eyebrow}
-      </p>
+      {eyebrow ? (
+        <p
+          className={classNames(
+            "font-semibold uppercase tracking-[0.25em] text-[var(--accent-strong)]",
+            compact ? "text-xs" : "text-sm",
+          )}
+        >
+          {eyebrow}
+        </p>
+      ) : null}
       <h2
         className={classNames(
           compact
-            ? "mt-1.5 max-w-[24ch] text-[1.75rem] font-semibold tracking-tight text-balance leading-tight md:text-[2rem]"
-            : "mt-2 max-w-[18ch] text-[2.2rem] font-semibold tracking-tight text-balance leading-[1.05] md:text-[2.85rem]",
+            ? classNames(eyebrow ? "mt-1.5" : "mt-0", "max-w-[24ch] text-[1.75rem] font-semibold tracking-tight text-balance leading-tight md:text-[2rem]")
+            : classNames(eyebrow ? "mt-2" : "mt-0", "max-w-[18ch] text-[2.2rem] font-semibold tracking-tight text-balance leading-[1.05] md:text-[2.85rem]"),
           titleClassName,
         )}
       >
@@ -2651,6 +2661,37 @@ function ScreenHeader({
         </p>
       ) : null}
     </div>
+  );
+}
+
+function BrandLockup({
+  className,
+  priority = false,
+}: {
+  className?: string;
+  priority?: boolean;
+}) {
+  return (
+    <Image
+      src="/brand/logo-lockup.png"
+      alt="Saatgut"
+      width={920}
+      height={450}
+      priority={priority}
+      className={className}
+    />
+  );
+}
+
+function BrandMark({ className }: { className?: string }) {
+  return (
+    <Image
+      src="/brand/logo-mark.png"
+      alt="Saatgut Mark"
+      width={420}
+      height={420}
+      className={className}
+    />
   );
 }
 
