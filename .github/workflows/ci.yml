@@ -3,7 +3,12 @@ name: CI
 on:
   push:
     branches: ["main"]
+    tags: ["v*"]
   pull_request:
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   verify:
@@ -56,3 +61,62 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  publish-images:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs: verify
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract app image metadata
+        id: app-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=main,enable={{is_default_branch}}
+            type=sha
+            type=ref,event=tag
+
+      - name: Build and push app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.app-meta.outputs.tags }}
+          labels: ${{ steps.app-meta.outputs.labels }}
+
+      - name: Extract db image metadata
+        id: db-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-db
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=main,enable={{is_default_branch}}
+            type=sha
+            type=ref,event=tag
+
+      - name: Build and push db image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/db/Dockerfile
+          push: true
+          tags: ${{ steps.db-meta.outputs.tags }}
+          labels: ${{ steps.db-meta.outputs.labels }}

@@ -6,6 +6,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)
 ![Vitest](https://img.shields.io/badge/Vitest-tested-6E9F18)
 ![Playwright](https://img.shields.io/badge/Playwright-e2e-45BA4B)
+![GHCR](https://img.shields.io/badge/GHCR-publishable-181717)
 
 Saatgut is a self-hosted seed-bank and cultivation journal web app for running a practical home-growing workflow: catalog varieties, track seed batches, define frost-date-based growing profiles, derive a 14-day calendar, record planting activity, and manage seed quality signals such as germination tests and stock corrections.
 
@@ -97,6 +98,41 @@ Notes:
 - Compose derives the app `DATABASE_URL` from `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`.
 - The bundled PostgreSQL image reconciles `POSTGRES_PASSWORD` onto the persisted role during startup, which helps avoid stale-password issues on reused volumes.
 - This setup is intended to be self-hosting friendly and Portainer-friendly, but the README does not claim production hardening beyond the shipped health checks and container wiring.
+
+## 📦 GHCR Images
+
+GitHub Actions now publishes container images to GHCR after the verification job passes on `main` and version tags.
+
+Published image names:
+
+- `ghcr.io/beisel-it/saatgut:latest`
+- `ghcr.io/beisel-it/saatgut:main`
+- `ghcr.io/beisel-it/saatgut-db:latest`
+- `ghcr.io/beisel-it/saatgut-db:main`
+
+The workflow also publishes immutable SHA and Git tag variants.
+
+## 🧭 Portainer Deployment
+
+For a registry-based Portainer stack, use [docker-compose.portainer.yml](docker-compose.portainer.yml).
+
+Typical flow:
+
+1. Create a stack in Portainer from the repository or upload the compose file.
+2. Use `docker-compose.portainer.yml`.
+3. Set at least:
+   - `AUTH_SECRET`
+   - `APP_URL`
+   - `POSTGRES_DB`
+   - `POSTGRES_USER`
+   - `POSTGRES_PASSWORD`
+4. Deploy the stack.
+
+Notes:
+
+- The Portainer variant pulls prebuilt GHCR images instead of building locally.
+- The custom database image keeps the shipped password-reconciliation behavior for reused volumes.
+- If you want deterministic upgrades, pin the image tags from `latest` to a release tag or SHA tag.
 
 ## ✅ Verification
 
