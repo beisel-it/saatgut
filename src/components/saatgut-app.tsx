@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import {
+  adjustSeedBatchStock,
   ApiClientError,
   createGrowingProfile,
+  createGerminationTest,
   createPlantingEvent,
   createSeedBatch,
   createSpecies,
@@ -14,11 +16,14 @@ import {
   loginUser,
   logoutUser,
   registerUser,
+  reverseSeedBatchTransaction,
+  updateProfilePhenology,
   upsertCultivationRule,
 } from "@/lib/client/api";
 import type {
   CalendarItem,
   DashboardData,
+  SeedBatch,
   SessionSnapshot,
   Species,
 } from "@/lib/client/types";
@@ -62,6 +67,43 @@ const speciesCategories: Species["category"][] = [
 
 const seedUnits = ["SEEDS", "PACKETS", "GRAMS"] as const;
 const plantingTypes = ["SOW_INDOORS", "SOW_OUTDOORS", "TRANSPLANT", "HARVEST"] as const;
+const phenologyStages: Array<{ id: string; label: string; hint: string }> = [
+  {
+    id: "late-winter",
+    label: "Late winter",
+    hint: "Use when the season still behaves like winter and protection-first planning matters.",
+  },
+  {
+    id: "first-spring",
+    label: "First spring",
+    hint: "Early flowering signals and soil wake-up. Good for cautious ramp-up.",
+  },
+  {
+    id: "full-spring",
+    label: "Full spring",
+    hint: "Growth is reliable and sowing windows usually widen quickly.",
+  },
+  {
+    id: "early-summer",
+    label: "Early summer",
+    hint: "Transplanting and first harvests overlap. Watch water stress.",
+  },
+  {
+    id: "high-summer",
+    label: "High summer",
+    hint: "Peak growth and harvest period. Storage and succession timing matter most.",
+  },
+  {
+    id: "late-summer",
+    label: "Late summer",
+    hint: "Seed saving and autumn succession decisions become more important.",
+  },
+  {
+    id: "early-autumn",
+    label: "Early autumn",
+    hint: "Shift attention to final harvests, seed cleanup, and storage checks.",
+  },
+];
 
 function classNames(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -81,14 +123,8 @@ function formatDate(value: string | null) {
 }
 
 function formatCalendarDate(item: CalendarItem) {
-  if (item.kind === "window") {
-    return formatDate(item.recommendedDate);
-  }
-
-  if (item.kind === "recorded") {
-    return formatDate(item.date);
-  }
-
+  if (item.kind === "window") return formatDate(item.recommendedDate);
+  if (item.kind === "recorded") return formatDate(item.date);
   return formatDate(item.dateStart);
 }
 
@@ -130,6 +166,19 @@ function toFormState(error: unknown): FormState {
   };
 }
 
+function parseTags(value: string) {
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function nullableRange(start: number | null, end: number | null, suffix: string) {
+  if (start === null && end === null) return "Not defined";
+  if (start !== null && end !== null) return `${start} to ${end} ${suffix}`;
+  return `${start ?? end} ${suffix}`;
+}
+
 export function SaatgutApp() {
   const [authMode, setAuthMode] = useState<AuthMode>("register");
   const [view, setView] = useState<ViewId>("dashboard");
@@ -144,6 +193,9 @@ export function SaatgutApp() {
   const [profileState, setProfileState] = useState<FormState>(initialFormState);
   const [ruleState, setRuleState] = useState<FormState>(initialFormState);
   const [plantingState, setPlantingState] = useState<FormState>(initialFormState);
+  const [germinationState, setGerminationState] = useState<FormState>(initialFormState);
+  const [correctionState, setCorrectionState] = useState<FormState>(initialFormState);
+
   const [authPending, startAuthTransition] = useTransition();
   const [refreshPending, startRefreshTransition] = useTransition();
 
@@ -167,6 +219,7 @@ export function SaatgutApp() {
     name: "",
     description: "",
     heirloom: false,
+    tags: "",
     notes: "",
     synonyms: "",
   });
@@ -210,6 +263,26 @@ export function SaatgutApp() {
     locationNote: "",
     notes: "",
   });
+  const [germinationForm, setGerminationForm] = useState({
+    seedBatchId: "",
+    entryDate: "",
+    sampleSize: "",
+    germinatedCount: "",
+    notes: "",
+  });
+  const [correctionForm, setCorrectionForm] = useState({
+    seedBatchId: "",
+    entryDate: "",
+    mode: "ADJUST_DELTA" as "SET_ABSOLUTE" | "ADJUST_DELTA",
+    quantity: "",
+    reason: "",
+  });
+  const [reversalForm, setReversalForm] = useState({
+    seedBatchId: "",
+    transactionId: "",
+    entryDate: "",
+    reason: "",
+  });
 
   async function loadDashboard() {
     const data = await fetchDashboardData();
@@ -225,7 +298,6 @@ export function SaatgutApp() {
 
       try {
         const nextSession = await getSession();
-
         if (cancelled) return;
 
         setSession(nextSession);
@@ -260,7 +332,7 @@ export function SaatgutApp() {
 
   const varietiesById = useMemo(
     () => new Map((dashboard?.varieties ?? []).map((variety) => [variety.id, variety])),
-    [dashboard],
+    [dashboard?.varieties],
   );
 
   const seedBatchesForSelectedVariety = useMemo(
@@ -269,6 +341,19 @@ export function SaatgutApp() {
         (seedBatch) => !plantingForm.varietyId || seedBatch.varietyId === plantingForm.varietyId,
       ),
     [dashboard?.seedBatches, plantingForm.varietyId],
+  );
+
+  const storageWarningsByBatch = useMemo(
+    () => new Map((dashboard?.seedBatches ?? []).map((seedBatch) => [seedBatch.id, seedBatch.storageWarnings ?? []])),
+    [dashboard?.seedBatches],
+  );
+
+  const criticalBatchCount = useMemo(
+    () =>
+      Array.from(storageWarningsByBatch.values()).filter((warnings) =>
+        warnings.some((warning) => warning.level === "critical"),
+      ).length,
+    [storageWarningsByBatch],
   );
 
   async function handleRegister(event: React.FormEvent<HTMLFormElement>) {
@@ -285,9 +370,7 @@ export function SaatgutApp() {
           setSession(result);
           await loadDashboard();
         })
-        .catch((error) => {
-          setAuthState(toFormState(error));
-        });
+        .catch((error) => setAuthState(toFormState(error)));
     });
   }
 
@@ -301,9 +384,7 @@ export function SaatgutApp() {
           setSession(result);
           await loadDashboard();
         })
-        .catch((error) => {
-          setAuthState(toFormState(error));
-        });
+        .catch((error) => setAuthState(toFormState(error)));
     });
   }
 
@@ -317,9 +398,9 @@ export function SaatgutApp() {
           setDashboard(null);
           setView("dashboard");
         })
-        .catch((error) => {
-          setSessionError(error instanceof Error ? error.message : "Failed to log out.");
-        });
+        .catch((error) =>
+          setSessionError(error instanceof Error ? error.message : "Failed to log out."),
+        );
     });
   }
 
@@ -340,11 +421,7 @@ export function SaatgutApp() {
         category: "VEGETABLE",
         notes: "",
       });
-      setSpeciesState({
-        error: null,
-        success: "Species saved.",
-        fieldErrors: {},
-      });
+      setSpeciesState({ error: null, success: "Species saved.", fieldErrors: {} });
       await loadDashboard();
     } catch (error) {
       setSpeciesState(toFormState(error));
@@ -361,25 +438,20 @@ export function SaatgutApp() {
         name: varietyForm.name,
         description: varietyForm.description || null,
         heirloom: varietyForm.heirloom,
+        tags: parseTags(varietyForm.tags),
         notes: varietyForm.notes || null,
-        synonyms: varietyForm.synonyms
-          .split(",")
-          .map((entry) => entry.trim())
-          .filter(Boolean),
+        synonyms: parseTags(varietyForm.synonyms),
       });
       setVarietyForm({
         speciesId: "",
         name: "",
         description: "",
         heirloom: false,
+        tags: "",
         notes: "",
         synonyms: "",
       });
-      setVarietyState({
-        error: null,
-        success: "Variety saved.",
-        fieldErrors: {},
-      });
+      setVarietyState({ error: null, success: "Variety saved.", fieldErrors: {} });
       await loadDashboard();
     } catch (error) {
       setVarietyState(toFormState(error));
@@ -409,11 +481,7 @@ export function SaatgutApp() {
         storageLocation: "",
         notes: "",
       });
-      setSeedBatchState({
-        error: null,
-        success: "Seed batch saved.",
-        fieldErrors: {},
-      });
+      setSeedBatchState({ error: null, success: "Seed batch saved.", fieldErrors: {} });
       await loadDashboard();
     } catch (error) {
       setSeedBatchState(toFormState(error));
@@ -429,9 +497,13 @@ export function SaatgutApp() {
         name: profileForm.name,
         lastFrostDate: toIsoDate(profileForm.lastFrostDate),
         firstFrostDate: toIsoDate(profileForm.firstFrostDate),
+        phenologyStage: null,
+        phenologyObservedAt: null,
+        phenologyNotes: null,
         notes: profileForm.notes || null,
         isActive: profileForm.isActive,
       });
+
       setProfileForm({
         name: "",
         lastFrostDate: "",
@@ -439,11 +511,7 @@ export function SaatgutApp() {
         notes: "",
         isActive: true,
       });
-      setProfileState({
-        error: null,
-        success: "Growing profile saved.",
-        fieldErrors: {},
-      });
+      setProfileState({ error: null, success: "Growing profile saved.", fieldErrors: {} });
       await loadDashboard();
     } catch (error) {
       setProfileState(toFormState(error));
@@ -470,11 +538,7 @@ export function SaatgutApp() {
           ? Number(ruleForm.successionIntervalDays)
           : null,
       });
-      setRuleState({
-        error: null,
-        success: "Cultivation rule saved.",
-        fieldErrors: {},
-      });
+      setRuleState({ error: null, success: "Cultivation rule saved.", fieldErrors: {} });
       await loadDashboard();
     } catch (error) {
       setRuleState(toFormState(error));
@@ -508,14 +572,94 @@ export function SaatgutApp() {
         locationNote: "",
         notes: "",
       });
-      setPlantingState({
+      setPlantingState({ error: null, success: "Planting event saved.", fieldErrors: {} });
+      await loadDashboard();
+    } catch (error) {
+      setPlantingState(toFormState(error));
+    }
+  }
+
+  async function submitGermination(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setGerminationState(initialFormState);
+
+    try {
+      await createGerminationTest(germinationForm.seedBatchId, {
+        testedAt: toIsoDate(germinationForm.entryDate),
+        sampleSize: Number(germinationForm.sampleSize),
+        germinatedCount: Number(germinationForm.germinatedCount),
+        notes: germinationForm.notes || null,
+      });
+      setGerminationForm({
+        seedBatchId: "",
+        entryDate: "",
+        sampleSize: "",
+        germinatedCount: "",
+        notes: "",
+      });
+      setGerminationState({
         error: null,
-        success: "Planting event saved.",
+        success: "Germination test logged.",
         fieldErrors: {},
       });
       await loadDashboard();
     } catch (error) {
-      setPlantingState(toFormState(error));
+      setGerminationState(toFormState(error));
+    }
+  }
+
+  async function submitCorrection(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCorrectionState(initialFormState);
+
+    try {
+      await adjustSeedBatchStock(correctionForm.seedBatchId, {
+        mode: correctionForm.mode,
+        quantity: Number(correctionForm.quantity),
+        reason: correctionForm.reason,
+        effectiveDate: toIsoDate(correctionForm.entryDate),
+      });
+      setCorrectionForm({
+        seedBatchId: "",
+        entryDate: "",
+        mode: "ADJUST_DELTA",
+        quantity: "",
+        reason: "",
+      });
+      setCorrectionState({
+        error: null,
+        success: "Stock correction applied.",
+        fieldErrors: {},
+      });
+      await loadDashboard();
+    } catch (error) {
+      setCorrectionState(toFormState(error));
+    }
+  }
+
+  async function submitReversal(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCorrectionState(initialFormState);
+
+    try {
+      await reverseSeedBatchTransaction(reversalForm.seedBatchId, reversalForm.transactionId, {
+        reason: reversalForm.reason,
+        effectiveDate: toIsoDate(reversalForm.entryDate),
+      });
+      setReversalForm({
+        seedBatchId: "",
+        transactionId: "",
+        entryDate: "",
+        reason: "",
+      });
+      setCorrectionState({
+        error: null,
+        success: "Correction reversal applied.",
+        fieldErrors: {},
+      });
+      await loadDashboard();
+    } catch (error) {
+      setCorrectionState(toFormState(error));
     }
   }
 
@@ -524,7 +668,7 @@ export function SaatgutApp() {
       <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(127,155,71,0.18),transparent_30%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-6 py-10">
         <div className="mx-auto max-w-5xl rounded-[2rem] border border-[var(--border)] bg-white/70 p-10 shadow-[var(--shadow)]">
           <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--accent-strong)]">
-            Saatgut MVP
+            Saatgut
           </p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight">Loading your workspace…</h1>
         </div>
@@ -541,28 +685,12 @@ export function SaatgutApp() {
               Saatgut
             </p>
             <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight md:text-6xl">
-              Run your seed bank, frost profile, and next garden actions from one field-ready workspace.
+              Run your seed bank, calendar, and batch quality decisions from one field-ready workspace.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-[color:rgba(24,49,40,0.78)] md:text-lg">
-              The MVP gives you an authenticated workspace with catalog management, seed batches,
-              cultivation rules, a 14-day calendar, and planting events that deduct stock.
+              Sign in to manage varieties, storage-sensitive seed batches, frost-date planning,
+              germination checks, and stock history without returning to paper notes.
             </p>
-
-            <div className="mt-10 grid gap-4 sm:grid-cols-3">
-              {[
-                ["Catalog", "Track species, varieties, and heirloom notes."],
-                ["Calendar", "See sowing, transplant, and harvest windows."],
-                ["Stock", "Record planting events and keep seed quantity honest."],
-              ].map(([title, copy]) => (
-                <article
-                  key={title}
-                  className="rounded-[1.5rem] border border-[var(--border)] bg-white/80 p-5"
-                >
-                  <h2 className="text-lg font-semibold">{title}</h2>
-                  <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{copy}</p>
-                </article>
-              ))}
-            </div>
           </section>
 
           <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(24,49,40,0.94)] p-6 text-white shadow-[var(--shadow)] md:p-8">
@@ -599,24 +727,10 @@ export function SaatgutApp() {
               <h2 className="text-2xl font-semibold">
                 {authMode === "register" ? "Set up your garden workspace" : "Return to your workspace"}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-white/72">
-                {authMode === "register"
-                  ? "The first account becomes the workspace owner and admin."
-                  : "Use the account created for your Saatgut workspace."}
-              </p>
             </div>
 
-            {sessionError ? (
-              <p className="mt-4 rounded-2xl border border-red-300/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-                {sessionError}
-              </p>
-            ) : null}
-
-            {authState.error ? (
-              <p className="mt-4 rounded-2xl border border-red-300/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-                {authState.error}
-              </p>
-            ) : null}
+            {sessionError ? <Alert tone="danger">{sessionError}</Alert> : null}
+            {authState.error ? <Alert tone="danger">{authState.error}</Alert> : null}
 
             {authMode === "register" ? (
               <form className="mt-6 grid gap-4" onSubmit={handleRegister}>
@@ -640,12 +754,7 @@ export function SaatgutApp() {
                     }
                   />
                 </Field>
-                <Field
-                  label="Workspace name"
-                  name="workspaceName"
-                  fieldErrors={authState.fieldErrors}
-                  optional
-                >
+                <Field label="Workspace name" name="workspaceName" fieldErrors={authState.fieldErrors} optional>
                   <input
                     className="field-input-dark"
                     type="text"
@@ -696,22 +805,21 @@ export function SaatgutApp() {
   }
 
   const dashboardStats = [
+    { label: "Species", value: dashboard?.species.length ?? 0 },
+    { label: "Varieties", value: dashboard?.varieties.length ?? 0 },
+    { label: "Seed batches", value: dashboard?.seedBatches.length ?? 0 },
+    { label: "14-day items", value: dashboard?.calendar.length ?? 0 },
     {
-      label: "Species",
-      value: dashboard?.species.length ?? 0,
+      label: "Quality signals",
+      value: (dashboard?.seedBatches ?? []).reduce(
+        (sum, seedBatch) =>
+          sum +
+          (seedBatch.germinationTests?.length ? 1 : 0) +
+          ((seedBatch.stockTransactions?.filter((transaction) => transaction.type !== "INITIAL_STOCK").length ?? 0) > 0 ? 1 : 0),
+        0,
+      ),
     },
-    {
-      label: "Varieties",
-      value: dashboard?.varieties.length ?? 0,
-    },
-    {
-      label: "Seed batches",
-      value: dashboard?.seedBatches.length ?? 0,
-    },
-    {
-      label: "14-day items",
-      value: dashboard?.calendar.length ?? 0,
-    },
+    { label: "Critical storage flags", value: criticalBatchCount },
   ];
 
   return (
@@ -748,9 +856,7 @@ export function SaatgutApp() {
 
           <div className="mt-8 rounded-[1.5rem] border border-white/10 bg-white/6 p-4">
             <p className="text-xs uppercase tracking-[0.24em] text-white/55">Active profile</p>
-            <p className="mt-2 text-lg font-semibold">
-              {activeProfile ? activeProfile.name : "None selected"}
-            </p>
+            <p className="mt-2 text-lg font-semibold">{activeProfile ? activeProfile.name : "None selected"}</p>
             <p className="mt-1 text-sm text-white/68">
               {activeProfile
                 ? `Last frost ${formatDate(activeProfile.lastFrostDate)}`
@@ -773,23 +879,21 @@ export function SaatgutApp() {
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--accent-strong)]">
-                  Authenticated seed-bank MVP
+                  Batch care and planning follow-up
                 </p>
                 <h2 className="mt-2 text-3xl font-semibold tracking-tight md:text-5xl">
-                  Field-ready planning, stock, and timing in one workspace.
+                  Use journal-backed quality signals, correction logs, and profile guidance without leaving the workspace.
                 </h2>
               </div>
               <button
                 type="button"
-                onClick={() => {
+                onClick={() =>
                   startRefreshTransition(() => {
                     void loadDashboard().catch((error) => {
-                      setSessionError(
-                        error instanceof Error ? error.message : "Failed to refresh data.",
-                      );
+                      setSessionError(error instanceof Error ? error.message : "Failed to refresh data.");
                     });
-                  });
-                }}
+                  })
+                }
                 className="rounded-full border border-[var(--border)] bg-white px-5 py-3 text-sm font-semibold"
                 disabled={refreshPending}
               >
@@ -797,14 +901,10 @@ export function SaatgutApp() {
               </button>
             </div>
 
-            {sessionError ? (
-              <p className="mt-4 rounded-2xl border border-red-300/40 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {sessionError}
-              </p>
-            ) : null}
+            {sessionError ? <Alert tone="danger">{sessionError}</Alert> : null}
           </header>
 
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
             {dashboardStats.map((stat) => (
               <article
                 key={stat.label}
@@ -819,7 +919,7 @@ export function SaatgutApp() {
           </div>
 
           {view === "dashboard" ? (
-            <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
               <Panel title="14-day calendar" subtitle="Upcoming windows, recorded work, and harvest estimates.">
                 {dashboard?.calendar.length ? (
                   <div className="grid gap-3">
@@ -860,123 +960,141 @@ export function SaatgutApp() {
               </Panel>
 
               <div className="space-y-4">
-                <Panel title="Recent planting events" subtitle="Latest recorded sowing, transplant, and harvest activity.">
-                  {dashboard?.plantings.length ? (
+                <Panel title="Seed quality watch" subtitle="Client-side warnings from batch age, storage notes, and journal history.">
+                  {dashboard?.seedBatches.length ? (
                     <div className="grid gap-3">
-                      {dashboard.plantings.slice(0, 6).map((event) => (
+                      {dashboard.seedBatches.slice(0, 5).map((seedBatch) => {
+                        const warnings = storageWarningsByBatch.get(seedBatch.id) ?? [];
+                        const variety = varietiesById.get(seedBatch.varietyId);
+
+                        return (
+                          <article
+                            key={seedBatch.id}
+                            className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <h3 className="text-base font-semibold">{variety?.name ?? "Unknown variety"}</h3>
+                              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
+                                {warnings.filter((warning) => warning.level !== "info").length} flags
+                              </span>
+                            </div>
+                            <div className="mt-3 grid gap-2">
+                              {warnings.slice(0, 2).map((warning) => (
+                                <WarningPill key={warning.title} level={warning.level}>
+                                  {warning.title}
+                                </WarningPill>
+                              ))}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <EmptyState title="No batch warnings yet" copy="Create seed batches to surface quality and storage insights." />
+                  )}
+                </Panel>
+
+                <Panel title="Batch signals" subtitle="Latest germination tests and stock adjustment notes from the explicit seed-quality contract.">
+                  {dashboard?.seedBatches.some(
+                    (seedBatch) =>
+                      (seedBatch.germinationTests?.length ?? 0) > 0 ||
+                      (seedBatch.stockTransactions?.length ?? 0) > 1,
+                  ) ? (
+                    <div className="grid gap-3">
+                      {(dashboard?.seedBatches ?? [])
+                        .flatMap((seedBatch) => [
+                          ...(seedBatch.germinationTests ?? []).slice(0, 1).map((test) => ({
+                            key: test.id,
+                            title: `Germination ${test.germinationRate ?? "?"}%`,
+                            subtitle: `${varietiesById.get(seedBatch.varietyId)?.name ?? "Batch"} · ${formatDate(test.testedAt)}`,
+                          })),
+                          ...(seedBatch.stockTransactions ?? [])
+                            .filter((transaction) => transaction.type !== "INITIAL_STOCK")
+                            .slice(0, 1)
+                            .map((transaction) => ({
+                              key: transaction.id,
+                              title: labelPlantingType(transaction.type),
+                              subtitle: `${varietiesById.get(seedBatch.varietyId)?.name ?? "Batch"} · ${formatDate(transaction.effectiveDate)}`,
+                            })),
+                        ])
+                        .slice(0, 8)
+                        .map((entry) => (
                         <article
-                          key={event.id}
+                          key={entry.key}
                           className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
                         >
-                          <div className="flex items-center justify-between gap-3">
-                            <h3 className="text-base font-semibold">
-                              {varietiesById.get(event.varietyId)?.name ?? "Unknown variety"}
-                            </h3>
-                            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
-                              {labelPlantingType(event.type)}
-                            </span>
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <h3 className="text-base font-semibold">{entry.title}</h3>
                           </div>
-                          <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.7)]">
-                            {event.actualDate ? "Actual" : "Planned"} date: {formatDate(event.actualDate ?? event.plannedDate)}
-                          </p>
+                          <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">{entry.subtitle}</p>
                         </article>
                       ))}
                     </div>
                   ) : (
                     <EmptyState
-                      title="No planting events yet"
-                      copy="Start from the Plantings section to log a sowing, transplant, or harvest."
+                      title="No quality journal entries"
+                      copy="Record germination tests or stock corrections to build a clearer seed history."
                     />
                   )}
-                </Panel>
-
-                <Panel title="Workspace notes" subtitle="Quick operational snapshot.">
-                  <div className="grid gap-3 text-sm leading-6 text-[color:rgba(24,49,40,0.76)]">
-                    <p>
-                      Current role: <strong>{session.membership.role}</strong>
-                    </p>
-                    <p>
-                      Workspace visibility: <strong>{session.membership.workspace.visibility}</strong>
-                    </p>
-                    <p>
-                      Active profile: <strong>{activeProfile?.name ?? "Required for calendar"}</strong>
-                    </p>
-                  </div>
                 </Panel>
               </div>
             </div>
           ) : null}
 
           {view === "catalog" ? (
-            <div className="grid gap-4 xl:grid-cols-2">
-              <Panel title="Species" subtitle="Create the crop types your varieties belong to.">
-                <DataForm state={speciesState} onSubmit={submitSpecies} submitLabel="Save species">
-                  <Field label="Common name" name="commonName" fieldErrors={speciesState.fieldErrors}>
-                    <input
-                      className="field-input"
-                      value={speciesForm.commonName}
-                      onChange={(event) =>
-                        setSpeciesForm((current) => ({ ...current, commonName: event.target.value }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Latin name" name="latinName" fieldErrors={speciesState.fieldErrors} optional>
-                    <input
-                      className="field-input"
-                      value={speciesForm.latinName}
-                      onChange={(event) =>
-                        setSpeciesForm((current) => ({ ...current, latinName: event.target.value }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Category" name="category" fieldErrors={speciesState.fieldErrors}>
-                    <select
-                      className="field-input"
-                      value={speciesForm.category}
-                      onChange={(event) =>
-                        setSpeciesForm((current) => ({
-                          ...current,
-                          category: event.target.value as Species["category"],
-                        }))
-                      }
-                    >
-                      {speciesCategories.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Notes" name="notes" fieldErrors={speciesState.fieldErrors} optional>
-                    <textarea
-                      className="field-input min-h-24"
-                      value={speciesForm.notes}
-                      onChange={(event) =>
-                        setSpeciesForm((current) => ({ ...current, notes: event.target.value }))
-                      }
-                    />
-                  </Field>
-                </DataForm>
-
-                <div className="mt-6 grid gap-3">
-                  {(dashboard?.species ?? []).map((species) => (
-                    <article key={species.id} className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <h3 className="text-base font-semibold">{species.commonName}</h3>
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
-                          {species.category}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">
-                        {species.latinName || "No latin name"}{species.notes ? ` · ${species.notes}` : ""}
-                      </p>
-                    </article>
-                  ))}
-                </div>
-              </Panel>
-
+            <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
               <div className="space-y-4">
-                <Panel title="Varieties" subtitle="Attach heirloom notes, synonyms, and species links.">
+                <Panel title="Species" subtitle="Create the crop types your varieties belong to.">
+                  <DataForm state={speciesState} onSubmit={submitSpecies} submitLabel="Save species">
+                    <Field label="Common name" name="commonName" fieldErrors={speciesState.fieldErrors}>
+                      <input
+                        className="field-input"
+                        value={speciesForm.commonName}
+                        onChange={(event) =>
+                          setSpeciesForm((current) => ({ ...current, commonName: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Latin name" name="latinName" fieldErrors={speciesState.fieldErrors} optional>
+                      <input
+                        className="field-input"
+                        value={speciesForm.latinName}
+                        onChange={(event) =>
+                          setSpeciesForm((current) => ({ ...current, latinName: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Category" name="category" fieldErrors={speciesState.fieldErrors}>
+                      <select
+                        className="field-input"
+                        value={speciesForm.category}
+                        onChange={(event) =>
+                          setSpeciesForm((current) => ({
+                            ...current,
+                            category: event.target.value as Species["category"],
+                          }))
+                        }
+                      >
+                        {speciesCategories.map((category) => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Notes" name="notes" fieldErrors={speciesState.fieldErrors} optional>
+                      <textarea
+                        className="field-input min-h-24"
+                        value={speciesForm.notes}
+                        onChange={(event) =>
+                          setSpeciesForm((current) => ({ ...current, notes: event.target.value }))
+                        }
+                      />
+                    </Field>
+                  </DataForm>
+                </Panel>
+
+                <Panel title="Varieties" subtitle="Attach heirloom notes, tags, synonyms, and species links.">
                   <DataForm state={varietyState} onSubmit={submitVariety} submitLabel="Save variety">
                     <Field label="Species" name="speciesId" fieldErrors={varietyState.fieldErrors}>
                       <select
@@ -1001,6 +1119,16 @@ export function SaatgutApp() {
                         onChange={(event) =>
                           setVarietyForm((current) => ({ ...current, name: event.target.value }))
                         }
+                      />
+                    </Field>
+                    <Field label="Tags" name="tags" fieldErrors={varietyState.fieldErrors} optional>
+                      <input
+                        className="field-input"
+                        value={varietyForm.tags}
+                        onChange={(event) =>
+                          setVarietyForm((current) => ({ ...current, tags: event.target.value }))
+                        }
+                        placeholder="heirloom, seed-saving, greenhouse"
                       />
                     </Field>
                     <Field label="Synonyms" name="synonyms" fieldErrors={varietyState.fieldErrors} optional>
@@ -1034,8 +1162,10 @@ export function SaatgutApp() {
                     </Field>
                   </DataForm>
                 </Panel>
+              </div>
 
-                <Panel title="Seed batches" subtitle="Track source, harvest year, quantity, and storage.">
+              <div className="space-y-4">
+                <Panel title="Seed batches" subtitle="Track stock, record germination tests, apply corrections, and reverse them when needed.">
                   <DataForm state={seedBatchState} onSubmit={submitSeedBatch} submitLabel="Save seed batch">
                     <Field label="Variety" name="varietyId" fieldErrors={seedBatchState.fieldErrors}>
                       <select
@@ -1094,10 +1224,7 @@ export function SaatgutApp() {
                           max="2100"
                           value={seedBatchForm.harvestYear}
                           onChange={(event) =>
-                            setSeedBatchForm((current) => ({
-                              ...current,
-                              harvestYear: event.target.value,
-                            }))
+                            setSeedBatchForm((current) => ({ ...current, harvestYear: event.target.value }))
                           }
                         />
                       </Field>
@@ -1111,12 +1238,7 @@ export function SaatgutApp() {
                         />
                       </Field>
                     </div>
-                    <Field
-                      label="Storage location"
-                      name="storageLocation"
-                      fieldErrors={seedBatchState.fieldErrors}
-                      optional
-                    >
+                    <Field label="Storage location" name="storageLocation" fieldErrors={seedBatchState.fieldErrors} optional>
                       <input
                         className="field-input"
                         value={seedBatchForm.storageLocation}
@@ -1130,27 +1252,221 @@ export function SaatgutApp() {
                     </Field>
                   </DataForm>
 
-                  <div className="mt-6 grid gap-3">
-                    {(dashboard?.seedBatches ?? []).map((seedBatch) => {
-                      const variety = varietiesById.get(seedBatch.varietyId);
-
-                      return (
-                        <article
-                          key={seedBatch.id}
-                          className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
+                  <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                    <DataForm state={germinationState} onSubmit={submitGermination} submitLabel="Log germination test">
+                      <Field label="Seed batch" name="seedBatchId" fieldErrors={germinationState.fieldErrors}>
+                        <select
+                          className="field-input"
+                          value={germinationForm.seedBatchId}
+                          onChange={(event) =>
+                            setGerminationForm((current) => ({ ...current, seedBatchId: event.target.value }))
+                          }
                         >
-                          <div className="flex items-center justify-between gap-3">
-                            <h3 className="text-base font-semibold">{variety?.name ?? "Unknown variety"}</h3>
-                            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
-                              {seedBatch.quantity} {seedBatch.unit.toLowerCase()}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">
-                            {seedBatch.source || "Unknown source"} · {seedBatch.storageLocation || "No storage location"}
-                          </p>
-                        </article>
-                      );
-                    })}
+                          <option value="">Select batch</option>
+                          {(dashboard?.seedBatches ?? []).map((seedBatch) => (
+                            <option key={seedBatch.id} value={seedBatch.id}>
+                              {(varietiesById.get(seedBatch.varietyId)?.name ?? "Batch")} · {seedBatch.quantity} {seedBatch.unit.toLowerCase()}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Test date" name="entryDate" fieldErrors={germinationState.fieldErrors}>
+                        <input
+                          className="field-input"
+                          type="date"
+                          value={germinationForm.entryDate}
+                          onChange={(event) =>
+                            setGerminationForm((current) => ({ ...current, entryDate: event.target.value }))
+                          }
+                        />
+                      </Field>
+                      <Field label="Sample size" name="sampleSize" fieldErrors={germinationState.fieldErrors}>
+                        <input
+                          className="field-input"
+                          type="number"
+                          min="0"
+                          value={germinationForm.sampleSize}
+                          onChange={(event) =>
+                            setGerminationForm((current) => ({ ...current, sampleSize: event.target.value }))
+                          }
+                        />
+                      </Field>
+                      <Field label="Germinated count" name="germinatedCount" fieldErrors={germinationState.fieldErrors}>
+                        <input
+                          className="field-input"
+                          type="number"
+                          min="0"
+                          value={germinationForm.germinatedCount}
+                          onChange={(event) =>
+                            setGerminationForm((current) => ({ ...current, germinatedCount: event.target.value }))
+                          }
+                        />
+                      </Field>
+                      <Field label="Result notes" name="details" fieldErrors={germinationState.fieldErrors} optional>
+                        <textarea
+                          className="field-input min-h-24"
+                          value={germinationForm.notes}
+                          onChange={(event) =>
+                            setGerminationForm((current) => ({ ...current, notes: event.target.value }))
+                          }
+                          placeholder="Example: 8/10 germinated after 6 days."
+                        />
+                      </Field>
+                    </DataForm>
+
+                    <DataForm state={correctionState} onSubmit={submitCorrection} submitLabel="Apply correction">
+                      <Field label="Seed batch" name="seedBatchId" fieldErrors={correctionState.fieldErrors}>
+                        <select
+                          className="field-input"
+                          value={correctionForm.seedBatchId}
+                          onChange={(event) =>
+                            setCorrectionForm((current) => ({ ...current, seedBatchId: event.target.value }))
+                          }
+                        >
+                          <option value="">Select batch</option>
+                          {(dashboard?.seedBatches ?? []).map((seedBatch) => (
+                            <option key={seedBatch.id} value={seedBatch.id}>
+                              {(varietiesById.get(seedBatch.varietyId)?.name ?? "Batch")} · {seedBatch.quantity} {seedBatch.unit.toLowerCase()}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <Field label="Mode" name="mode" fieldErrors={correctionState.fieldErrors}>
+                          <select
+                            className="field-input"
+                            value={correctionForm.mode}
+                            onChange={(event) =>
+                              setCorrectionForm((current) => ({
+                                ...current,
+                                mode: event.target.value as "SET_ABSOLUTE" | "ADJUST_DELTA",
+                              }))
+                            }
+                          >
+                            <option value="ADJUST_DELTA">Adjust by delta</option>
+                            <option value="SET_ABSOLUTE">Set absolute quantity</option>
+                          </select>
+                        </Field>
+                        <Field label="Entry date" name="entryDate" fieldErrors={correctionState.fieldErrors}>
+                          <input
+                            className="field-input"
+                            type="date"
+                            value={correctionForm.entryDate}
+                            onChange={(event) =>
+                              setCorrectionForm((current) => ({ ...current, entryDate: event.target.value }))
+                            }
+                          />
+                        </Field>
+                      </div>
+                      <Field label="Quantity referenced" name="quantity" fieldErrors={correctionState.fieldErrors} optional>
+                        <input
+                          className="field-input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={correctionForm.quantity}
+                          onChange={(event) =>
+                            setCorrectionForm((current) => ({ ...current, quantity: event.target.value }))
+                          }
+                        />
+                      </Field>
+                      <Field label="Reason" name="reason" fieldErrors={correctionState.fieldErrors}>
+                        <textarea
+                          className="field-input min-h-24"
+                          value={correctionForm.reason}
+                          onChange={(event) =>
+                            setCorrectionForm((current) => ({ ...current, reason: event.target.value }))
+                          }
+                          placeholder="Example: corrected after recount or reconciled against stored packets."
+                        />
+                      </Field>
+                    </DataForm>
+                  </div>
+
+                  <div className="mt-4 rounded-[1.5rem] border border-[var(--border)] bg-white/70 p-4">
+                    <h3 className="text-lg font-semibold">Reverse a correction</h3>
+                    <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.68)]">
+                      Reverse a manual correction transaction when it should not have changed stock.
+                    </p>
+                    <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={submitReversal}>
+                      <Field label="Seed batch" name="seedBatchId" fieldErrors={correctionState.fieldErrors}>
+                        <select
+                          className="field-input"
+                          value={reversalForm.seedBatchId}
+                          onChange={(event) =>
+                            setReversalForm((current) => ({
+                              ...current,
+                              seedBatchId: event.target.value,
+                              transactionId: "",
+                            }))
+                          }
+                        >
+                          <option value="">Select batch</option>
+                          {(dashboard?.seedBatches ?? []).map((seedBatch) => (
+                            <option key={seedBatch.id} value={seedBatch.id}>
+                              {(varietiesById.get(seedBatch.varietyId)?.name ?? "Batch")} · {seedBatch.quantity} {seedBatch.unit.toLowerCase()}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Correction transaction" name="transactionId" fieldErrors={correctionState.fieldErrors}>
+                        <select
+                          className="field-input"
+                          value={reversalForm.transactionId}
+                          onChange={(event) =>
+                            setReversalForm((current) => ({ ...current, transactionId: event.target.value }))
+                          }
+                        >
+                          <option value="">Select correction</option>
+                          {((dashboard?.seedBatches ?? []).find((seedBatch) => seedBatch.id === reversalForm.seedBatchId)
+                            ?.stockTransactions ?? [])
+                            .filter(
+                              (transaction) =>
+                                transaction.type === "MANUAL_CORRECTION" && !transaction.reversalOfId,
+                            )
+                            .map((transaction) => (
+                              <option key={transaction.id} value={transaction.id}>
+                                {formatDate(transaction.effectiveDate)} · {transaction.quantityDelta}
+                              </option>
+                            ))}
+                        </select>
+                      </Field>
+                      <Field label="Reversal date" name="entryDate" fieldErrors={correctionState.fieldErrors}>
+                        <input
+                          className="field-input"
+                          type="date"
+                          value={reversalForm.entryDate}
+                          onChange={(event) =>
+                            setReversalForm((current) => ({ ...current, entryDate: event.target.value }))
+                          }
+                        />
+                      </Field>
+                      <Field label="Reason" name="reason" fieldErrors={correctionState.fieldErrors}>
+                        <input
+                          className="field-input"
+                          value={reversalForm.reason}
+                          onChange={(event) =>
+                            setReversalForm((current) => ({ ...current, reason: event.target.value }))
+                          }
+                        />
+                      </Field>
+                      <button className="w-fit rounded-full bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white">
+                        Reverse correction
+                      </button>
+                    </form>
+                  </div>
+
+                  <div className="mt-6 grid gap-3">
+                    {(dashboard?.seedBatches ?? []).map((seedBatch) => (
+                      <SeedBatchCard
+                        key={seedBatch.id}
+                        seedBatch={seedBatch}
+                        varietyName={varietiesById.get(seedBatch.varietyId)?.name ?? "Unknown variety"}
+                        warnings={storageWarningsByBatch.get(seedBatch.id) ?? []}
+                        germinationTests={seedBatch.germinationTests ?? []}
+                        adjustments={seedBatch.stockTransactions?.filter((transaction) => transaction.type !== "INITIAL_STOCK") ?? []}
+                      />
+                    ))}
                   </div>
                 </Panel>
               </div>
@@ -1159,7 +1475,7 @@ export function SaatgutApp() {
 
           {view === "profiles" ? (
             <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-              <Panel title="Growing profiles" subtitle="Manage frost dates and choose the active planning profile.">
+              <Panel title="Growing profiles" subtitle="Manage frost dates and set persisted phenology state for local seasonal context.">
                 <DataForm state={profileState} onSubmit={submitProfile} submitLabel="Save profile">
                   <Field label="Profile name" name="name" fieldErrors={profileState.fieldErrors}>
                     <input
@@ -1177,10 +1493,7 @@ export function SaatgutApp() {
                         type="date"
                         value={profileForm.lastFrostDate}
                         onChange={(event) =>
-                          setProfileForm((current) => ({
-                            ...current,
-                            lastFrostDate: event.target.value,
-                          }))
+                          setProfileForm((current) => ({ ...current, lastFrostDate: event.target.value }))
                         }
                       />
                     </Field>
@@ -1190,10 +1503,7 @@ export function SaatgutApp() {
                         type="date"
                         value={profileForm.firstFrostDate}
                         onChange={(event) =>
-                          setProfileForm((current) => ({
-                            ...current,
-                            firstFrostDate: event.target.value,
-                          }))
+                          setProfileForm((current) => ({ ...current, firstFrostDate: event.target.value }))
                         }
                       />
                     </Field>
@@ -1220,45 +1530,104 @@ export function SaatgutApp() {
                 </DataForm>
               </Panel>
 
-              <Panel title="Profile summary" subtitle="The calendar uses the active profile for all frost-relative windows.">
-                {dashboard?.profiles.length ? (
-                  <div className="grid gap-3">
-                    {dashboard.profiles.map((profile) => (
+              <div className="space-y-4">
+                <Panel title="Phenology helper" subtitle="Optional local state to reality-check the frost profile with what the garden is actually doing.">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {phenologyStages.map((stage) => (
                       <article
-                        key={profile.id}
-                        className={classNames(
-                          "rounded-[1.25rem] border px-4 py-4",
-                          profile.isActive
-                            ? "border-[var(--accent)] bg-[color:rgba(127,155,71,0.12)]"
-                            : "border-[var(--border)] bg-[var(--muted)]",
-                        )}
+                        key={stage.id}
+                        className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
                       >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <h3 className="text-lg font-semibold">{profile.name}</h3>
-                          {profile.isActive ? (
-                            <span className="rounded-full bg-[var(--foreground)] px-3 py-1 text-xs font-semibold text-white">
-                              Active
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">
-                          Last frost {formatDate(profile.lastFrostDate)} · First frost {formatDate(profile.firstFrostDate)}
-                        </p>
-                        {profile.notes ? (
-                          <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
-                            {profile.notes}
-                          </p>
-                        ) : null}
+                        <h3 className="text-base font-semibold">{stage.label}</h3>
+                        <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{stage.hint}</p>
                       </article>
                     ))}
                   </div>
-                ) : (
-                  <EmptyState
-                    title="No growing profiles yet"
-                    copy="Create one active profile before expecting calendar windows or transplant timing."
-                  />
-                )}
-              </Panel>
+                </Panel>
+
+                <Panel title="Profile summary" subtitle="The calendar uses the active profile, and phenology is now persisted on the profile contract.">
+                  {dashboard?.profiles.length ? (
+                    <div className="grid gap-3">
+                      {dashboard.profiles.map((profile) => (
+                        <article
+                          key={profile.id}
+                          className={classNames(
+                            "rounded-[1.25rem] border px-4 py-4",
+                            profile.isActive
+                              ? "border-[var(--accent)] bg-[color:rgba(127,155,71,0.12)]"
+                              : "border-[var(--border)] bg-[var(--muted)]",
+                          )}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <h3 className="text-lg font-semibold">{profile.name}</h3>
+                            {profile.isActive ? (
+                              <span className="rounded-full bg-[var(--foreground)] px-3 py-1 text-xs font-semibold text-white">
+                                Active
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">
+                            Last frost {formatDate(profile.lastFrostDate)} · First frost {formatDate(profile.firstFrostDate)}
+                          </p>
+                          <div className="mt-4 grid gap-2">
+                            <label className="grid gap-2 text-sm font-medium">
+                              <span>Observed phenology stage</span>
+                              <select
+                                className="field-input"
+                                value={profile.phenologyStage ?? ""}
+                                onChange={(event) => {
+                                  void updateProfilePhenology(profile.id, {
+                                    phenologyStage: event.target.value || null,
+                                    phenologyObservedAt: new Date().toISOString(),
+                                    phenologyNotes: profile.phenologyNotes ?? null,
+                                  }).then(loadDashboard).catch((error) => setProfileState(toFormState(error)));
+                                }}
+                              >
+                                <option value="">None</option>
+                                {phenologyStages.map((stage) => (
+                                  <option key={stage.id} value={stage.id}>
+                                    {stage.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                              <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                              {phenologyStages.find((stage) => stage.id === profile.phenologyStage)?.hint ??
+                                "Use phenology only as a reality-check against frost-date assumptions."}
+                            </p>
+                          </div>
+                          <div className="mt-3 grid gap-2">
+                            <label className="grid gap-2 text-sm font-medium">
+                              <span>Phenology notes</span>
+                              <textarea
+                                className="field-input min-h-20"
+                                value={profile.phenologyNotes ?? ""}
+                                onChange={(event) => {
+                                  void updateProfilePhenology(profile.id, {
+                                    phenologyStage: profile.phenologyStage ?? null,
+                                    phenologyObservedAt: profile.phenologyObservedAt ?? new Date().toISOString(),
+                                    phenologyNotes: event.target.value || null,
+                                  }).then(loadDashboard).catch((error) => setProfileState(toFormState(error)));
+                                }}
+                              />
+                            </label>
+                          </div>
+                        {profile.notes ? (
+                            <p className="mt-3 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                              {profile.notes}
+                            </p>
+                          ) : null}
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      title="No growing profiles yet"
+                      copy="Create one active profile before expecting calendar windows or transplant timing."
+                    />
+                  )}
+                </Panel>
+              </div>
             </div>
           ) : null}
 
@@ -1383,10 +1752,7 @@ export function SaatgutApp() {
                         className="field-input"
                         value={plantingForm.seedBatchId}
                         onChange={(event) =>
-                          setPlantingForm((current) => ({
-                            ...current,
-                            seedBatchId: event.target.value,
-                          }))
+                          setPlantingForm((current) => ({ ...current, seedBatchId: event.target.value }))
                         }
                       >
                         <option value="">None</option>
@@ -1446,10 +1812,7 @@ export function SaatgutApp() {
                       className="field-input"
                       value={plantingForm.locationNote}
                       onChange={(event) =>
-                        setPlantingForm((current) => ({
-                          ...current,
-                          locationNote: event.target.value,
-                        }))
+                        setPlantingForm((current) => ({ ...current, locationNote: event.target.value }))
                       }
                     />
                   </Field>
@@ -1557,16 +1920,8 @@ function DataForm({
 }) {
   return (
     <form className="grid gap-4" onSubmit={onSubmit}>
-      {state.error ? (
-        <p className="rounded-2xl border border-red-300/40 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {state.error}
-        </p>
-      ) : null}
-      {state.success ? (
-        <p className="rounded-2xl border border-emerald-300/40 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {state.success}
-        </p>
-      ) : null}
+      {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
+      {state.success ? <Alert tone="success">{state.success}</Alert> : null}
       {children}
       <button className="w-fit rounded-full bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white">
         {submitLabel}
@@ -1584,6 +1939,130 @@ function EmptyState({ title, copy }: { title: string; copy: string }) {
   );
 }
 
+function Alert({
+  tone,
+  children,
+}: {
+  tone: "danger" | "success";
+  children: React.ReactNode;
+}) {
+  const styles =
+    tone === "danger"
+      ? "mt-4 rounded-2xl border border-red-300/40 bg-red-50 px-4 py-3 text-sm text-red-700"
+      : "mt-4 rounded-2xl border border-emerald-300/40 bg-emerald-50 px-4 py-3 text-sm text-emerald-700";
+
+  return <p className={styles}>{children}</p>;
+}
+
+function WarningPill({
+  level,
+  children,
+}: {
+  level: "info" | "warning" | "critical";
+  children: React.ReactNode;
+}) {
+  const classes =
+    level === "critical"
+      ? "border-red-300/50 bg-red-50 text-red-700"
+      : level === "warning"
+        ? "border-amber-300/50 bg-amber-50 text-amber-700"
+        : "border-sky-300/50 bg-sky-50 text-sky-700";
+
+  return (
+    <span className={classNames("rounded-full border px-3 py-1 text-xs font-semibold", classes)}>
+      {children}
+    </span>
+  );
+}
+
+function SeedBatchCard({
+  seedBatch,
+  varietyName,
+  warnings,
+  germinationTests,
+  adjustments,
+}: {
+  seedBatch: SeedBatch;
+  varietyName: string;
+  warnings: NonNullable<SeedBatch["storageWarnings"]>;
+  germinationTests: NonNullable<SeedBatch["germinationTests"]>;
+  adjustments: NonNullable<SeedBatch["stockTransactions"]>;
+}) {
+  return (
+    <article className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold">{varietyName}</h3>
+          <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.72)]">
+            {seedBatch.quantity} {seedBatch.unit.toLowerCase()} · {seedBatch.storageLocation || "No storage location"}
+          </p>
+        </div>
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
+          {seedBatch.harvestYear ? `Harvest ${seedBatch.harvestYear}` : "Year unknown"}
+        </span>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {warnings.map((warning) => (
+          <WarningPill key={`${seedBatch.id}-${warning.title}`} level={warning.level}>
+            {warning.title}
+          </WarningPill>
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
+            Germination tests
+          </p>
+          <div className="mt-2 grid gap-2">
+            {germinationTests.length ? (
+              germinationTests.slice(0, 2).map((entry) => (
+                <div key={entry.id} className="rounded-xl bg-white px-3 py-3 text-sm">
+                  <p className="font-medium">{formatDate(entry.testedAt)}</p>
+                  <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
+                    {entry.germinatedCount}/{entry.sampleSize} germinated
+                    {entry.germinationRate ? ` · ${entry.germinationRate}%` : ""}
+                    {entry.notes ? ` · ${entry.notes}` : ""}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p className="rounded-xl bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
+                No germination tests recorded yet.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
+            Corrections and undo history
+          </p>
+          <div className="mt-2 grid gap-2">
+            {adjustments.length ? (
+              adjustments.slice(0, 2).map((entry) => (
+                <div key={entry.id} className="rounded-xl bg-white px-3 py-3 text-sm">
+                  <p className="font-medium">{labelPlantingType(entry.type)}</p>
+                  <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
+                    {formatDate(entry.effectiveDate)}
+                    {entry.quantityDelta ? ` · delta ${entry.quantityDelta}` : ""}
+                    {entry.reason ? ` · ${entry.reason}` : ""}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p className="rounded-xl bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
+                No correction history recorded.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function RuleGrid({
   form,
   setForm,
@@ -1591,7 +2070,7 @@ function RuleGrid({
   form: RuleFormValues;
   setForm: React.Dispatch<React.SetStateAction<RuleFormValues>>;
 }) {
-  const fields: Array<[keyof typeof form, string]> = [
+  const fields: Array<[keyof RuleFormValues, string]> = [
     ["sowIndoorsStartWeeks", "Indoor sowing start"],
     ["sowIndoorsEndWeeks", "Indoor sowing end"],
     ["sowOutdoorsStartWeeks", "Outdoor sowing start"],
@@ -1625,14 +2104,4 @@ function RuleGrid({
       ))}
     </div>
   );
-}
-
-function nullableRange(
-  start: number | null,
-  end: number | null,
-  suffix: string,
-) {
-  if (start === null && end === null) return "Not defined";
-  if (start !== null && end !== null) return `${start} to ${end} ${suffix}`;
-  return `${start ?? end} ${suffix}`;
 }
