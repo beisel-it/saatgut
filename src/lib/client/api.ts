@@ -9,6 +9,7 @@ import type {
   JournalEntry,
   Membership,
   PasskeyCredential,
+  PasskeyListResponse,
   PlantingEvent,
   ReminderTask,
   SeedBatch,
@@ -151,6 +152,18 @@ export function completePasskeyEnrollment(input: { response: unknown }) {
   return request<{ passkey: PasskeyCredential }>("/api/v1/auth/passkeys/enroll/verify", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export function listPasskeys() {
+  return request<PasskeyListResponse>("/api/v1/auth/passkeys", {
+    method: "GET",
+  });
+}
+
+export function removePasskey(passkeyId: string) {
+  return request<{ passkey: PasskeyCredential }>(`/api/v1/auth/passkeys/${passkeyId}`, {
+    method: "DELETE",
   });
 }
 

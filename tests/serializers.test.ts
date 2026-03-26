@@ -97,6 +97,9 @@ describe("serializePasskeyCredential", () => {
     } as never);
 
     expect(passkey.lastUsedAt).toBe("2026-03-26T12:00:00.000Z");
+    expect(passkey.credentialPreview).toBeNull();
+    expect(passkey.canRemove).toBe(true);
+    expect(passkey.removalBlockedReason).toBeNull();
     expect(passkey).not.toHaveProperty("publicKey");
   });
 });

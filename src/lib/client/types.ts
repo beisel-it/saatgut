@@ -38,12 +38,21 @@ export type SessionSnapshot = {
 
 export type PasskeyCredential = {
   id: string;
+  credentialPreview: string | null;
   deviceType: "SINGLE_DEVICE" | "MULTI_DEVICE";
   backedUp: boolean;
   transports: string[];
+  canRemove: boolean;
+  removalBlockedReason: "LAST_SIGNIN_METHOD" | null;
   lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type PasskeyListResponse = {
+  items: PasskeyCredential[];
+  passwordFallbackAvailable: boolean;
+  totalPasskeys: number;
 };
 
 export type Species = {

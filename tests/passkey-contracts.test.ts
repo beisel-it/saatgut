@@ -43,5 +43,7 @@ describe("passkey auth OpenAPI paths", () => {
     expect(document.paths["/auth/passkeys/login/verify"]).toBeDefined();
     expect(document.paths["/auth/passkeys/enroll/options"]).toBeDefined();
     expect(document.paths["/auth/passkeys/enroll/verify"]).toBeDefined();
+    expect(document.paths["/auth/passkeys"]).toBeDefined();
+    expect(document.paths["/auth/passkeys/{passkeyId}"]).toBeDefined();
   });
 });

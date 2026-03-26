@@ -72,18 +72,28 @@ export function serializeMembership(membership: {
 
 export function serializePasskeyCredential(passkey: {
   id: string;
+  credentialId?: string;
   deviceType: "SINGLE_DEVICE" | "MULTI_DEVICE";
   backedUp: boolean;
   transports: string[];
   lastUsedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  canRemove?: boolean;
+  removalBlockedReason?: string | null;
 }) {
+  const credentialPreview = passkey.credentialId
+    ? `${passkey.credentialId.slice(0, 8)}…${passkey.credentialId.slice(-4)}`
+    : null;
+
   return {
     id: passkey.id,
+    credentialPreview,
     deviceType: passkey.deviceType,
     backedUp: passkey.backedUp,
     transports: passkey.transports,
+    canRemove: passkey.canRemove ?? true,
+    removalBlockedReason: passkey.removalBlockedReason ?? null,
     lastUsedAt: passkey.lastUsedAt?.toISOString() ?? null,
     createdAt: passkey.createdAt.toISOString(),
     updatedAt: passkey.updatedAt.toISOString(),

@@ -21,6 +21,7 @@ import { env } from "@/lib/env";
 import { ApiError } from "@/lib/server/api-error";
 import { writeAuditLog } from "@/lib/server/audit-log";
 import type { AuthContext } from "@/lib/server/auth-context";
+import { serializePasskeyCredential } from "@/lib/server/serializers";
 
 function defaultWorkspaceName(email: string): string {
   const localPart = email.split("@")[0] ?? "Saatgut";
@@ -67,6 +68,104 @@ async function getDefaultMembershipForUser(userId: string) {
   }
 
   return membership;
+}
+
+function sortPasskeys<
+  T extends {
+    lastUsedAt: Date | null;
+    createdAt: Date;
+  },
+>(passkeys: T[]): T[] {
+  return [...passkeys].sort((left, right) => {
+    if (left.lastUsedAt && right.lastUsedAt) {
+      return right.lastUsedAt.getTime() - left.lastUsedAt.getTime();
+    }
+
+    if (left.lastUsedAt) {
+      return -1;
+    }
+
+    if (right.lastUsedAt) {
+      return 1;
+    }
+
+    return right.createdAt.getTime() - left.createdAt.getTime();
+  });
+}
+
+function canRemovePasskey(passwordHash: string | null, passkeyCount: number) {
+  return Boolean(passwordHash) || passkeyCount > 1;
+}
+
+export async function listPasskeyCredentials(auth: AuthContext) {
+  const user = await prisma.user.findUnique({
+    where: { id: auth.userId },
+    include: {
+      passkeys: true,
+    },
+  });
+
+  if (!user) {
+    throw new ApiError(404, "USER_NOT_FOUND", "User account was not found.");
+  }
+
+  const removable = canRemovePasskey(user.passwordHash, user.passkeys.length);
+  const items = sortPasskeys(user.passkeys).map((passkey) =>
+    serializePasskeyCredential({
+      ...passkey,
+      canRemove: removable,
+      removalBlockedReason: removable ? null : "LAST_SIGNIN_METHOD",
+    }),
+  );
+
+  return {
+    items,
+    passwordFallbackAvailable: Boolean(user.passwordHash),
+    totalPasskeys: items.length,
+  };
+}
+
+export async function removePasskeyCredential(auth: AuthContext, passkeyId: string) {
+  return prisma.$transaction(async (tx) => {
+    const user = await tx.user.findUnique({
+      where: { id: auth.userId },
+      include: {
+        passkeys: true,
+      },
+    });
+
+    if (!user) {
+      throw new ApiError(404, "USER_NOT_FOUND", "User account was not found.");
+    }
+
+    const passkey = user.passkeys.find((candidate) => candidate.id === passkeyId);
+
+    if (!passkey) {
+      throw new ApiError(404, "PASSKEY_NOT_FOUND", "Passkey was not found for this user.");
+    }
+
+    if (!canRemovePasskey(user.passwordHash, user.passkeys.length)) {
+      throw new ApiError(
+        409,
+        "LAST_SIGNIN_METHOD",
+        "You cannot remove the last passkey unless this account also has a password.",
+      );
+    }
+
+    await tx.passkeyCredential.delete({
+      where: { id: passkey.id },
+    });
+
+    await writeAuditLog(tx, auth, "auth.passkeyRemove", "PasskeyCredential", passkey.id, {
+      credentialId: passkey.credentialId,
+    });
+
+    return serializePasskeyCredential({
+      ...passkey,
+      canRemove: true,
+      removalBlockedReason: null,
+    });
+  });
 }
 
 export async function beginPasskeySignup(input: { email: string; workspaceName?: string }) {

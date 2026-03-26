@@ -106,6 +106,16 @@ export function getOpenApiDocument() {
       "/auth/passkeys/enroll/verify": {
         post: { summary: "Verify passkey enrollment for an authenticated user", responses: { "200": { description: "Passkey enrolled" } } },
       },
+      "/auth/passkeys": {
+        get: { summary: "List enrolled passkeys for the authenticated user", responses: { "200": { description: "Passkey list" } } },
+      },
+      "/auth/passkeys/{passkeyId}": {
+        delete: {
+          summary: "Remove an enrolled passkey when another sign-in method remains available",
+          parameters: [{ name: "passkeyId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Passkey removed" }, "409": { description: "Last sign-in method blocked" } },
+        },
+      },
       "/auth/session": {
         get: { summary: "Fetch the authenticated session snapshot", responses: { "200": { description: "Session" } } },
         delete: { summary: "Clear the current session cookie", responses: { "200": { description: "Logged out" } } },
