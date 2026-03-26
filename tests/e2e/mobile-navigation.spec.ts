@@ -4,7 +4,6 @@ test.use({ viewport: { width: 390, height: 844 } });
 
 test("refined mobile navigation opens, closes, and reaches every shipped surface", async ({
   page,
-  baseURL,
 }) => {
   const stamp = Date.now().toString();
   const workspaceName = `Mobil Garten ${stamp}`;
