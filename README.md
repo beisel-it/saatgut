@@ -1,46 +1,38 @@
 # Saatgut
 
-Saatgut is a small web application workspace for the first runnable slice: a landing-to-waitlist flow backed by a minimal TypeScript API.
+Saatgut is a self-hosted seed-bank and cultivation journal web app for managing varieties, seed batches, frost-date-based growing profiles, cultivation rules, and a practical 14-day calendar of upcoming garden work.
 
-## Backend Slice
+## MVP Scope
 
-- `GET /api/v1/health` returns `{ "status": "ok" }`
-- `POST /api/v1/waitlist` validates `email` and `interestArea`
-- successful submissions are stored in `data/waitlist-submissions.json`
+The current build target is the seed-bank MVP defined in `reference.md` and [docs/roadmap/mvp-technical-spec.md](/home/florian/.openclaw/workspace/saatgut/docs/roadmap/mvp-technical-spec.md):
 
-## Local Setup
+- authentication
+- species and varieties
+- seed batches
+- growing profiles
+- cultivation rules
+- 14-day calendar view
+- planting events with stock deduction
 
-Install dependencies:
+## Technical Direction
 
-```bash
-npm install
-```
+The agreed runtime direction is:
 
-Run the API locally on `127.0.0.1:8000`:
+- Next.js 15
+- TypeScript
+- Prisma
+- PostgreSQL
+- Vitest and Playwright
+- Docker Compose for local and Portainer-friendly deployment
 
-```bash
-npm run api:dev
-```
+## Current Status
 
-Run the automated checks:
+The previous waitlist prototype is obsolete and should not be extended or merged back into the product. Current implementation work should follow only the seed-bank roadmap and task graph.
 
-```bash
-npm test
-```
+## Key Docs
 
-## Environment
-
-Copy `.env.example` to `.env` if you want to customize the storage path.
-
-- `SAATGUT_DATA_PATH`: path to the waitlist submissions file, defaults to `./data/waitlist-submissions.json`
-
-## Example Request
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/v1/waitlist \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "gardener@example.com",
-    "interestArea": "Learning what to plant"
-  }'
-```
+- [docs/roadmap/project-context.md](/home/florian/.openclaw/workspace/saatgut/docs/roadmap/project-context.md)
+- [docs/roadmap/initial-backlog.md](/home/florian/.openclaw/workspace/saatgut/docs/roadmap/initial-backlog.md)
+- [docs/roadmap/mvp-technical-spec.md](/home/florian/.openclaw/workspace/saatgut/docs/roadmap/mvp-technical-spec.md)
+- [docs/roadmap/qa-baseline-first-slice.md](/home/florian/.openclaw/workspace/saatgut/docs/roadmap/qa-baseline-first-slice.md)
+- [reference.md](/home/florian/.openclaw/workspace/saatgut/reference.md)
