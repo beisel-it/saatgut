@@ -57,11 +57,13 @@ test("refined mobile navigation opens, closes, and reaches every shipped surface
   await page.getByRole("button", { name: "Katalog" }).click();
   await expect(page.getByRole("button", { name: "Navigation öffnen" })).toHaveAttribute("aria-expanded", "false");
   await expect(page.getByRole("heading", { name: "Sorten und Chargen pflegen." })).toBeVisible();
+  await expect(mobileNavigation.getByRole("button", { name: "Übersicht" })).not.toBeVisible();
 
   await page.getByRole("button", { name: "Navigation öffnen" }).click();
   await page.getByRole("button", { name: "Druckbögen" }).click();
   await expect(page.getByRole("button", { name: "Navigation öffnen" })).toHaveAttribute("aria-expanded", "false");
   await expect(page.getByRole("heading", { name: "A4-Druckbögen für Dein Saatgut." })).toBeVisible();
+  await expect(mobileNavigation.getByRole("button", { name: "Katalog" })).not.toBeVisible();
 
   await page.getByRole("button", { name: "Navigation öffnen" }).click();
   await page.getByRole("button", { name: "Profile" }).click();
