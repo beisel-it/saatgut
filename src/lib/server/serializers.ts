@@ -125,6 +125,9 @@ export function serializeSpecies(species: {
   commonName: string;
   latinName: string | null;
   category: SpeciesCategory;
+  germinationNotes: string | null;
+  preferredLocation: string | null;
+  companionPlantingNotes: string | null;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -144,6 +147,9 @@ export function serializeVariety(variety: {
   description: string | null;
   heirloom: boolean;
   tags: string[];
+  germinationNotes: string | null;
+  preferredLocation: string | null;
+  companionPlantingNotes: string | null;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -152,6 +158,9 @@ export function serializeVariety(variety: {
     commonName: string;
     latinName: string | null;
     category: SpeciesCategory;
+    germinationNotes?: string | null;
+    preferredLocation?: string | null;
+    companionPlantingNotes?: string | null;
   };
   synonyms?: Array<{ id: string; name: string; createdAt: Date }>;
   cultivationRule?: {

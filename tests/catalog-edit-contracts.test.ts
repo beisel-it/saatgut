@@ -9,8 +9,14 @@ import { getOpenApiDocument } from "@/lib/server/openapi";
 
 describe("catalog edit schemas", () => {
   it("accepts partial species updates", () => {
-    expect(speciesUpdateSchema.parse({ commonName: "Paprika" })).toEqual({
+    expect(
+      speciesUpdateSchema.parse({
+        commonName: "Paprika",
+        preferredLocation: "Warmer, windgeschuetzter Platz",
+      }),
+    ).toEqual({
       commonName: "Paprika",
+      preferredLocation: "Warmer, windgeschuetzter Platz",
     });
   });
 
@@ -19,10 +25,12 @@ describe("catalog edit schemas", () => {
       varietyUpdateSchema.parse({
         tags: ["qa", "editable"],
         synonyms: ["Sweet Pepper"],
+        companionPlantingNotes: "Basilikum and Tagetes work well nearby.",
       }),
     ).toEqual({
       tags: ["qa", "editable"],
       synonyms: ["Sweet Pepper"],
+      companionPlantingNotes: "Basilikum and Tagetes work well nearby.",
     });
   });
 

@@ -157,37 +157,43 @@ model Membership {
 }
 
 model Species {
-  id          String          @id @default(cuid())
-  workspaceId String
-  commonName  String
-  latinName   String?
-  category    SpeciesCategory @default(VEGETABLE)
-  notes       String?
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  varieties   Variety[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id                   String          @id @default(cuid())
+  workspaceId          String
+  commonName           String
+  latinName            String?
+  category             SpeciesCategory @default(VEGETABLE)
+  germinationNotes     String?
+  preferredLocation    String?
+  companionPlantingNotes String?
+  notes                String?
+  workspace            Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  varieties            Variety[]
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 }
 
 model Variety {
-  id              String            @id @default(cuid())
-  workspaceId     String
-  speciesId       String
-  name            String
-  description     String?
-  heirloom        Boolean           @default(false)
-  tags            String[]          @default([])
-  notes           String?
-  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  species         Species           @relation(fields: [speciesId], references: [id], onDelete: Restrict)
-  synonyms        VarietySynonym[]
-  seedBatches     SeedBatch[]
-  cultivationRule CultivationRule?
-  plantingEvents  PlantingEvent[]
-  journalEntries  PlantingJournalEntry[]
-  reminderTasks   ReminderTask[]
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                    String            @id @default(cuid())
+  workspaceId           String
+  speciesId             String
+  name                  String
+  description           String?
+  heirloom              Boolean           @default(false)
+  tags                  String[]          @default([])
+  germinationNotes      String?
+  preferredLocation     String?
+  companionPlantingNotes String?
+  notes                 String?
+  workspace             Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  species               Species           @relation(fields: [speciesId], references: [id], onDelete: Restrict)
+  synonyms              VarietySynonym[]
+  seedBatches           SeedBatch[]
+  cultivationRule       CultivationRule?
+  plantingEvents        PlantingEvent[]
+  journalEntries        PlantingJournalEntry[]
+  reminderTasks         ReminderTask[]
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
   @@index([workspaceId, name])
 }

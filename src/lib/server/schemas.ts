@@ -36,6 +36,9 @@ export const speciesCreateSchema = z.object({
   commonName: z.string().trim().min(1).max(120),
   latinName: z.string().trim().min(1).max(160).optional().nullable(),
   category: z.nativeEnum(SpeciesCategory).default(SpeciesCategory.VEGETABLE),
+  germinationNotes: z.string().trim().max(2000).optional().nullable(),
+  preferredLocation: z.string().trim().max(500).optional().nullable(),
+  companionPlantingNotes: z.string().trim().max(2000).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
 });
 
@@ -51,6 +54,9 @@ export const varietyCreateSchema = z.object({
   description: z.string().trim().max(2000).optional().nullable(),
   heirloom: z.boolean().default(false),
   tags: z.array(z.string().trim().min(1).max(48)).max(12).default([]),
+  germinationNotes: z.string().trim().max(2000).optional().nullable(),
+  preferredLocation: z.string().trim().max(500).optional().nullable(),
+  companionPlantingNotes: z.string().trim().max(2000).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
   synonyms: z.array(z.string().trim().min(1).max(160)).max(12).default([]),
 });

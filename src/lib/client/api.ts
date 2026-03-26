@@ -198,6 +198,9 @@ export function createSpecies(input: {
   commonName: string;
   latinName?: string | null;
   category: Species["category"];
+  germinationNotes?: string | null;
+  preferredLocation?: string | null;
+  companionPlantingNotes?: string | null;
   notes?: string | null;
 }) {
   return request<Species>("/api/v1/species", {
@@ -212,6 +215,9 @@ export function updateSpecies(
     commonName?: string;
     latinName?: string | null;
     category?: Species["category"];
+    germinationNotes?: string | null;
+    preferredLocation?: string | null;
+    companionPlantingNotes?: string | null;
     notes?: string | null;
   },
 ) {
@@ -233,6 +239,9 @@ export function createVariety(input: {
   description?: string | null;
   heirloom: boolean;
   tags: string[];
+  germinationNotes?: string | null;
+  preferredLocation?: string | null;
+  companionPlantingNotes?: string | null;
   notes?: string | null;
   synonyms: string[];
 }) {
@@ -250,6 +259,9 @@ export function updateVariety(
     description?: string | null;
     heirloom?: boolean;
     tags?: string[];
+    germinationNotes?: string | null;
+    preferredLocation?: string | null;
+    companionPlantingNotes?: string | null;
     notes?: string | null;
     synonyms?: string[];
   },

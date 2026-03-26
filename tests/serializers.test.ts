@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   serializeApiToken,
   serializePasskeyCredential,
+  serializeSpecies,
+  serializeVariety,
   serializeSeedBatch,
   serializeUser,
   serializeWorkspaceMember,
@@ -26,6 +28,54 @@ describe("serializeSeedBatch", () => {
     });
 
     expect(payload.quantity).toBe("42.5");
+  });
+});
+
+describe("guidance serializers", () => {
+  it("keeps horticultural guidance fields JSON-safe on species and varieties", () => {
+    const species = serializeSpecies({
+      id: "species_1",
+      workspaceId: "workspace_1",
+      commonName: "Tomate",
+      latinName: "Solanum lycopersicum",
+      category: "VEGETABLE",
+      germinationNotes: "24C and evenly moist compost.",
+      preferredLocation: "Full sun with shelter from wind.",
+      companionPlantingNotes: "Works well with basil and tagetes.",
+      notes: null,
+      createdAt: new Date("2026-03-26T00:00:00.000Z"),
+      updatedAt: new Date("2026-03-26T00:00:00.000Z"),
+    });
+
+    const variety = serializeVariety({
+      id: "variety_1",
+      workspaceId: "workspace_1",
+      speciesId: "species_1",
+      name: "Berner Rose",
+      description: null,
+      heirloom: true,
+      tags: ["tomato"],
+      germinationNotes: "Bottom heat speeds emergence.",
+      preferredLocation: "Greenhouse or very warm bed.",
+      companionPlantingNotes: "Avoid potatoes nearby.",
+      notes: null,
+      createdAt: new Date("2026-03-26T00:00:00.000Z"),
+      updatedAt: new Date("2026-03-26T00:00:00.000Z"),
+      species: {
+        id: "species_1",
+        commonName: "Tomate",
+        latinName: "Solanum lycopersicum",
+        category: "VEGETABLE",
+        germinationNotes: "24C and evenly moist compost.",
+        preferredLocation: "Full sun with shelter from wind.",
+        companionPlantingNotes: "Works well with basil and tagetes.",
+      },
+    });
+
+    expect(species.germinationNotes).toBe("24C and evenly moist compost.");
+    expect(species.preferredLocation).toBe("Full sun with shelter from wind.");
+    expect(variety.companionPlantingNotes).toBe("Avoid potatoes nearby.");
+    expect(variety.species?.companionPlantingNotes).toBe("Works well with basil and tagetes.");
   });
 });
 

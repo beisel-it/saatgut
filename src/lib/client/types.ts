@@ -61,6 +61,9 @@ export type Species = {
   commonName: string;
   latinName: string | null;
   category: "VEGETABLE" | "FRUIT" | "HERB" | "FLOWER" | "OTHER";
+  germinationNotes: string | null;
+  preferredLocation: string | null;
+  companionPlantingNotes: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -91,6 +94,9 @@ export type Variety = {
   description: string | null;
   heirloom: boolean;
   tags: string[];
+  germinationNotes: string | null;
+  preferredLocation: string | null;
+  companionPlantingNotes: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -99,6 +105,9 @@ export type Variety = {
     commonName: string;
     latinName: string | null;
     category: Species["category"];
+    germinationNotes?: string | null;
+    preferredLocation?: string | null;
+    companionPlantingNotes?: string | null;
   };
   synonyms?: Array<{
     id: string;

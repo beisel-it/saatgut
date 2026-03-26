@@ -101,6 +101,10 @@ export async function listSpecies(
         ? [
             { commonName: { contains: filters.q, mode: "insensitive" } },
             { latinName: { contains: filters.q, mode: "insensitive" } },
+            { germinationNotes: { contains: filters.q, mode: "insensitive" } },
+            { preferredLocation: { contains: filters.q, mode: "insensitive" } },
+            { companionPlantingNotes: { contains: filters.q, mode: "insensitive" } },
+            { notes: { contains: filters.q, mode: "insensitive" } },
           ]
         : undefined,
     },
@@ -114,6 +118,9 @@ export async function createSpecies(
     commonName: string;
     latinName?: string | null;
     category: Prisma.SpeciesCreateInput["category"];
+    germinationNotes?: string | null;
+    preferredLocation?: string | null;
+    companionPlantingNotes?: string | null;
     notes?: string | null;
   },
 ) {
@@ -126,6 +133,9 @@ export async function createSpecies(
         commonName: input.commonName,
         latinName: input.latinName ?? null,
         category: input.category,
+        germinationNotes: input.germinationNotes ?? null,
+        preferredLocation: input.preferredLocation ?? null,
+        companionPlantingNotes: input.companionPlantingNotes ?? null,
         notes: input.notes ?? null,
       },
     });
@@ -146,6 +156,9 @@ export async function updateSpecies(
     commonName?: string;
     latinName?: string | null;
     category?: Prisma.SpeciesUpdateInput["category"];
+    germinationNotes?: string | null;
+    preferredLocation?: string | null;
+    companionPlantingNotes?: string | null;
     notes?: string | null;
   },
 ) {
@@ -160,6 +173,9 @@ export async function updateSpecies(
         commonName: input.commonName,
         latinName: input.latinName,
         category: input.category,
+        germinationNotes: input.germinationNotes,
+        preferredLocation: input.preferredLocation,
+        companionPlantingNotes: input.companionPlantingNotes,
         notes: input.notes,
       },
     });
@@ -234,6 +250,9 @@ export async function searchVarieties(
         ? [
             { name: { contains: filters.q, mode: "insensitive" } },
             { description: { contains: filters.q, mode: "insensitive" } },
+            { germinationNotes: { contains: filters.q, mode: "insensitive" } },
+            { preferredLocation: { contains: filters.q, mode: "insensitive" } },
+            { companionPlantingNotes: { contains: filters.q, mode: "insensitive" } },
             { notes: { contains: filters.q, mode: "insensitive" } },
             { species: { commonName: { contains: filters.q, mode: "insensitive" } } },
             { synonyms: { some: { name: { contains: filters.q, mode: "insensitive" } } } },
@@ -257,6 +276,9 @@ export async function createVariety(
     description?: string | null;
     heirloom: boolean;
     tags: string[];
+    germinationNotes?: string | null;
+    preferredLocation?: string | null;
+    companionPlantingNotes?: string | null;
     notes?: string | null;
     synonyms: string[];
   },
@@ -274,6 +296,9 @@ export async function createVariety(
         description: input.description ?? null,
         heirloom: input.heirloom,
         tags: input.tags,
+        germinationNotes: input.germinationNotes ?? null,
+        preferredLocation: input.preferredLocation ?? null,
+        companionPlantingNotes: input.companionPlantingNotes ?? null,
         notes: input.notes ?? null,
         synonyms: input.synonyms.length
           ? {
@@ -306,6 +331,9 @@ export async function updateVariety(
     description?: string | null;
     heirloom?: boolean;
     tags?: string[];
+    germinationNotes?: string | null;
+    preferredLocation?: string | null;
+    companionPlantingNotes?: string | null;
     notes?: string | null;
     synonyms?: string[];
   },
@@ -327,6 +355,9 @@ export async function updateVariety(
         description: input.description,
         heirloom: input.heirloom,
         tags: input.tags,
+        germinationNotes: input.germinationNotes,
+        preferredLocation: input.preferredLocation,
+        companionPlantingNotes: input.companionPlantingNotes,
         notes: input.notes,
         synonyms:
           input.synonyms === undefined
