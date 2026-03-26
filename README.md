@@ -32,6 +32,17 @@ docker compose up --build
 
 The web app will be available on `http://localhost:3000` and will run Prisma migrations on container startup.
 
+### Compose And Portainer Credential Rules
+
+- Treat `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` as the source of truth for the self-hosted stack.
+- The custom PostgreSQL container startup reconciles `POSTGRES_PASSWORD` back onto the database role on every boot, so reused volumes do not keep stale credentials after a password change.
+- The app service derives its internal `DATABASE_URL` from those same Compose variables, which keeps Prisma and PostgreSQL aligned for registration, login, and migrations.
+- If you rotate the password in Portainer or `.env`, redeploy the stack. A volume reset is only required if you want to discard the database contents, not to apply the new password.
+
+### Existing Volume Recovery
+
+If an older deployment left the volume with different credentials, redeploy the stack with the desired `POSTGRES_PASSWORD`. The database container now repairs the role password during startup before the app begins serving traffic.
+
 ## Verification
 
 Use the baseline verification commands:
