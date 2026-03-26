@@ -5,10 +5,12 @@
   "description": "Saatgut seed-bank MVP workspace.",
   "scripts": {
     "setup": "npm run db:generate",
+    "predev": "npm run db:generate",
     "dev": "next dev --hostname 0.0.0.0",
     "build": "next build",
+    "prestart": "npm run db:generate",
     "start": "next start --hostname 0.0.0.0",
-    "start:container": "sh -c 'npm run db:deploy && npm run start'",
+    "start:container": "sh -c 'npm run db:generate && npm run db:deploy && npm run start'",
     "backup:db": "./scripts/backup-postgres.sh",
     "lint": "eslint src tests next.config.ts vitest.config.ts eslint.config.mjs --max-warnings=0",
     "typecheck": "rm -rf .next/types && next typegen && tsc --noEmit",
