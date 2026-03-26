@@ -58,6 +58,16 @@ type RuleFormValues = {
   successionIntervalDays: string;
 };
 
+type PacketIntakeFormValues = {
+  packetName: string;
+  quantity: string;
+  unit: (typeof seedUnits)[number];
+  source: string;
+  harvestYear: string;
+  storageLocation: string;
+  notes: string;
+};
+
 const initialFormState: FormState = {
   error: null,
   success: null,
@@ -83,6 +93,18 @@ const phenologyStageIds = [
   "late-summer",
   "early-autumn",
 ] as const;
+
+function createInitialPacketIntakeForm(): PacketIntakeFormValues {
+  return {
+    packetName: "",
+    quantity: "",
+    unit: "PACKETS",
+    source: "",
+    harvestYear: "",
+    storageLocation: "",
+    notes: "",
+  };
+}
 
 function classNames(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -265,15 +287,7 @@ export function SaatgutApp() {
     category: "VEGETABLE" as Species["category"],
     notes: "",
   });
-  const [packetIntakeForm, setPacketIntakeForm] = useState({
-    packetName: "",
-    quantity: "",
-    unit: "PACKETS" as (typeof seedUnits)[number],
-    source: "",
-    harvestYear: "",
-    storageLocation: "",
-    notes: "",
-  });
+  const [packetIntakeForm, setPacketIntakeForm] = useState<PacketIntakeFormValues>(createInitialPacketIntakeForm);
   const [varietyForm, setVarietyForm] = useState({
     speciesId: "",
     name: "",
@@ -333,6 +347,7 @@ export function SaatgutApp() {
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogCategory, setCatalogCategory] = useState<Species["category"] | "ALL">("ALL");
   const [catalogView, setCatalogView] = useState<"ALL" | "ON_HAND" | "ATTENTION">("ALL");
+  const [catalogAddOpen, setCatalogAddOpen] = useState(false);
   const [catalogToolsOpen, setCatalogToolsOpen] = useState(false);
   const [printScope, setPrintScope] = useState<"ALL" | "DIGEST" | "VARIETIES" | "BATCHES">("ALL");
   const [printOnlyStocked, setPrintOnlyStocked] = useState(true);
@@ -747,17 +762,10 @@ export function SaatgutApp() {
         notes: packetIntakeForm.notes || null,
       });
 
-      setPacketIntakeForm({
-        packetName: "",
-        quantity: "",
-        unit: "PACKETS",
-        source: "",
-        harvestYear: "",
-        storageLocation: "",
-        notes: "",
-      });
+      setPacketIntakeForm(createInitialPacketIntakeForm());
       setPacketIntakeState({ error: null, success: t.catalog.intakeSaved, fieldErrors: {} });
       await loadDashboard();
+      setCatalogAddOpen(false);
     } catch (error) {
       setPacketIntakeState(toFormState(error, t));
     }
@@ -936,6 +944,17 @@ export function SaatgutApp() {
     } catch (error) {
       setCorrectionState(toFormState(error, t));
     }
+  }
+
+  function openCatalogAddModal() {
+    setPacketIntakeState(initialFormState);
+    setCatalogAddOpen(true);
+  }
+
+  function closeCatalogAddModal() {
+    setCatalogAddOpen(false);
+    setPacketIntakeState(initialFormState);
+    setPacketIntakeForm(createInitialPacketIntakeForm());
   }
 
   if (sessionLoading) {
@@ -1434,119 +1453,129 @@ export function SaatgutApp() {
                     subtitle={t.catalog.heroSubtitle}
                     titleClassName="max-w-[22ch]"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setCatalogToolsOpen((current) => !current)}
-                    className="w-full rounded-lg border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold lg:w-auto"
-                  >
-                    {catalogToolsOpen ? t.catalog.toolsHide : t.catalog.toolsShow}
-                  </button>
+                  <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto lg:flex-col">
+                    <button
+                      type="button"
+                      onClick={openCatalogAddModal}
+                      className="w-full rounded-lg bg-[var(--foreground)] px-4 py-3 text-sm font-semibold text-white lg:w-auto"
+                    >
+                      {t.catalog.addButton}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCatalogToolsOpen((current) => !current)}
+                      className="w-full rounded-lg border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold lg:w-auto"
+                    >
+                      {catalogToolsOpen ? t.catalog.toolsHide : t.catalog.toolsShow}
+                    </button>
+                  </div>
                 </div>
               </section>
+              <ResponsiveModal
+                open={catalogAddOpen}
+                title={t.catalog.addModalTitle}
+                subtitle={t.catalog.addModalSubtitle}
+                closeLabel={t.common.close}
+                onClose={closeCatalogAddModal}
+              >
+                <div className="rounded-lg border border-[var(--border)] bg-white/80 p-4 md:p-5">
+                  <DataForm state={packetIntakeState} onSubmit={submitPacketIntake} submitLabel={t.catalog.saveSeedBatch}>
+                    <Field label={t.catalog.intakePacketLabel} name="packetName" fieldErrors={packetIntakeState.fieldErrors} optionalLabel={t.common.optional}>
+                      <input
+                        className="field-input"
+                        value={packetIntakeForm.packetName}
+                        onChange={(event) =>
+                          setPacketIntakeForm((current) => ({ ...current, packetName: event.target.value }))
+                        }
+                        placeholder={t.catalog.intakePacketPlaceholder}
+                      />
+                    </Field>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label={t.forms.quantity} name="quantity" fieldErrors={packetIntakeState.fieldErrors} optionalLabel={t.common.optional}>
+                        <input
+                          className="field-input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={packetIntakeForm.quantity}
+                          onChange={(event) =>
+                            setPacketIntakeForm((current) => ({ ...current, quantity: event.target.value }))
+                          }
+                        />
+                      </Field>
+                      <Field label={t.forms.unit} name="unit" fieldErrors={packetIntakeState.fieldErrors} optionalLabel={t.common.optional}>
+                        <select
+                          className="field-input"
+                          value={packetIntakeForm.unit}
+                          onChange={(event) =>
+                            setPacketIntakeForm((current) => ({
+                              ...current,
+                              unit: event.target.value as (typeof seedUnits)[number],
+                            }))
+                          }
+                        >
+                          {seedUnits.map((unit) => (
+                            <option key={unit} value={unit}>
+                              {labelSeedUnit(unit, t)}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label={t.forms.source} name="source" fieldErrors={packetIntakeState.fieldErrors} optional optionalLabel={t.common.optional}>
+                        <input
+                          className="field-input"
+                          value={packetIntakeForm.source}
+                          onChange={(event) =>
+                            setPacketIntakeForm((current) => ({ ...current, source: event.target.value }))
+                          }
+                          placeholder={t.catalog.intakeSourcePlaceholder}
+                        />
+                      </Field>
+                      <Field label={t.forms.harvestYear} name="harvestYear" fieldErrors={packetIntakeState.fieldErrors} optional optionalLabel={t.common.optional}>
+                        <input
+                          className="field-input"
+                          type="number"
+                          min="1900"
+                          max="2100"
+                          value={packetIntakeForm.harvestYear}
+                          onChange={(event) =>
+                            setPacketIntakeForm((current) => ({ ...current, harvestYear: event.target.value }))
+                          }
+                        />
+                      </Field>
+                    </div>
+                    <Field label={t.forms.storageLocation} name="storageLocation" fieldErrors={packetIntakeState.fieldErrors} optional optionalLabel={t.common.optional}>
+                      <input
+                        className="field-input"
+                        value={packetIntakeForm.storageLocation}
+                        onChange={(event) =>
+                          setPacketIntakeForm((current) => ({
+                            ...current,
+                            storageLocation: event.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
+                    <Field label={t.forms.notes} name="notes" fieldErrors={packetIntakeState.fieldErrors} optional optionalLabel={t.common.optional}>
+                      <textarea
+                        className="field-input min-h-24"
+                        value={packetIntakeForm.notes}
+                        onChange={(event) =>
+                          setPacketIntakeForm((current) => ({ ...current, notes: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <p className="max-w-[44ch] text-sm leading-6 text-[color:rgba(24,49,40,0.62)]">
+                      {t.catalog.intakeCreateHint}
+                    </p>
+                  </DataForm>
+                </div>
+              </ResponsiveModal>
               {catalogToolsOpen ? (
                 <Panel title={t.catalog.toolsTitle} subtitle={t.catalog.toolsSubtitle}>
                   <div className="grid gap-3">
-                    <div className="rounded-lg border border-[var(--border)] bg-white/70 p-4">
-                      <div className="mb-4">
-                        <h3 className="max-w-[22ch] text-lg font-semibold tracking-tight">{t.catalog.intakeTitle}</h3>
-                        <p className="mt-2 max-w-[42ch] text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
-                          {t.catalog.intakeSubtitle}
-                        </p>
-                      </div>
-                      <DataForm state={packetIntakeState} onSubmit={submitPacketIntake} submitLabel={t.catalog.saveSeedBatch}>
-                        <Field label={t.catalog.intakePacketLabel} name="packetName" fieldErrors={packetIntakeState.fieldErrors} optionalLabel={t.common.optional}>
-                          <input
-                            className="field-input"
-                            value={packetIntakeForm.packetName}
-                            onChange={(event) =>
-                              setPacketIntakeForm((current) => ({ ...current, packetName: event.target.value }))
-                            }
-                            placeholder={t.catalog.intakePacketPlaceholder}
-                          />
-                        </Field>
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <Field label={t.forms.quantity} name="quantity" fieldErrors={packetIntakeState.fieldErrors} optionalLabel={t.common.optional}>
-                            <input
-                              className="field-input"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={packetIntakeForm.quantity}
-                              onChange={(event) =>
-                                setPacketIntakeForm((current) => ({ ...current, quantity: event.target.value }))
-                              }
-                            />
-                          </Field>
-                          <Field label={t.forms.unit} name="unit" fieldErrors={packetIntakeState.fieldErrors} optionalLabel={t.common.optional}>
-                            <select
-                              className="field-input"
-                              value={packetIntakeForm.unit}
-                              onChange={(event) =>
-                                setPacketIntakeForm((current) => ({
-                                  ...current,
-                                  unit: event.target.value as (typeof seedUnits)[number],
-                                }))
-                              }
-                            >
-                              {seedUnits.map((unit) => (
-                                <option key={unit} value={unit}>
-                                  {labelSeedUnit(unit, t)}
-                                </option>
-                              ))}
-                            </select>
-                          </Field>
-                        </div>
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <Field label={t.forms.source} name="source" fieldErrors={packetIntakeState.fieldErrors} optional optionalLabel={t.common.optional}>
-                            <input
-                              className="field-input"
-                              value={packetIntakeForm.source}
-                              onChange={(event) =>
-                                setPacketIntakeForm((current) => ({ ...current, source: event.target.value }))
-                              }
-                              placeholder={t.catalog.intakeSourcePlaceholder}
-                            />
-                          </Field>
-                          <Field label={t.forms.harvestYear} name="harvestYear" fieldErrors={packetIntakeState.fieldErrors} optional optionalLabel={t.common.optional}>
-                            <input
-                              className="field-input"
-                              type="number"
-                              min="1900"
-                              max="2100"
-                              value={packetIntakeForm.harvestYear}
-                              onChange={(event) =>
-                                setPacketIntakeForm((current) => ({ ...current, harvestYear: event.target.value }))
-                              }
-                            />
-                          </Field>
-                        </div>
-                        <Field label={t.forms.storageLocation} name="storageLocation" fieldErrors={packetIntakeState.fieldErrors} optional optionalLabel={t.common.optional}>
-                          <input
-                            className="field-input"
-                            value={packetIntakeForm.storageLocation}
-                            onChange={(event) =>
-                              setPacketIntakeForm((current) => ({
-                                ...current,
-                                storageLocation: event.target.value,
-                              }))
-                            }
-                          />
-                        </Field>
-                        <Field label={t.forms.notes} name="notes" fieldErrors={packetIntakeState.fieldErrors} optional optionalLabel={t.common.optional}>
-                          <textarea
-                            className="field-input min-h-24"
-                            value={packetIntakeForm.notes}
-                            onChange={(event) =>
-                              setPacketIntakeForm((current) => ({ ...current, notes: event.target.value }))
-                            }
-                          />
-                        </Field>
-                        <p className="max-w-[44ch] text-sm leading-6 text-[color:rgba(24,49,40,0.62)]">
-                          {t.catalog.intakeCreateHint}
-                        </p>
-                      </DataForm>
-                    </div>
-
                     <CollapsiblePanel title={t.catalog.intakeAdvancedTitle} actionLabel={t.catalog.advancedOpen}>
                       <div className="mb-4">
                         <p className="max-w-[44ch] text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
@@ -2731,6 +2760,50 @@ function PrintPage({ children }: { children: React.ReactNode }) {
     <section className="print-page mx-auto w-full max-w-full overflow-hidden rounded-xl border border-[var(--border)] bg-white shadow-[var(--shadow)] print:max-w-none print:rounded-none print:border-0 print:shadow-none">
       <div className="print-page-inner min-h-[297mm] p-6 md:p-8 print:min-h-0 print:p-[12mm]">{children}</div>
     </section>
+  );
+}
+
+function ResponsiveModal({
+  open,
+  title,
+  subtitle,
+  closeLabel,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  subtitle: string;
+  closeLabel: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[color:rgba(24,49,40,0.52)] backdrop-blur-[2px]">
+      <div className="flex h-full w-full items-stretch justify-center md:p-6" onClick={onClose}>
+        <div
+          className="flex h-full w-full flex-col overflow-hidden bg-[color:rgba(253,249,240,0.98)] shadow-[var(--shadow)] md:h-auto md:max-h-[calc(100vh-3rem)] md:max-w-3xl md:rounded-xl md:border md:border-[var(--border)]"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-5 py-4 md:px-6">
+            <div className="min-w-0">
+              <h3 className="max-w-[18ch] text-[1.5rem] font-semibold tracking-tight leading-tight">{title}</h3>
+              <p className="mt-2 max-w-[42ch] text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{subtitle}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold"
+            >
+              {closeLabel}
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 md:px-6 md:py-6">{children}</div>
+        </div>
+      </div>
+    </div>
   );
 }
 

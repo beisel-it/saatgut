@@ -38,6 +38,7 @@ const de = {
     openNavigation: "Navigation öffnen",
     closeNavigation: "Navigation schließen",
     menu: "Menü",
+    close: "Schließen",
   },
   apiErrors: {
     UNAUTHORIZED: "Du musst Dich anmelden, um fortzufahren.",
@@ -155,6 +156,10 @@ const de = {
     toolsTitle: "Katalogwerkzeuge",
     toolsSubtitle:
       "Anlegen, nachpflegen und Bestände anpassen, wenn Du aktiv etwas ändern willst.",
+    addButton: "Hinzufügen",
+    addModalTitle: "Neue Saatgutpackung hinzufügen",
+    addModalSubtitle:
+      "Erfasse eine Packung in einem Schritt. Auf kleineren Bildschirmen öffnet sich der Ablauf vollflächig, damit Du ohne Gedränge arbeiten kannst.",
     toolsShow: "Werkzeuge zeigen",
     toolsHide: "Werkzeuge verbergen",
     listHint: "Öffne eine Sorte, um Chargen, Prüfungen und Hinweise zu sehen.",
@@ -515,6 +520,7 @@ const en: AppMessages = {
     openNavigation: "Open navigation",
     closeNavigation: "Close navigation",
     menu: "Menu",
+    close: "Close",
   },
   apiErrors: {
     UNAUTHORIZED: "You need to sign in to continue.",
@@ -632,6 +638,10 @@ const en: AppMessages = {
     toolsTitle: "Catalog tools",
     toolsSubtitle:
       "Create, maintain, and adjust stock only when you need to change something.",
+    addButton: "Add seeds",
+    addModalTitle: "Add a new seed packet",
+    addModalSubtitle:
+      "Capture a packet in one flow. On smaller screens the intake opens full-screen so the form stays easy to use.",
     toolsShow: "Show tools",
     toolsHide: "Hide tools",
     listHint: "Expand a variety to see batches, checks, and related notes.",
