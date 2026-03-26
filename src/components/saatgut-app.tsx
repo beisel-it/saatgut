@@ -114,6 +114,12 @@ type PacketIntakeFormValues = {
   notes: string;
 };
 
+type CropGuidance = {
+  germinationNotes: string | null;
+  preferredLocation: string | null;
+  companionPlantingNotes: string | null;
+};
+
 type EditableMembershipRole = Exclude<SessionSnapshot["membership"]["role"], "OWNER">;
 
 type CatalogDeleteTarget = {
@@ -168,6 +174,21 @@ function createInitialPacketIntakeForm(): PacketIntakeFormValues {
 
 function classNames(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
+}
+
+function getCropGuidance(
+  variety: Pick<Variety, "germinationNotes" | "preferredLocation" | "companionPlantingNotes"> | null | undefined,
+  species:
+    | Pick<Species, "germinationNotes" | "preferredLocation" | "companionPlantingNotes">
+    | Pick<NonNullable<Variety["species"]>, "germinationNotes" | "preferredLocation" | "companionPlantingNotes">
+    | null
+    | undefined,
+): CropGuidance {
+  return {
+    germinationNotes: variety?.germinationNotes || species?.germinationNotes || null,
+    preferredLocation: variety?.preferredLocation || species?.preferredLocation || null,
+    companionPlantingNotes: variety?.companionPlantingNotes || species?.companionPlantingNotes || null,
+  };
 }
 
 function toIsoDate(dateValue: string) {
@@ -413,6 +434,9 @@ export function SaatgutApp() {
     commonName: "",
     latinName: "",
     category: "VEGETABLE" as Species["category"],
+    germinationNotes: "",
+    preferredLocation: "",
+    companionPlantingNotes: "",
     notes: "",
   });
   const [packetIntakeForm, setPacketIntakeForm] = useState<PacketIntakeFormValues>(createInitialPacketIntakeForm);
@@ -421,6 +445,9 @@ export function SaatgutApp() {
     commonName: "",
     latinName: "",
     category: "VEGETABLE" as Species["category"],
+    germinationNotes: "",
+    preferredLocation: "",
+    companionPlantingNotes: "",
     notes: "",
   });
   const [varietyForm, setVarietyForm] = useState({
@@ -429,6 +456,9 @@ export function SaatgutApp() {
     description: "",
     heirloom: false,
     tags: "",
+    germinationNotes: "",
+    preferredLocation: "",
+    companionPlantingNotes: "",
     notes: "",
     synonyms: "",
   });
@@ -439,6 +469,9 @@ export function SaatgutApp() {
     description: "",
     heirloom: false,
     tags: "",
+    germinationNotes: "",
+    preferredLocation: "",
+    companionPlantingNotes: "",
     notes: "",
     synonyms: "",
   });
@@ -763,6 +796,12 @@ export function SaatgutApp() {
           variety.notes,
           species?.commonName,
           species?.latinName,
+          variety.germinationNotes,
+          variety.preferredLocation,
+          variety.companionPlantingNotes,
+          species?.germinationNotes,
+          species?.preferredLocation,
+          species?.companionPlantingNotes,
           ...(variety.tags ?? []),
           ...((variety.synonyms ?? []).map((synonym) => synonym.name)),
           ...seedBatches.flatMap((seedBatch) => [seedBatch.source, seedBatch.storageLocation, seedBatch.notes]),
@@ -993,12 +1032,18 @@ export function SaatgutApp() {
         commonName: speciesForm.commonName,
         latinName: speciesForm.latinName || null,
         category: speciesForm.category,
+        germinationNotes: speciesForm.germinationNotes || null,
+        preferredLocation: speciesForm.preferredLocation || null,
+        companionPlantingNotes: speciesForm.companionPlantingNotes || null,
         notes: speciesForm.notes || null,
       });
       setSpeciesForm({
         commonName: "",
         latinName: "",
         category: "VEGETABLE",
+        germinationNotes: "",
+        preferredLocation: "",
+        companionPlantingNotes: "",
         notes: "",
       });
       setSpeciesState({ error: null, success: t.statuses.speciesSaved, fieldErrors: {} });
@@ -1019,6 +1064,9 @@ export function SaatgutApp() {
         description: varietyForm.description || null,
         heirloom: varietyForm.heirloom,
         tags: parseTags(varietyForm.tags),
+        germinationNotes: varietyForm.germinationNotes || null,
+        preferredLocation: varietyForm.preferredLocation || null,
+        companionPlantingNotes: varietyForm.companionPlantingNotes || null,
         notes: varietyForm.notes || null,
         synonyms: parseTags(varietyForm.synonyms),
       });
@@ -1028,6 +1076,9 @@ export function SaatgutApp() {
         description: "",
         heirloom: false,
         tags: "",
+        germinationNotes: "",
+        preferredLocation: "",
+        companionPlantingNotes: "",
         notes: "",
         synonyms: "",
       });
@@ -1075,6 +1126,9 @@ export function SaatgutApp() {
       commonName: species.commonName,
       latinName: species.latinName ?? "",
       category: species.category,
+      germinationNotes: species.germinationNotes ?? "",
+      preferredLocation: species.preferredLocation ?? "",
+      companionPlantingNotes: species.companionPlantingNotes ?? "",
       notes: species.notes ?? "",
     });
   }
@@ -1094,6 +1148,9 @@ export function SaatgutApp() {
         commonName: speciesEditForm.commonName,
         latinName: speciesEditForm.latinName || null,
         category: speciesEditForm.category,
+        germinationNotes: speciesEditForm.germinationNotes || null,
+        preferredLocation: speciesEditForm.preferredLocation || null,
+        companionPlantingNotes: speciesEditForm.companionPlantingNotes || null,
         notes: speciesEditForm.notes || null,
       });
       setSpeciesEditState({ error: null, success: t.statuses.speciesUpdated, fieldErrors: {} });
@@ -1113,6 +1170,9 @@ export function SaatgutApp() {
       description: variety.description ?? "",
       heirloom: variety.heirloom,
       tags: variety.tags.join(", "),
+      germinationNotes: variety.germinationNotes ?? "",
+      preferredLocation: variety.preferredLocation ?? "",
+      companionPlantingNotes: variety.companionPlantingNotes ?? "",
       notes: variety.notes ?? "",
       synonyms: (variety.synonyms ?? []).map((synonym) => synonym.name).join(", "),
     });
@@ -1135,6 +1195,9 @@ export function SaatgutApp() {
         description: varietyEditForm.description || null,
         heirloom: varietyEditForm.heirloom,
         tags: parseTags(varietyEditForm.tags),
+        germinationNotes: varietyEditForm.germinationNotes || null,
+        preferredLocation: varietyEditForm.preferredLocation || null,
+        companionPlantingNotes: varietyEditForm.companionPlantingNotes || null,
         notes: varietyEditForm.notes || null,
         synonyms: parseTags(varietyEditForm.synonyms),
       });
@@ -2754,6 +2817,12 @@ export function SaatgutApp() {
                                   ))}
                                 </select>
                               </Field>
+                              <GuidanceFields
+                                values={speciesForm}
+                                setValues={setSpeciesForm}
+                                fieldErrors={speciesState.fieldErrors}
+                                t={t}
+                              />
                               <Field label={t.forms.notes} name="notes" fieldErrors={speciesState.fieldErrors} optional optionalLabel={t.common.optional}>
                                 <textarea
                                   className="field-input min-h-24"
@@ -2810,6 +2879,12 @@ export function SaatgutApp() {
                                           ))}
                                         </select>
                                       </Field>
+                                      <GuidanceFields
+                                        values={speciesEditForm}
+                                        setValues={setSpeciesEditForm}
+                                        fieldErrors={speciesEditState.fieldErrors}
+                                        t={t}
+                                      />
                                       <Field label={t.forms.notes} name="notes" fieldErrors={speciesEditState.fieldErrors} optional optionalLabel={t.common.optional}>
                                         <textarea
                                           className="field-input min-h-24"
@@ -2918,6 +2993,12 @@ export function SaatgutApp() {
                                 />
                                 {t.catalog.heirloom}
                               </label>
+                              <GuidanceFields
+                                values={varietyForm}
+                                setValues={setVarietyForm}
+                                fieldErrors={varietyState.fieldErrors}
+                                t={t}
+                              />
                               <Field label={t.forms.description} name="description" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
                                 <textarea
                                   className="field-input min-h-24"
@@ -2993,6 +3074,12 @@ export function SaatgutApp() {
                                         />
                                         {t.catalog.heirloom}
                                       </label>
+                                      <GuidanceFields
+                                        values={varietyEditForm}
+                                        setValues={setVarietyEditForm}
+                                        fieldErrors={varietyEditState.fieldErrors}
+                                        t={t}
+                                      />
                                       <Field label={t.forms.description} name="description" fieldErrors={varietyEditState.fieldErrors} optional optionalLabel={t.common.optional}>
                                         <textarea
                                           className="field-input min-h-24"
@@ -3997,6 +4084,10 @@ export function SaatgutApp() {
                                 ))}
                               </select>
                             </Field>
+                            <CropGuidancePanel
+                              variety={(dashboard?.varieties ?? []).find((variety) => variety.id === ruleEditForm.varietyId) ?? null}
+                              t={t}
+                            />
                             <RuleGrid form={ruleEditForm} setForm={setRuleEditForm} t={t} />
                             <div className="flex flex-wrap gap-3">
                               <button className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit">{t.common.saveChanges}</button>
@@ -4018,6 +4109,11 @@ export function SaatgutApp() {
                               <p>{t.rules.transplant}: {nullableRange(rule.transplantStartWeeks, rule.transplantEndWeeks, t.rules.weeksAfter, t.common.notDefined)}</p>
                               <p>{t.rules.harvest}: {nullableRange(rule.harvestStartDays, rule.harvestEndDays, t.rules.daysAfter, t.common.notDefined)}</p>
                             </div>
+                            <CropGuidancePanel
+                              className="mt-4"
+                              variety={(dashboard?.varieties ?? []).find((variety) => variety.id === rule.variety.id) ?? null}
+                              t={t}
+                            />
                           </>
                         )}
                       </article>
@@ -4049,6 +4145,10 @@ export function SaatgutApp() {
                       ))}
                     </select>
                   </Field>
+                  <CropGuidancePanel
+                    variety={(dashboard?.varieties ?? []).find((variety) => variety.id === ruleForm.varietyId) ?? null}
+                    t={t}
+                  />
                   <RuleGrid form={ruleForm} setForm={setRuleForm} t={t} />
                 </DataForm>
               </Panel>
@@ -5482,6 +5582,9 @@ function CatalogVarietyCard({
     description: string;
     heirloom: boolean;
     tags: string;
+    germinationNotes: string;
+    preferredLocation: string;
+    companionPlantingNotes: string;
     notes: string;
     synonyms: string;
   };
@@ -5492,6 +5595,9 @@ function CatalogVarietyCard({
     description: string;
     heirloom: boolean;
     tags: string;
+    germinationNotes: string;
+    preferredLocation: string;
+    companionPlantingNotes: string;
     notes: string;
     synonyms: string;
   }>>;
@@ -5504,6 +5610,7 @@ function CatalogVarietyCard({
   locale: Locale;
   t: AppMessages;
 }) {
+  const guidance = getCropGuidance(variety, species);
   const warningCount = seedBatches.reduce(
     (sum, seedBatch) => sum + (warningsByBatch.get(seedBatch.id) ?? []).filter((warning) => warning.level !== "info").length,
     0,
@@ -5597,6 +5704,12 @@ function CatalogVarietyCard({
                   onChange={(event) => setVarietyEditForm((current) => ({ ...current, description: event.target.value }))}
                 />
               </Field>
+              <GuidanceFields
+                values={varietyEditForm}
+                setValues={setVarietyEditForm}
+                fieldErrors={varietyEditState.fieldErrors}
+                t={t}
+              />
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label={t.forms.tags} name="tags" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional} optional>
                   <input
@@ -5656,6 +5769,8 @@ function CatalogVarietyCard({
             ))}
           </div>
         ) : null}
+
+        <CropGuidancePanel className="mt-4" guidance={guidance} t={t} />
 
         <div className="mt-5">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
@@ -6023,6 +6138,93 @@ function RuleGrid({
           </div>
         </section>
       ))}
+    </div>
+  );
+}
+
+function GuidanceFields<T extends {
+  germinationNotes: string;
+  preferredLocation: string;
+  companionPlantingNotes: string;
+}>({
+  values,
+  setValues,
+  fieldErrors,
+  t,
+}: {
+  values: T;
+  setValues: React.Dispatch<React.SetStateAction<T>>;
+  fieldErrors: Record<string, string[] | undefined>;
+  t: AppMessages;
+}) {
+  return (
+    <div className="grid gap-4">
+      <Field label={t.forms.germinationNotes} name="germinationNotes" fieldErrors={fieldErrors} optional optionalLabel={t.common.optional}>
+        <textarea
+          className="field-input min-h-24"
+          value={values.germinationNotes}
+          onChange={(event) => setValues((current) => ({ ...current, germinationNotes: event.target.value }))}
+          placeholder={t.forms.germinationNotesPlaceholder}
+        />
+      </Field>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label={t.forms.preferredLocation} name="preferredLocation" fieldErrors={fieldErrors} optional optionalLabel={t.common.optional}>
+          <input
+            className="field-input"
+            value={values.preferredLocation}
+            onChange={(event) => setValues((current) => ({ ...current, preferredLocation: event.target.value }))}
+            placeholder={t.forms.preferredLocationPlaceholder}
+          />
+        </Field>
+        <Field label={t.forms.companionPlantingNotes} name="companionPlantingNotes" fieldErrors={fieldErrors} optional optionalLabel={t.common.optional}>
+          <input
+            className="field-input"
+            value={values.companionPlantingNotes}
+            onChange={(event) => setValues((current) => ({ ...current, companionPlantingNotes: event.target.value }))}
+            placeholder={t.forms.companionPlantingNotesPlaceholder}
+          />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+function CropGuidancePanel({
+  variety,
+  guidance,
+  className,
+  t,
+}: {
+  variety?: Variety | null;
+  guidance?: CropGuidance | null;
+  className?: string;
+  t: AppMessages;
+}) {
+  const resolvedGuidance =
+    guidance ?? getCropGuidance(variety ?? null, variety?.species ?? null);
+  const items = [
+    { label: t.rules.germinationTitle, value: resolvedGuidance.germinationNotes },
+    { label: t.rules.preferredLocationTitle, value: resolvedGuidance.preferredLocation },
+    { label: t.rules.companionPlantingTitle, value: resolvedGuidance.companionPlantingNotes },
+  ].filter((item) => Boolean(item.value));
+
+  if (!items.length) return null;
+
+  return (
+    <div className={classNames("rounded-lg border border-[var(--border)] bg-white/72 px-4 py-4", className)}>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+        {t.rules.guidanceEyebrow}
+      </p>
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        {items.map((item) => (
+          <div key={item.label} className="rounded-md bg-[var(--muted)] px-3 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.56)]">
+              {item.label}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.76)]">{item.value}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
