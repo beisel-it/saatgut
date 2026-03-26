@@ -24,6 +24,8 @@ body {
   min-height: 100vh;
   color: var(--foreground);
   font-family: var(--font-sans);
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
 }
 
 a {
@@ -67,4 +69,52 @@ textarea {
 
 .field-input-dark::placeholder {
   color: rgba(255, 255, 255, 0.5);
+}
+
+.print-root {
+  isolation: isolate;
+}
+
+@media print {
+  html,
+  body {
+    background: white;
+  }
+
+  body {
+    min-height: auto;
+  }
+
+  .print-hide {
+    display: none !important;
+  }
+
+  .print-root {
+    display: block;
+  }
+
+  .print-page {
+    margin: 0;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .print-page-inner {
+    min-height: auto;
+  }
+
+  .sheet-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
 }

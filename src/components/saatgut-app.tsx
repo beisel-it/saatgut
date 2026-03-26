@@ -25,14 +25,17 @@ import { getIntlLocale, type AppMessages, type Locale } from "@/lib/i18n";
 import type {
   CalendarItem,
   DashboardData,
+  GrowingProfile,
   SeedBatch,
+  SeedBatchTransaction,
+  SeedBatchWarning,
   SessionSnapshot,
   Species,
   Variety,
 } from "@/lib/client/types";
 
 type AuthMode = "login" | "register";
-type ViewId = "dashboard" | "catalog" | "profiles" | "rules" | "plantings";
+type ViewId = "dashboard" | "catalog" | "profiles" | "rules" | "plantings" | "sheets";
 
 type FormState = {
   error: string | null;
@@ -166,6 +169,37 @@ function nullableRange(start: number | null, end: number | null, suffix: string,
   return `${start ?? end} ${suffix}`;
 }
 
+function formatNumber(value: string | number | null | undefined, locale: Locale, fallback: string) {
+  if (value === null || value === undefined || value === "") return fallback;
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (Number.isNaN(numericValue)) return String(value);
+
+  return new Intl.NumberFormat(getIntlLocale(locale), {
+    maximumFractionDigits: 2,
+  }).format(numericValue);
+}
+
+function formatSeedQuantity(
+  value: string | null,
+  unit: SeedBatch["unit"],
+  locale: Locale,
+  t: AppMessages,
+  fallback: string,
+) {
+  if (!value) return fallback;
+  return `${formatNumber(value, locale, fallback)} ${labelSeedUnit(unit, t).toLowerCase()}`;
+}
+
+function chunkArray<T>(values: T[], size: number) {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
 export function SaatgutApp() {
   const { locale, setLocale, t } = useI18n();
   const [authMode, setAuthMode] = useState<AuthMode>("register");
@@ -261,6 +295,9 @@ export function SaatgutApp() {
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogCategory, setCatalogCategory] = useState<Species["category"] | "ALL">("ALL");
   const [catalogView, setCatalogView] = useState<"ALL" | "ON_HAND" | "ATTENTION">("ALL");
+  const [printScope, setPrintScope] = useState<"ALL" | "DIGEST" | "VARIETIES" | "BATCHES">("ALL");
+  const [printOnlyStocked, setPrintOnlyStocked] = useState(true);
+  const [printIncludeNotes, setPrintIncludeNotes] = useState(true);
   const [correctionForm, setCorrectionForm] = useState({
     seedBatchId: "",
     entryDate: "",
@@ -410,6 +447,65 @@ export function SaatgutApp() {
     storageWarningsByBatch,
   ]);
 
+  const printableCatalogEntries = useMemo(() => {
+    const entries = (dashboard?.varieties ?? [])
+      .map((variety) => {
+        const species =
+          variety.species ?? (dashboard?.species ?? []).find((entry) => entry.id === variety.speciesId) ?? null;
+        const seedBatches = (dashboard?.seedBatches ?? [])
+          .filter((seedBatch) => seedBatch.varietyId === variety.id)
+          .sort((left, right) => {
+            const leftValue = left.harvestYear ?? 0;
+            const rightValue = right.harvestYear ?? 0;
+            return rightValue - leftValue;
+          });
+        const warnings = seedBatches.flatMap((seedBatch) => storageWarningsByBatch.get(seedBatch.id) ?? []);
+        const latestTest = seedBatches
+          .flatMap((seedBatch) => seedBatch.germinationTests ?? [])
+          .sort((left, right) => new Date(right.testedAt).getTime() - new Date(left.testedAt).getTime())[0] ?? null;
+
+        return {
+          variety,
+          species,
+          seedBatches,
+          warnings,
+          latestTest,
+        };
+      })
+      .filter((entry) => (printOnlyStocked ? entry.seedBatches.length > 0 : true))
+      .sort((left, right) => left.variety.name.localeCompare(right.variety.name));
+
+    return entries;
+  }, [dashboard?.seedBatches, dashboard?.species, dashboard?.varieties, printOnlyStocked, storageWarningsByBatch]);
+
+  const printableVarietyPages = useMemo(() => chunkArray(printableCatalogEntries, 2), [printableCatalogEntries]);
+
+  const printableBatchCards = useMemo(
+    () =>
+      printableCatalogEntries.flatMap((entry) =>
+        entry.seedBatches.map((seedBatch) => ({
+          seedBatch,
+          variety: entry.variety,
+          species: entry.species,
+          warnings: storageWarningsByBatch.get(seedBatch.id) ?? [],
+          latestTest:
+            [...(seedBatch.germinationTests ?? [])].sort(
+              (left, right) => new Date(right.testedAt).getTime() - new Date(left.testedAt).getTime(),
+            )[0] ?? null,
+          latestAdjustment:
+            [...(seedBatch.stockTransactions ?? [])]
+              .filter((transaction) => transaction.type !== "INITIAL_STOCK")
+              .sort(
+                (left, right) =>
+                  new Date(right.effectiveDate).getTime() - new Date(left.effectiveDate).getTime(),
+              )[0] ?? null,
+        })),
+      ),
+    [printableCatalogEntries, storageWarningsByBatch],
+  );
+
+  const printableBatchPages = useMemo(() => chunkArray(printableBatchCards, 4), [printableBatchCards]);
+
   async function handleRegister(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAuthState(initialFormState);
@@ -456,6 +552,10 @@ export function SaatgutApp() {
           setSessionError(error instanceof Error ? error.message : t.statuses.logoutFailed),
         );
     });
+  }
+
+  function handlePrint() {
+    window.print();
   }
 
   async function submitSpecies(event: React.FormEvent<HTMLFormElement>) {
@@ -902,9 +1002,9 @@ export function SaatgutApp() {
   ];
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(127,155,71,0.18),transparent_28%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-4 py-4 md:px-6 md:py-6">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(127,155,71,0.18),transparent_28%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-4 py-4 md:px-6 md:py-6 print:bg-white print:px-0 print:py-0">
       <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-5 text-white shadow-[var(--shadow)] lg:sticky lg:top-4 lg:self-start">
+        <aside className="print-hide rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-5 text-white shadow-[var(--shadow)] lg:sticky lg:top-4 lg:self-start">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-white/65">{t.common.brand}</p>
           <h1 className="mt-3 max-w-full break-words text-2xl font-semibold tracking-tight md:text-3xl">{session.membership.workspace.name}</h1>
           <p className="mt-2 break-all text-sm text-white/70">
@@ -918,6 +1018,7 @@ export function SaatgutApp() {
               ["profiles", t.nav.profiles],
               ["rules", t.nav.rules],
               ["plantings", t.nav.plantings],
+              ["sheets", t.nav.sheets],
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -954,7 +1055,7 @@ export function SaatgutApp() {
         </aside>
 
         <section className="space-y-4">
-          <header className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-4 shadow-[var(--shadow)] md:p-5">
+          <header className="print-hide rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-4 shadow-[var(--shadow)] md:p-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <ScreenHeader
                 eyebrow={t.dashboard.heroEyebrow}
@@ -982,7 +1083,7 @@ export function SaatgutApp() {
             {sessionError ? <Alert tone="danger">{sessionError}</Alert> : null}
           </header>
 
-          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+          <div className="print-hide grid gap-4 md:grid-cols-3 xl:grid-cols-6">
             {dashboardStats.map((stat) => (
               <article
                 key={stat.label}
@@ -1634,6 +1735,142 @@ export function SaatgutApp() {
             </div>
           ) : null}
 
+          {view === "sheets" ? (
+            <div className="space-y-4">
+              <section className="print-hide rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
+                <ScreenHeader
+                  eyebrow={t.sheets.eyebrow}
+                  title={t.sheets.heroTitle}
+                  subtitle={t.sheets.heroSubtitle}
+                  titleClassName="max-w-[23ch]"
+                />
+              </section>
+
+              <div className="print-hide grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+                <Panel title={t.sheets.controlsTitle} subtitle={t.sheets.controlsSubtitle}>
+                  <div className="grid gap-4">
+                    <Field
+                      label={t.sheets.contentLabel}
+                      name="print-scope"
+                      fieldErrors={{}}
+                      optionalLabel={t.common.optional}
+                    >
+                      <select
+                        className="field-input"
+                        value={printScope}
+                        onChange={(event) =>
+                          setPrintScope(event.target.value as "ALL" | "DIGEST" | "VARIETIES" | "BATCHES")
+                        }
+                      >
+                        <option value="ALL">{t.sheets.allSheets}</option>
+                        <option value="DIGEST">{t.sheets.digestOnly}</option>
+                        <option value="VARIETIES">{t.sheets.varietySheetsOnly}</option>
+                        <option value="BATCHES">{t.sheets.batchSheetsOnly}</option>
+                      </select>
+                    </Field>
+
+                    <label className="flex items-center gap-3 text-sm font-medium text-[var(--foreground)]">
+                      <input
+                        type="checkbox"
+                        checked={printOnlyStocked}
+                        onChange={(event) => setPrintOnlyStocked(event.target.checked)}
+                      />
+                      {t.sheets.stockedOnly}
+                    </label>
+
+                    <label className="flex items-center gap-3 text-sm font-medium text-[var(--foreground)]">
+                      <input
+                        type="checkbox"
+                        checked={printIncludeNotes}
+                        onChange={(event) => setPrintIncludeNotes(event.target.checked)}
+                      />
+                      {t.sheets.includeNotes}
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={handlePrint}
+                      className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit"
+                    >
+                      {t.sheets.openPrintDialog}
+                    </button>
+
+                    <p className="max-w-[42ch] text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                      {t.sheets.exportHint}
+                    </p>
+                  </div>
+                </Panel>
+
+                <Panel title={t.sheets.previewTitle} subtitle={t.sheets.previewSubtitle}>
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    <CatalogSummaryCard label={t.sheets.varietiesStat} value={printableCatalogEntries.length} />
+                    <CatalogSummaryCard label={t.sheets.batchesStat} value={printableBatchCards.length} />
+                    <CatalogSummaryCard
+                      label={t.sheets.warningsStat}
+                      value={printableBatchCards.reduce(
+                        (sum, entry) => sum + entry.warnings.filter((warning) => warning.level !== "info").length,
+                        0,
+                      )}
+                    />
+                    <CatalogSummaryCard label={t.sheets.calendarStat} value={dashboard?.calendar.length ?? 0} />
+                  </div>
+                </Panel>
+              </div>
+
+              <div className="print-root space-y-6 print:space-y-0">
+                {printScope === "ALL" || printScope === "DIGEST" ? (
+                  <PrintPage>
+                    <DigestSheet
+                      workspaceName={session.membership.workspace.name}
+                      generatedAt={new Date().toISOString()}
+                      locale={locale}
+                      t={t}
+                      activeProfile={activeProfile}
+                      calendarItems={dashboard?.calendar ?? []}
+                      entries={printableCatalogEntries}
+                    />
+                  </PrintPage>
+                ) : null}
+
+                {printScope === "ALL" || printScope === "VARIETIES"
+                  ? printableVarietyPages.map((entries, index) => (
+                      <PrintPage key={`variety-page-${index}`}>
+                        <div className="grid h-full gap-4">
+                          {entries.map((entry) => (
+                            <VarietySheetCard
+                              key={entry.variety.id}
+                              entry={entry}
+                              locale={locale}
+                              t={t}
+                              includeNotes={printIncludeNotes}
+                            />
+                          ))}
+                        </div>
+                      </PrintPage>
+                    ))
+                  : null}
+
+                {printScope === "ALL" || printScope === "BATCHES"
+                  ? printableBatchPages.map((entries, index) => (
+                      <PrintPage key={`batch-page-${index}`}>
+                        <div className="grid h-full gap-4 md:grid-cols-2">
+                          {entries.map((entry) => (
+                            <BatchSheetCard
+                              key={entry.seedBatch.id}
+                              entry={entry}
+                              locale={locale}
+                              t={t}
+                              includeNotes={printIncludeNotes}
+                            />
+                          ))}
+                        </div>
+                      </PrintPage>
+                    ))
+                  : null}
+              </div>
+            </div>
+          ) : null}
+
           {view === "profiles" ? (
             <div className="space-y-4">
               <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
@@ -2106,6 +2343,428 @@ function ScreenHeader({
         </p>
       ) : null}
     </div>
+  );
+}
+
+type PrintableCatalogEntry = {
+  variety: Variety;
+  species: Variety["species"] | Species | null;
+  seedBatches: SeedBatch[];
+  warnings: SeedBatchWarning[];
+  latestTest: NonNullable<SeedBatch["germinationTests"]>[number] | null;
+};
+
+function PrintPage({ children }: { children: React.ReactNode }) {
+  return (
+    <section className="print-page mx-auto w-full max-w-[210mm] overflow-hidden rounded-xl border border-[var(--border)] bg-white shadow-[var(--shadow)] print:max-w-none print:rounded-none print:border-0 print:shadow-none">
+      <div className="print-page-inner min-h-[297mm] p-6 md:p-8 print:min-h-0 print:p-[12mm]">{children}</div>
+    </section>
+  );
+}
+
+function DigestSheet({
+  workspaceName,
+  generatedAt,
+  locale,
+  t,
+  activeProfile,
+  calendarItems,
+  entries,
+}: {
+  workspaceName: string;
+  generatedAt: string;
+  locale: Locale;
+  t: AppMessages;
+  activeProfile: GrowingProfile | null;
+  calendarItems: CalendarItem[];
+  entries: PrintableCatalogEntry[];
+}) {
+  const warningCount = entries.reduce(
+    (sum, entry) => sum + entry.warnings.filter((warning) => warning.level !== "info").length,
+    0,
+  );
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--border)] pb-5">
+        <div className="max-w-[34rem]">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
+            {t.sheets.digestTitle}
+          </p>
+          <h2 className="mt-2 max-w-[18ch] text-[2rem] font-semibold tracking-tight leading-tight">
+            {workspaceName}
+          </h2>
+          <p className="mt-2 max-w-[44rem] text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+            {t.sheets.digestSubtitle}
+          </p>
+          <p className="mt-2 max-w-[44rem] text-sm leading-6 text-[color:rgba(24,49,40,0.62)]">
+            {t.sheets.digestIntro}
+          </p>
+        </div>
+        <div className="min-w-[11rem] rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm">
+          <p className="font-semibold text-[var(--foreground)]">{t.sheets.generatedOn}</p>
+          <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
+            {formatDate(generatedAt, locale, t.common.notSet)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <DigestStatCard label={t.sheets.varietiesStat} value={entries.length} />
+        <DigestStatCard label={t.sheets.batchesStat} value={entries.reduce((sum, entry) => sum + entry.seedBatches.length, 0)} />
+        <DigestStatCard label={t.sheets.warningsStat} value={warningCount} />
+        <DigestStatCard label={t.sheets.calendarStat} value={calendarItems.length} />
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[0.72fr_1.28fr]">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+            {t.sheets.activeProfileLabel}
+          </p>
+          <h3 className="mt-2 text-lg font-semibold">
+            {activeProfile ? activeProfile.name : t.sheets.noActiveProfile}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+            {activeProfile
+              ? `${t.sheets.frostWindow}: ${formatDate(activeProfile.lastFrostDate, locale, t.common.notSet)} ${t.calendar.rangeSeparator} ${formatDate(activeProfile.firstFrostDate, locale, t.common.notSet)}`
+              : t.dashboard.createActiveProfile}
+          </p>
+          {activeProfile?.phenologyStage ? (
+            <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+              {t.profiles.observedStage}: {t.phenologyStages[activeProfile.phenologyStage as keyof typeof t.phenologyStages]?.label ?? activeProfile.phenologyStage}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+            {t.sheets.nextDates}
+          </p>
+          {calendarItems.length ? (
+            <div className="mt-3 grid gap-2">
+              {calendarItems.slice(0, 5).map((item, index) => (
+                <div
+                  key={`${item.kind}-${index}`}
+                  className="flex items-center justify-between gap-3 border-b border-[color:rgba(24,49,40,0.08)] pb-2 last:border-b-0 last:pb-0"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">
+                      {item.kind === "window"
+                        ? `${t.calendar.windowLabel[item.type]} · ${item.varietyName}`
+                        : item.kind === "recorded"
+                          ? `${labelPlantingType(item.event.type, t)} · ${item.varietyName}`
+                          : `${t.calendar.windowLabel[item.type]} · ${item.varietyName}`}
+                    </p>
+                    <p className="text-sm text-[color:rgba(24,49,40,0.68)]">
+                      {summarizeCalendarItem(item, locale, t)}
+                    </p>
+                  </div>
+                  <p className="whitespace-nowrap text-sm font-medium">
+                    {formatCalendarDate(item, locale, t.common.notSet)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">{t.sheets.noCalendar}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-5 flex-1 rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+          {t.sheets.focusVarieties}
+        </p>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {entries.slice(0, 8).map((entry) => (
+            <div key={entry.variety.id} className="rounded-lg border border-[var(--border)] bg-white px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="break-words text-base font-semibold">{entry.variety.name}</h3>
+                  <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.68)]">
+                    {entry.species?.commonName ?? t.common.notSet}
+                  </p>
+                </div>
+                <p className="whitespace-nowrap text-sm font-medium">
+                  {entry.seedBatches.length} {t.stats.seedBatches.toLowerCase()}
+                </p>
+              </div>
+              <div className="mt-3 grid gap-1 text-sm text-[color:rgba(24,49,40,0.72)]">
+                <p>
+                  {t.sheets.stockLabel}:{" "}
+                  {entry.seedBatches.length
+                    ? entry.seedBatches
+                        .map((seedBatch) =>
+                          formatSeedQuantity(seedBatch.quantity, seedBatch.unit, locale, t, t.common.notSet),
+                        )
+                        .join(" · ")
+                    : t.sheets.noBatches}
+                </p>
+                <p>
+                  {t.sheets.latestTestLabel}:{" "}
+                  {entry.latestTest
+                    ? `${formatDate(entry.latestTest.testedAt, locale, t.common.notSet)} · ${entry.latestTest.germinationRate ?? "?"}%`
+                    : t.sheets.noTest}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VarietySheetCard({
+  entry,
+  locale,
+  t,
+  includeNotes,
+}: {
+  entry: PrintableCatalogEntry;
+  locale: Locale;
+  t: AppMessages;
+  includeNotes: boolean;
+}) {
+  const rule = entry.variety.cultivationRule;
+
+  return (
+    <article className="sheet-card flex flex-col rounded-lg border border-[var(--border)] bg-[var(--muted)] p-5">
+      <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] pb-4">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+            {t.sheets.varietySheetLabel}
+          </p>
+          <h3 className="mt-2 break-words text-[1.75rem] font-semibold tracking-tight leading-tight">
+            {entry.variety.name}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+            {t.sheets.speciesLabel}: {entry.species?.commonName ?? t.common.notSet}
+            {entry.species?.latinName ? ` · ${entry.species.latinName}` : ""}
+            {entry.species?.category ? ` · ${labelSpeciesCategory(entry.species.category, t)}` : ""}
+          </p>
+        </div>
+        <div className="min-w-[10rem] rounded-lg border border-[var(--border)] bg-white px-4 py-3 text-sm">
+          <p className="font-semibold">{t.sheets.stockLabel}</p>
+          <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
+            {entry.seedBatches.length
+              ? entry.seedBatches
+                  .map((seedBatch) =>
+                    formatSeedQuantity(seedBatch.quantity, seedBatch.unit, locale, t, t.common.notSet),
+                  )
+                  .join(" · ")
+              : t.sheets.noBatches}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-[1.08fr_0.92fr]">
+        <div className="space-y-4">
+          {entry.variety.description ? (
+            <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.74)]">{entry.variety.description}</p>
+          ) : null}
+
+          {(entry.variety.tags.length > 0 || (entry.variety.synonyms?.length ?? 0) > 0) ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              <SheetTagList
+                title={t.sheets.tagsLabel}
+                items={entry.variety.tags}
+              />
+              <SheetTagList
+                title={t.sheets.synonymsLabel}
+                items={(entry.variety.synonyms ?? []).map((synonym) => synonym.name)}
+              />
+            </div>
+          ) : null}
+
+          <div className="rounded-lg border border-[var(--border)] bg-white px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+              {t.sheets.rulesLabel}
+            </p>
+            <div className="mt-3 grid gap-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+              <p>{t.rules.indoorSowing}: {rule ? nullableRange(rule.sowIndoorsStartWeeks, rule.sowIndoorsEndWeeks, t.rules.weeksBefore, t.common.notDefined) : t.common.notDefined}</p>
+              <p>{t.rules.outdoorSowing}: {rule ? nullableRange(rule.sowOutdoorsStartWeeks, rule.sowOutdoorsEndWeeks, t.rules.weeksBefore, t.common.notDefined) : t.common.notDefined}</p>
+              <p>{t.rules.transplant}: {rule ? nullableRange(rule.transplantStartWeeks, rule.transplantEndWeeks, t.rules.weeksAfter, t.common.notDefined) : t.common.notDefined}</p>
+              <p>{t.rules.harvest}: {rule ? nullableRange(rule.harvestStartDays, rule.harvestEndDays, t.rules.daysAfter, t.common.notDefined) : t.common.notDefined}</p>
+            </div>
+          </div>
+
+          {includeNotes && entry.variety.notes ? (
+            <SheetSection title={t.sheets.notesLabel}>
+              <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{entry.variety.notes}</p>
+            </SheetSection>
+          ) : null}
+        </div>
+
+        <SheetSection title={t.catalog.batchListTitle}>
+          {entry.seedBatches.length ? (
+            <div className="grid gap-3">
+              {entry.seedBatches.map((seedBatch) => {
+                const latestTest =
+                  [...(seedBatch.germinationTests ?? [])].sort(
+                    (left, right) => new Date(right.testedAt).getTime() - new Date(left.testedAt).getTime(),
+                  )[0] ?? null;
+                const warnings = (seedBatch.storageWarnings ?? []).filter((warning) => warning.level !== "info");
+
+                return (
+                  <div key={seedBatch.id} className="rounded-lg border border-[var(--border)] bg-white px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold">
+                          {seedBatch.source ?? t.common.batchFallback}
+                          {seedBatch.harvestYear ? ` · ${t.seedBatch.harvestPrefix} ${seedBatch.harvestYear}` : ""}
+                        </p>
+                        <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.68)]">
+                          {t.sheets.quantityLabel}:{" "}
+                          {formatSeedQuantity(seedBatch.quantity, seedBatch.unit, locale, t, t.common.notSet)}
+                        </p>
+                      </div>
+                      <p className="text-sm font-medium">
+                        {latestTest
+                          ? `${latestTest.germinationRate ?? "?"}%`
+                          : t.sheets.noTest}
+                      </p>
+                    </div>
+                    <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.68)]">
+                      {t.sheets.storageLabel}: {seedBatch.storageLocation || t.sheets.storageFallback}
+                    </p>
+                    {warnings.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {warnings.slice(0, 3).map((warning) => (
+                          <span key={`${seedBatch.id}-${warning.code}`} className="rounded-md border border-[var(--border)] bg-[var(--muted)] px-2.5 py-1 text-xs font-semibold">
+                            {getWarningTitle(warning.code, warning.title, t)}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">{t.sheets.noBatches}</p>
+          )}
+        </SheetSection>
+      </div>
+    </article>
+  );
+}
+
+function BatchSheetCard({
+  entry,
+  locale,
+  t,
+  includeNotes,
+}: {
+  entry: {
+    seedBatch: SeedBatch;
+    variety: Variety;
+    species: Variety["species"] | Species | null;
+    warnings: SeedBatchWarning[];
+    latestTest: NonNullable<SeedBatch["germinationTests"]>[number] | null;
+    latestAdjustment: SeedBatchTransaction | null;
+  };
+  locale: Locale;
+  t: AppMessages;
+  includeNotes: boolean;
+}) {
+  const visibleWarnings = entry.warnings.filter((warning) => warning.level !== "info");
+
+  return (
+    <article className="sheet-card flex min-h-[10.8rem] flex-col rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4">
+      <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] pb-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+            {t.sheets.batchSheetLabel}
+          </p>
+          <h3 className="mt-1 break-words text-xl font-semibold leading-tight">{entry.variety.name}</h3>
+          <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.68)]">
+            {entry.species?.commonName ?? t.common.notSet}
+          </p>
+        </div>
+        <div className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-right text-sm">
+          <p className="font-semibold">{t.sheets.stockLabel}</p>
+          <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
+            {formatSeedQuantity(entry.seedBatch.quantity, entry.seedBatch.unit, locale, t, t.common.notSet)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid flex-1 gap-3">
+        <div className="grid gap-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+          <p>{t.sheets.sourceLabel}: {entry.seedBatch.source ?? t.common.notSet}</p>
+          <p>{t.sheets.harvestYearLabel}: {entry.seedBatch.harvestYear ?? t.seedBatch.yearUnknown}</p>
+          <p>{t.sheets.storageLabel}: {entry.seedBatch.storageLocation || t.sheets.storageFallback}</p>
+          <p>
+            {t.sheets.latestTestLabel}:{" "}
+            {entry.latestTest
+              ? `${formatDate(entry.latestTest.testedAt, locale, t.common.notSet)} · ${entry.latestTest.germinationRate ?? "?"}%`
+              : t.sheets.noTest}
+          </p>
+          {entry.latestAdjustment ? (
+            <p>
+              {t.seedBatch.correctionHistoryTitle}: {formatDate(entry.latestAdjustment.effectiveDate, locale, t.common.notSet)}
+            </p>
+          ) : null}
+        </div>
+
+        {visibleWarnings.length ? (
+          <SheetSection title={t.sheets.warningsLabel}>
+            <div className="flex flex-wrap gap-2">
+              {visibleWarnings.slice(0, 4).map((warning) => (
+                <span key={`${entry.seedBatch.id}-${warning.code}`} className="rounded-md border border-[var(--border)] bg-white px-2.5 py-1 text-xs font-semibold">
+                  {getWarningTitle(warning.code, warning.title, t)}
+                </span>
+              ))}
+            </div>
+          </SheetSection>
+        ) : null}
+
+        {includeNotes && entry.seedBatch.notes ? (
+          <SheetSection title={t.sheets.notesLabel}>
+            <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{entry.seedBatch.notes}</p>
+          </SheetSection>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+function DigestStatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <article className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
+        {label}
+      </p>
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
+    </article>
+  );
+}
+
+function SheetSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-lg border border-[var(--border)] bg-white px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+        {title}
+      </p>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
+function SheetTagList({ title, items }: { title: string; items: string[] }) {
+  if (!items.length) return null;
+
+  return (
+    <SheetSection title={title}>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item) => (
+          <span key={`${title}-${item}`} className="rounded-md border border-[var(--border)] bg-[var(--muted)] px-2.5 py-1 text-xs font-semibold">
+            {item}
+          </span>
+        ))}
+      </div>
+    </SheetSection>
   );
 }
 
