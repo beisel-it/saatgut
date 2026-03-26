@@ -16,7 +16,9 @@ import type {
   Species,
   TimelineItem,
   User,
+  UserInvite,
   Variety,
+  WorkspaceMember,
 } from "@/lib/client/types";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n";
 
@@ -539,5 +541,48 @@ export function createApiToken(input: {
 export function revokeApiToken(tokenId: string) {
   return request<ApiToken>(`/api/v1/admin/api-tokens/${tokenId}/revoke`, {
     method: "POST",
+  });
+}
+
+export function fetchWorkspaceMembers() {
+  return request<{ items: WorkspaceMember[]; invites: UserInvite[] }>("/api/v1/workspace/members", {
+    method: "GET",
+  });
+}
+
+export function inviteWorkspaceCollaborator(input: {
+  email: string;
+  role: Exclude<Membership["role"], "OWNER">;
+  expiresInDays?: number;
+}) {
+  return request<{ invite: UserInvite; token: string }>("/api/v1/workspace/invites", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function acceptWorkspaceInvite(input: {
+  token: string;
+  password?: string;
+}) {
+  return request<{ user: User; membership: Membership }>("/api/v1/workspace/invites/accept", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateWorkspaceMemberRole(
+  userId: string,
+  input: { role: Exclude<Membership["role"], "OWNER"> },
+) {
+  return request<{ member: WorkspaceMember }>(`/api/v1/workspace/members/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function removeWorkspaceMember(userId: string) {
+  return request<{ member: WorkspaceMember }>(`/api/v1/workspace/members/${userId}`, {
+    method: "DELETE",
   });
 }

@@ -148,6 +148,19 @@ export async function requireAuth(
   };
 }
 
+export async function getOptionalSessionAuth(request: Request): Promise<AuthContext | null> {
+  try {
+    const auth = await requireAuth(request);
+    return auth.authMethod === "session" ? auth : null;
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
 export function applySessionCookie(response: NextResponse, token: string): void {
   response.cookies.set({
     name: SESSION_COOKIE_NAME,

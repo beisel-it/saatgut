@@ -70,6 +70,25 @@ export function serializeMembership(membership: {
   };
 }
 
+export function serializeWorkspaceMember(membership: {
+  role: MembershipRole;
+  createdAt: Date;
+  user: {
+    id: string;
+    email: string;
+    isActive: boolean;
+    role: UserRole;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+}) {
+  return {
+    role: membership.role,
+    createdAt: membership.createdAt.toISOString(),
+    user: serializeUser(membership.user),
+  };
+}
+
 export function serializeSpecies(species: {
   id: string;
   workspaceId: string;

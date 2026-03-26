@@ -218,6 +218,31 @@ export function getOpenApiDocument() {
       "/backups/summary": {
         get: { summary: "Describe the supported backup artifacts and commands", responses: { "200": { description: "Backup summary" } } },
       },
+      "/workspace/members": {
+        get: { summary: "List workspace collaborators and pending invites", responses: { "200": { description: "Workspace member list" } } },
+      },
+      "/workspace/members/{userId}": {
+        patch: {
+          summary: "Update a collaborator role between member and viewer access",
+          parameters: [{ name: "userId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Updated" } },
+        },
+        delete: {
+          summary: "Remove a collaborator from the workspace without deleting the underlying account",
+          parameters: [{ name: "userId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Removed" } },
+        },
+      },
+      "/workspace/invites": {
+        post: { summary: "Invite a collaborator to the current workspace", responses: { "201": { description: "Created" } } },
+      },
+      "/workspace/invites/accept": {
+        post: {
+          summary: "Accept a workspace invitation as a new or existing account",
+          security: [{ sessionCookie: [] }],
+          responses: { "200": { description: "Accepted" } },
+        },
+      },
       "/admin/api-tokens": {
         get: { summary: "List API tokens", responses: { "200": { description: "Token list" } } },
         post: { summary: "Create an API token", responses: { "201": { description: "Created" } } },

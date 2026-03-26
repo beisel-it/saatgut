@@ -219,6 +219,12 @@ export type UserInvite = {
   updatedAt: string;
 };
 
+export type WorkspaceMember = {
+  role: Membership["role"];
+  createdAt: string;
+  user: User;
+};
+
 export type GerminationTest = {
   id: string;
   workspaceId: string;

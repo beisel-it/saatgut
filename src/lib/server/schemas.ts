@@ -152,7 +152,11 @@ export const adminInviteCreateSchema = z.object({
 
 export const inviteAcceptSchema = z.object({
   token: z.string().min(16),
-  password: z.string().min(8),
+  password: z.string().min(8).optional(),
+});
+
+export const workspaceMemberRoleUpdateSchema = z.object({
+  role: z.enum([MembershipRole.MEMBER, MembershipRole.VIEWER]),
 });
 
 export const passwordChangeSchema = z.object({

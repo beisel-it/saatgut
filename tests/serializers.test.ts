@@ -1,7 +1,12 @@
 import { Decimal } from "@prisma/client/runtime/library";
 import { describe, expect, it } from "vitest";
 
-import { serializeApiToken, serializeSeedBatch, serializeUser } from "@/lib/server/serializers";
+import {
+  serializeApiToken,
+  serializeSeedBatch,
+  serializeUser,
+  serializeWorkspaceMember,
+} from "@/lib/server/serializers";
 
 describe("serializeSeedBatch", () => {
   it("converts Prisma decimals to JSON-safe strings", () => {
@@ -53,5 +58,26 @@ describe("sensitive serializer output", () => {
 
     expect(user).not.toHaveProperty("passwordHash");
     expect(token).not.toHaveProperty("tokenHash");
+  });
+});
+
+describe("serializeWorkspaceMember", () => {
+  it("keeps membership output JSON-safe without exposing password material", () => {
+    const member = serializeWorkspaceMember({
+      role: "MEMBER",
+      createdAt: new Date("2026-03-26T00:00:00.000Z"),
+      user: {
+        id: "user_1",
+        email: "grower@example.com",
+        isActive: true,
+        role: "MEMBER",
+        passwordHash: "secret",
+        createdAt: new Date("2026-03-26T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-26T00:00:00.000Z"),
+      } as never,
+    });
+
+    expect(member.createdAt).toBe("2026-03-26T00:00:00.000Z");
+    expect(member.user).not.toHaveProperty("passwordHash");
   });
 });
