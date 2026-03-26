@@ -2141,7 +2141,7 @@ export function SaatgutApp() {
                 </Panel>
               </div>
 
-              <div className="print-root space-y-6 print:space-y-0">
+              <div className="print-root mx-auto w-full max-w-[210mm] space-y-6 overflow-x-clip print:max-w-none print:space-y-0 print:overflow-visible">
                 {printScope === "ALL" || printScope === "DIGEST" ? (
                   <PrintPage>
                     <DigestSheet
@@ -2728,7 +2728,7 @@ type PrintableCatalogEntry = {
 
 function PrintPage({ children }: { children: React.ReactNode }) {
   return (
-    <section className="print-page mx-auto w-full max-w-[210mm] overflow-hidden rounded-xl border border-[var(--border)] bg-white shadow-[var(--shadow)] print:max-w-none print:rounded-none print:border-0 print:shadow-none">
+    <section className="print-page mx-auto w-full max-w-full overflow-hidden rounded-xl border border-[var(--border)] bg-white shadow-[var(--shadow)] print:max-w-none print:rounded-none print:border-0 print:shadow-none">
       <div className="print-page-inner min-h-[297mm] p-6 md:p-8 print:min-h-0 print:p-[12mm]">{children}</div>
     </section>
   );
@@ -2773,7 +2773,7 @@ function DigestSheet({
             {t.sheets.digestIntro}
           </p>
         </div>
-        <div className="min-w-[11rem] rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm">
+        <div className="w-full rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm sm:w-auto sm:min-w-[11rem]">
           <p className="font-semibold text-[var(--foreground)]">{t.sheets.generatedOn}</p>
           <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
             {formatDate(generatedAt, locale, t.common.notSet)}
@@ -2831,7 +2831,7 @@ function DigestSheet({
                       {summarizeCalendarItem(item, locale, t)}
                     </p>
                   </div>
-                  <p className="whitespace-nowrap text-sm font-medium">
+                  <p className="text-right text-sm font-medium sm:whitespace-nowrap">
                     {formatCalendarDate(item, locale, t.common.notSet)}
                   </p>
                 </div>
@@ -2857,7 +2857,7 @@ function DigestSheet({
                     {entry.species?.commonName ?? t.common.notSet}
                   </p>
                 </div>
-                <p className="whitespace-nowrap text-sm font-medium">
+                <p className="text-right text-sm font-medium sm:whitespace-nowrap">
                   {entry.seedBatches.length} {t.stats.seedBatches.toLowerCase()}
                 </p>
               </div>
@@ -2916,7 +2916,7 @@ function VarietySheetCard({
             {entry.species?.category ? ` · ${labelSpeciesCategory(entry.species.category, t)}` : ""}
           </p>
         </div>
-        <div className="min-w-[10rem] rounded-lg border border-[var(--border)] bg-white px-4 py-3 text-sm">
+        <div className="w-full rounded-lg border border-[var(--border)] bg-white px-4 py-3 text-sm sm:w-auto sm:min-w-[10rem]">
           <p className="font-semibold">{t.sheets.stockLabel}</p>
           <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
             {entry.seedBatches.length
@@ -2937,7 +2937,7 @@ function VarietySheetCard({
           ) : null}
 
           {(entry.variety.tags.length > 0 || (entry.variety.synonyms?.length ?? 0) > 0) ? (
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 lg:grid-cols-2">
               <SheetTagList
                 title={t.sheets.tagsLabel}
                 items={entry.variety.tags}
