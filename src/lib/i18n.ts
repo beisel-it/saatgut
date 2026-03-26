@@ -35,6 +35,9 @@ const de = {
     signingOut: "Abmeldung läuft…",
     yes: "Ja",
     no: "Nein",
+    openNavigation: "Navigation öffnen",
+    closeNavigation: "Navigation schließen",
+    menu: "Menü",
   },
   apiErrors: {
     UNAUTHORIZED: "Du musst Dich anmelden, um fortzufahren.",
@@ -477,6 +480,9 @@ const en: AppMessages = {
     signingOut: "Signing out…",
     yes: "Yes",
     no: "No",
+    openNavigation: "Open navigation",
+    closeNavigation: "Close navigation",
+    menu: "Menu",
   },
   apiErrors: {
     UNAUTHORIZED: "You need to sign in to continue.",

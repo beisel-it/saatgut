@@ -220,6 +220,7 @@ export function SaatgutApp() {
 
   const [authPending, startAuthTransition] = useTransition();
   const [refreshPending, startRefreshTransition] = useTransition();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const [registerForm, setRegisterForm] = useState({
     email: "",
@@ -540,6 +541,7 @@ export function SaatgutApp() {
 
   async function handleLogout() {
     setSessionError(null);
+    setMobileNavOpen(false);
 
     startAuthTransition(() => {
       void logoutUser()
@@ -556,6 +558,11 @@ export function SaatgutApp() {
 
   function handlePrint() {
     window.print();
+  }
+
+  function handleSelectView(nextView: ViewId) {
+    setView(nextView);
+    setMobileNavOpen(false);
   }
 
   async function submitSpecies(event: React.FormEvent<HTMLFormElement>) {
@@ -1000,11 +1007,19 @@ export function SaatgutApp() {
     },
     { label: t.stats.criticalStorageFlags, value: criticalBatchCount },
   ];
+  const navigationItems: Array<[ViewId, string]> = [
+    ["dashboard", t.nav.dashboard],
+    ["catalog", t.nav.catalog],
+    ["profiles", t.nav.profiles],
+    ["rules", t.nav.rules],
+    ["plantings", t.nav.plantings],
+    ["sheets", t.nav.sheets],
+  ];
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(127,155,71,0.18),transparent_28%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-4 py-4 md:px-6 md:py-6 print:bg-white print:px-0 print:py-0">
       <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="print-hide rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-5 text-white shadow-[var(--shadow)] lg:sticky lg:top-4 lg:self-start">
+        <aside className="print-hide hidden rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-5 text-white shadow-[var(--shadow)] lg:sticky lg:top-4 lg:block lg:self-start">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-white/65">{t.common.brand}</p>
           <h1 className="mt-3 max-w-full break-words text-2xl font-semibold tracking-tight md:text-3xl">{session.membership.workspace.name}</h1>
           <p className="mt-2 break-all text-sm text-white/70">
@@ -1012,18 +1027,11 @@ export function SaatgutApp() {
           </p>
 
           <nav className="mt-8 grid gap-2">
-            {[
-              ["dashboard", t.nav.dashboard],
-              ["catalog", t.nav.catalog],
-              ["profiles", t.nav.profiles],
-              ["rules", t.nav.rules],
-              ["plantings", t.nav.plantings],
-              ["sheets", t.nav.sheets],
-            ].map(([id, label]) => (
+            {navigationItems.map(([id, label]) => (
               <button
                 key={id}
                 type="button"
-                onClick={() => setView(id as ViewId)}
+                onClick={() => handleSelectView(id)}
                 className={classNames(
                   "rounded-lg px-4 py-3 text-left text-sm font-medium leading-6 transition",
                   view === id ? "bg-white text-[var(--foreground)]" : "bg-white/6 text-white/84 hover:bg-white/10",
@@ -1055,6 +1063,71 @@ export function SaatgutApp() {
         </aside>
 
         <section className="space-y-4">
+          <div className="print-hide rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-3 text-white shadow-[var(--shadow)] lg:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60">{t.common.brand}</p>
+                <h1 className="mt-1 truncate text-lg font-semibold tracking-tight">{session.membership.workspace.name}</h1>
+              </div>
+              <button
+                type="button"
+                aria-expanded={mobileNavOpen}
+                aria-label={mobileNavOpen ? t.common.closeNavigation : t.common.openNavigation}
+                onClick={() => setMobileNavOpen((current) => !current)}
+                className="shrink-0 rounded-md border border-white/14 bg-white/8 px-3 py-2 text-sm font-semibold text-white"
+              >
+                {mobileNavOpen ? t.common.closeNavigation : t.common.menu}
+              </button>
+            </div>
+
+            {mobileNavOpen ? (
+              <div className="mt-3 border-t border-white/10 pt-3">
+                <p className="truncate text-sm text-white/68">
+                  {session.user.email} · {labelMembershipRole(session.membership.role, t)}
+                </p>
+
+                <nav className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {navigationItems.map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => handleSelectView(id)}
+                      className={classNames(
+                        "rounded-md px-3 py-2.5 text-left text-sm font-medium transition",
+                        view === id
+                          ? "bg-white text-[var(--foreground)]"
+                          : "bg-white/6 text-white/84 hover:bg-white/10",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </nav>
+
+                <div className="mt-3 rounded-md border border-white/10 bg-white/6 p-3">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-white/52">{t.dashboard.activeProfile}</p>
+                  <p className="mt-1 text-sm font-semibold">
+                    {activeProfile ? activeProfile.name : t.dashboard.noActiveProfile}
+                  </p>
+                  <p className="mt-1 text-sm text-white/68">
+                    {activeProfile
+                      ? `${t.dashboard.lastFrost} ${formatDate(activeProfile.lastFrostDate, locale, t.common.notSet)}`
+                      : t.dashboard.createActiveProfile}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="mt-3 w-full rounded-md border border-white/14 px-4 py-2.5 text-sm font-semibold text-white/88"
+                  disabled={authPending}
+                >
+                  {authPending ? t.common.signingOut : t.common.signOut}
+                </button>
+              </div>
+            ) : null}
+          </div>
+
           <header className="print-hide rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-4 shadow-[var(--shadow)] md:p-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <ScreenHeader
