@@ -151,6 +151,7 @@ const de = {
     toolsTitle: "Katalogwerkzeuge",
     toolsSubtitle:
       "Anlegen, nachpflegen und Bestände anpassen, wenn Du aktiv etwas ändern willst.",
+    toolsOpen: "Öffnen",
     speciesToolTitle: "Arten anlegen",
     varietiesToolTitle: "Sorten anlegen",
     batchesToolTitle: "Chargen pflegen",
@@ -537,6 +538,7 @@ const en: AppMessages = {
     toolsTitle: "Catalog tools",
     toolsSubtitle:
       "Create, maintain, and adjust stock only when you need to change something.",
+    toolsOpen: "Open",
     speciesToolTitle: "Add species",
     varietiesToolTitle: "Add varieties",
     batchesToolTitle: "Manage batches",

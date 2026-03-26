@@ -720,7 +720,7 @@ export function SaatgutApp() {
   if (sessionLoading) {
     return (
       <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(127,155,71,0.18),transparent_30%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-6 py-10">
-        <div className="mx-auto max-w-5xl rounded-[2rem] border border-[var(--border)] bg-white/70 p-10 shadow-[var(--shadow)]">
+        <div className="mx-auto max-w-5xl rounded-xl border border-[var(--border)] bg-white/70 p-10 shadow-[var(--shadow)]">
           <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--accent-strong)]">
             {t.common.brand}
           </p>
@@ -734,7 +734,7 @@ export function SaatgutApp() {
     return (
       <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(127,155,71,0.22),transparent_32%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-5 py-8 md:px-10 md:py-12">
         <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-8 shadow-[var(--shadow)] md:p-10">
+          <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-8 shadow-[var(--shadow)] md:p-10">
             <ScreenHeader
               eyebrow={t.common.brand}
               title={t.auth.heroTitle}
@@ -744,13 +744,13 @@ export function SaatgutApp() {
             />
           </section>
 
-          <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(24,49,40,0.94)] p-6 text-white shadow-[var(--shadow)] md:p-8">
-            <div className="flex items-center justify-between gap-3">
-              <div className="inline-flex rounded-full bg-white/10 p-1 text-sm">
+          <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.94)] p-6 text-white shadow-[var(--shadow)] md:p-8">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex w-full flex-wrap rounded-lg bg-white/10 p-1 text-sm sm:w-auto">
                 <button
                   type="button"
                   className={classNames(
-                    "rounded-full px-3 py-2 transition",
+                    "min-w-0 flex-1 rounded-md px-3 py-2 transition sm:flex-none",
                     locale === "de" && "bg-white text-[var(--foreground)]",
                   )}
                   onClick={() => setLocale("de")}
@@ -760,7 +760,7 @@ export function SaatgutApp() {
                 <button
                   type="button"
                   className={classNames(
-                    "rounded-full px-3 py-2 transition",
+                    "min-w-0 flex-1 rounded-md px-3 py-2 transition sm:flex-none",
                     locale === "en" && "bg-white text-[var(--foreground)]",
                   )}
                   onClick={() => setLocale("en")}
@@ -770,11 +770,11 @@ export function SaatgutApp() {
               </div>
               <span className="text-xs uppercase tracking-[0.24em] text-white/60">{t.locale.switchLabel}</span>
             </div>
-            <div className="mt-6 inline-flex rounded-full bg-white/10 p-1 text-sm">
+            <div className="mt-6 flex w-full flex-wrap rounded-lg bg-white/10 p-1 text-sm">
               <button
                 type="button"
                 className={classNames(
-                  "rounded-full px-4 py-2 transition",
+                  "min-w-0 flex-1 rounded-md px-4 py-2 transition",
                   authMode === "register" && "bg-white text-[var(--foreground)]",
                 )}
                 onClick={() => {
@@ -787,7 +787,7 @@ export function SaatgutApp() {
               <button
                 type="button"
                 className={classNames(
-                  "rounded-full px-4 py-2 transition",
+                  "min-w-0 flex-1 rounded-md px-4 py-2 transition",
                   authMode === "login" && "bg-white text-[var(--foreground)]",
                 )}
                 onClick={() => {
@@ -846,7 +846,7 @@ export function SaatgutApp() {
                     }
                   />
                 </Field>
-                <button className="rounded-full bg-white px-5 py-3 font-semibold text-[var(--foreground)]" disabled={authPending}>
+                <button className="w-full rounded-lg bg-white px-5 py-3 font-semibold text-[var(--foreground)] sm:w-fit" disabled={authPending}>
                   {authPending ? t.auth.creatingWorkspace : t.auth.createWorkspace}
                 </button>
               </form>
@@ -872,7 +872,7 @@ export function SaatgutApp() {
                     }
                   />
                 </Field>
-                <button className="rounded-full bg-white px-5 py-3 font-semibold text-[var(--foreground)]" disabled={authPending}>
+                <button className="w-full rounded-lg bg-white px-5 py-3 font-semibold text-[var(--foreground)] sm:w-fit" disabled={authPending}>
                   {authPending ? t.auth.signingIn : t.auth.signIn}
                 </button>
               </form>
@@ -904,10 +904,10 @@ export function SaatgutApp() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(127,155,71,0.18),transparent_28%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-4 py-4 md:px-6 md:py-6">
       <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-5 text-white shadow-[var(--shadow)]">
+        <aside className="rounded-xl border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-5 text-white shadow-[var(--shadow)] lg:sticky lg:top-4 lg:self-start">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-white/65">{t.common.brand}</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">{session.membership.workspace.name}</h1>
-          <p className="mt-2 text-sm text-white/70">
+          <h1 className="mt-3 max-w-full break-words text-2xl font-semibold tracking-tight md:text-3xl">{session.membership.workspace.name}</h1>
+          <p className="mt-2 break-all text-sm text-white/70">
             {session.user.email} · {labelMembershipRole(session.membership.role, t)}
           </p>
 
@@ -924,7 +924,7 @@ export function SaatgutApp() {
                 type="button"
                 onClick={() => setView(id as ViewId)}
                 className={classNames(
-                  "rounded-2xl px-4 py-3 text-left text-sm font-medium transition",
+                  "rounded-lg px-4 py-3 text-left text-sm font-medium leading-6 transition",
                   view === id ? "bg-white text-[var(--foreground)]" : "bg-white/6 text-white/84 hover:bg-white/10",
                 )}
               >
@@ -933,7 +933,7 @@ export function SaatgutApp() {
             ))}
           </nav>
 
-          <div className="mt-8 rounded-[1.5rem] border border-white/10 bg-white/6 p-4">
+          <div className="mt-8 rounded-lg border border-white/10 bg-white/6 p-4">
             <p className="text-xs uppercase tracking-[0.24em] text-white/55">{t.dashboard.activeProfile}</p>
             <p className="mt-2 text-lg font-semibold">{activeProfile ? activeProfile.name : t.dashboard.noActiveProfile}</p>
             <p className="mt-1 text-sm text-white/68">
@@ -946,7 +946,7 @@ export function SaatgutApp() {
           <button
             type="button"
             onClick={handleLogout}
-            className="mt-8 w-full rounded-full border border-white/14 px-4 py-3 text-sm font-semibold text-white/88"
+            className="mt-8 w-full rounded-lg border border-white/14 px-4 py-3 text-sm font-semibold text-white/88"
             disabled={authPending}
           >
             {authPending ? t.common.signingOut : t.common.signOut}
@@ -954,13 +954,14 @@ export function SaatgutApp() {
         </aside>
 
         <section className="space-y-4">
-          <header className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-7">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <header className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-4 shadow-[var(--shadow)] md:p-5">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <ScreenHeader
                 eyebrow={t.dashboard.heroEyebrow}
                 title={t.dashboard.heroTitle}
                 subtitle={t.dashboard.heroSubtitle}
-                titleClassName="max-w-[14ch] md:max-w-[15ch]"
+                titleClassName="max-w-[24ch]"
+                compact
               />
               <button
                 type="button"
@@ -971,7 +972,7 @@ export function SaatgutApp() {
                     });
                   })
                 }
-                className="rounded-full border border-[var(--border)] bg-white px-5 py-3 text-sm font-semibold"
+                className="w-full rounded-lg border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold md:w-auto"
                 disabled={refreshPending}
               >
                 {refreshPending ? t.common.refreshing : t.common.refreshWorkspace}
@@ -985,7 +986,7 @@ export function SaatgutApp() {
             {dashboardStats.map((stat) => (
               <article
                 key={stat.label}
-                className="rounded-[1.5rem] border border-[var(--border)] bg-white/80 p-5 shadow-[var(--shadow)]"
+                className="rounded-lg border border-[var(--border)] bg-white/80 p-5 shadow-[var(--shadow)]"
               >
                 <p className="max-w-[16ch] text-balance text-xs font-semibold uppercase leading-5 tracking-[0.16em] text-[color:rgba(24,49,40,0.58)] sm:text-sm">
                   {stat.label}
@@ -1003,7 +1004,7 @@ export function SaatgutApp() {
                     {dashboard.calendar.map((item, index) => (
                       <article
                         key={`${item.kind}-${index}`}
-                        className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
+                        className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
@@ -1018,7 +1019,7 @@ export function SaatgutApp() {
                                   : `${t.calendar.windowLabel[item.type]} · ${item.varietyName}`}
                             </h3>
                           </div>
-                          <p className="rounded-full bg-white px-3 py-1 text-sm font-medium">
+                          <p className="rounded-md bg-white px-3 py-1 text-sm font-medium">
                             {formatCalendarDate(item, locale, t.common.notSet)}
                           </p>
                         </div>
@@ -1047,11 +1048,11 @@ export function SaatgutApp() {
                         return (
                           <article
                             key={seedBatch.id}
-                            className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
+                            className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
                           >
                             <div className="flex items-center justify-between gap-3">
                               <h3 className="text-base font-semibold">{variety?.name ?? t.common.unknownVariety}</h3>
-                              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
+                              <span className="rounded-md bg-white px-3 py-1 text-xs font-semibold">
                                 {warnings.filter((warning) => warning.level !== "info").length} {t.dashboard.flags}
                               </span>
                             </div>
@@ -1098,7 +1099,7 @@ export function SaatgutApp() {
                         .map((entry) => (
                         <article
                           key={entry.key}
-                          className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
+                          className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <h3 className="text-base font-semibold">{entry.title}</h3>
@@ -1120,7 +1121,7 @@ export function SaatgutApp() {
 
           {view === "catalog" ? (
             <div className="space-y-4">
-              <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
+              <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
                 <ScreenHeader
                   eyebrow={t.catalog.eyebrow}
                   title={t.catalog.heroTitle}
@@ -1129,7 +1130,7 @@ export function SaatgutApp() {
                 />
               </section>
               <div className="grid gap-4 xl:grid-cols-[0.72fr_1.28fr]">
-                <div className="space-y-4">
+                <div className="space-y-4 xl:sticky xl:top-4 xl:self-start">
                   <Panel title={t.catalog.browseTitle} subtitle={t.catalog.browseSubtitle}>
                     <div className="grid gap-4">
                       <label className="grid gap-2 text-sm font-medium text-[var(--foreground)]">
@@ -1193,7 +1194,7 @@ export function SaatgutApp() {
 
                   <Panel title={t.catalog.toolsTitle} subtitle={t.catalog.toolsSubtitle}>
                     <div className="grid gap-3">
-                      <CollapsiblePanel title={t.catalog.speciesToolTitle}>
+                      <CollapsiblePanel title={t.catalog.speciesToolTitle} actionLabel={t.catalog.toolsOpen}>
                         <DataForm state={speciesState} onSubmit={submitSpecies} submitLabel={t.catalog.saveSpecies}>
                           <Field label={t.forms.commonName} name="commonName" fieldErrors={speciesState.fieldErrors} optionalLabel={t.common.optional}>
                             <input
@@ -1243,7 +1244,7 @@ export function SaatgutApp() {
                         </DataForm>
                       </CollapsiblePanel>
 
-                      <CollapsiblePanel title={t.catalog.varietiesToolTitle}>
+                      <CollapsiblePanel title={t.catalog.varietiesToolTitle} actionLabel={t.catalog.toolsOpen}>
                         <DataForm state={varietyState} onSubmit={submitVariety} submitLabel={t.catalog.saveVariety}>
                           <Field label={t.forms.species} name="speciesId" fieldErrors={varietyState.fieldErrors} optionalLabel={t.common.optional}>
                             <select
@@ -1312,7 +1313,7 @@ export function SaatgutApp() {
                         </DataForm>
                       </CollapsiblePanel>
 
-                      <CollapsiblePanel title={t.catalog.batchesToolTitle}>
+                      <CollapsiblePanel title={t.catalog.batchesToolTitle} actionLabel={t.catalog.toolsOpen}>
                         <div className="grid gap-4">
                           <DataForm state={seedBatchState} onSubmit={submitSeedBatch} submitLabel={t.catalog.saveSeedBatch}>
                             <Field label={t.forms.variety} name="varietyId" fieldErrors={seedBatchState.fieldErrors} optionalLabel={t.common.optional}>
@@ -1531,7 +1532,7 @@ export function SaatgutApp() {
                             </DataForm>
                           </div>
 
-                          <div className="rounded-[1.5rem] border border-[var(--border)] bg-white/70 p-4">
+                          <div className="rounded-lg border border-[var(--border)] bg-white/70 p-4">
                             <h3 className="text-lg font-semibold">{t.catalog.reverseCorrectionTitle}</h3>
                             <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.68)]">
                               {t.catalog.reverseCorrectionCopy}
@@ -1598,7 +1599,7 @@ export function SaatgutApp() {
                                   }
                                 />
                               </Field>
-                              <button className="w-fit rounded-full bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white">
+                              <button className="w-fit rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white">
                                 {t.catalog.reverseCorrection}
                               </button>
                             </form>
@@ -1635,12 +1636,12 @@ export function SaatgutApp() {
 
           {view === "profiles" ? (
             <div className="space-y-4">
-              <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
+              <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
                 <ScreenHeader
                   eyebrow={t.profiles.eyebrow}
                   title={t.profiles.heroTitle}
                   subtitle={t.profiles.heroSubtitle}
-                  titleClassName="max-w-[16ch]"
+                  titleClassName="max-w-[24ch]"
                 />
               </section>
               <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
@@ -1705,7 +1706,7 @@ export function SaatgutApp() {
                     {phenologyStageIds.map((stageId) => (
                       <article
                         key={stageId}
-                        className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
+                        className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
                       >
                         <h3 className="text-base font-semibold">{t.phenologyStages[stageId].label}</h3>
                         <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{t.phenologyStages[stageId].hint}</p>
@@ -1721,7 +1722,7 @@ export function SaatgutApp() {
                         <article
                           key={profile.id}
                           className={classNames(
-                            "rounded-[1.25rem] border px-4 py-4",
+                            "rounded-lg border px-4 py-4",
                             profile.isActive
                               ? "border-[var(--accent)] bg-[color:rgba(127,155,71,0.12)]"
                               : "border-[var(--border)] bg-[var(--muted)]",
@@ -1730,7 +1731,7 @@ export function SaatgutApp() {
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <h3 className="text-lg font-semibold">{profile.name}</h3>
                             {profile.isActive ? (
-                              <span className="rounded-full bg-[var(--foreground)] px-3 py-1 text-xs font-semibold text-white">
+                              <span className="rounded-md bg-[var(--foreground)] px-3 py-1 text-xs font-semibold text-white">
                                 {t.common.active}
                               </span>
                             ) : null}
@@ -1804,7 +1805,7 @@ export function SaatgutApp() {
 
           {view === "rules" ? (
             <div className="space-y-4">
-              <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
+              <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
                 <ScreenHeader
                   eyebrow={t.rules.eyebrow}
                   title={t.rules.heroTitle}
@@ -1841,7 +1842,7 @@ export function SaatgutApp() {
                     {dashboard.rules.map((rule) => (
                       <article
                         key={rule.id}
-                        className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
+                        className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
                       >
                         <h3 className="text-lg font-semibold">{rule.variety.name}</h3>
                         <div className="mt-3 grid gap-2 text-sm text-[color:rgba(24,49,40,0.72)] md:grid-cols-2">
@@ -1866,7 +1867,7 @@ export function SaatgutApp() {
 
           {view === "plantings" ? (
             <div className="space-y-4">
-              <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
+              <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
                 <ScreenHeader
                   eyebrow={t.plantings.eyebrow}
                   title={t.plantings.heroTitle}
@@ -2015,13 +2016,13 @@ export function SaatgutApp() {
                     {dashboard.plantings.map((event) => (
                       <article
                         key={event.id}
-                        className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
+                        className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <h3 className="text-base font-semibold">
                             {varietiesById.get(event.varietyId)?.name ?? t.common.unknownVariety}
                           </h3>
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
+                          <span className="rounded-md bg-white px-3 py-1 text-xs font-semibold">
                             {labelPlantingType(event.type, t)}
                           </span>
                         </div>
@@ -2057,31 +2058,50 @@ function ScreenHeader({
   subtitle,
   supportingCopy,
   titleClassName,
+  compact = false,
 }: {
   eyebrow: string;
   title: string;
   subtitle: string;
   supportingCopy?: string;
   titleClassName?: string;
+  compact?: boolean;
 }) {
   return (
     <div>
-      <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--accent-strong)]">
+      <p
+        className={classNames(
+          "font-semibold uppercase tracking-[0.25em] text-[var(--accent-strong)]",
+          compact ? "text-xs" : "text-sm",
+        )}
+      >
         {eyebrow}
       </p>
       <h2
         className={classNames(
-          "mt-2 max-w-[15ch] text-3xl font-semibold tracking-tight text-balance md:text-4xl",
+          compact
+            ? "mt-1.5 max-w-[22ch] text-2xl font-semibold tracking-tight text-balance md:text-[2rem]"
+            : "mt-2 max-w-[15ch] text-3xl font-semibold tracking-tight text-balance md:text-4xl",
           titleClassName,
         )}
       >
         {title}
       </h2>
-      <p className="mt-2 max-w-[34rem] text-base leading-7 text-[color:rgba(24,49,40,0.82)] md:text-lg">
+      <p
+        className={classNames(
+          "max-w-[34rem] text-[color:rgba(24,49,40,0.82)]",
+          compact ? "mt-1.5 text-sm leading-6 md:text-base" : "mt-2 text-base leading-7 md:text-lg",
+        )}
+      >
         {subtitle}
       </p>
       {supportingCopy ? (
-        <p className="mt-3 max-w-[38rem] text-sm leading-6 text-[color:rgba(24,49,40,0.68)] md:text-base">
+        <p
+          className={classNames(
+            "max-w-[38rem] text-[color:rgba(24,49,40,0.68)]",
+            compact ? "mt-2 text-sm leading-6" : "mt-3 text-sm leading-6 md:text-base",
+          )}
+        >
           {supportingCopy}
         </p>
       ) : null}
@@ -2091,7 +2111,7 @@ function ScreenHeader({
 
 function CatalogSummaryCard({ label, value }: { label: string; value: number }) {
   return (
-    <article className="rounded-[1.25rem] border border-[var(--border)] bg-white/70 px-4 py-4">
+    <article className="rounded-lg border border-[var(--border)] bg-white/70 px-4 py-4">
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
         {label}
       </p>
@@ -2102,17 +2122,22 @@ function CatalogSummaryCard({ label, value }: { label: string; value: number }) 
 
 function CollapsiblePanel({
   title,
+  actionLabel,
   children,
 }: {
   title: string;
+  actionLabel: string;
   children: React.ReactNode;
 }) {
   return (
-    <details className="rounded-[1.5rem] border border-[var(--border)] bg-white/70 p-4">
-      <summary className="cursor-pointer list-none text-base font-semibold">
-        {title}
+    <details className="rounded-lg border border-[var(--border)] bg-white/70 p-4 open:bg-white">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold">
+        <span className="min-w-0 text-balance">{title}</span>
+        <span className="text-xs uppercase tracking-[0.18em] text-[color:rgba(24,49,40,0.46)]">
+          {actionLabel}
+        </span>
       </summary>
-      <div className="mt-4">{children}</div>
+      <div className="mt-4 border-t border-[var(--border)] pt-4">{children}</div>
     </details>
   );
 }
@@ -2140,18 +2165,18 @@ function CatalogVarietyCard({
   );
 
   return (
-    <article className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4">
+    <article className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="max-w-3xl">
+        <div className="max-w-3xl min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-xl font-semibold">{variety.name}</h3>
+            <h3 className="text-xl font-semibold break-words">{variety.name}</h3>
             {variety.heirloom ? (
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
+              <span className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
                 {t.catalog.heirloom}
               </span>
             ) : null}
           </div>
-          <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.72)]">
+          <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
             {species?.commonName ?? t.common.notSet}
             {species?.latinName ? ` · ${species.latinName}` : ""}
             {species?.category ? ` · ${labelSpeciesCategory(species.category, t)}` : ""}
@@ -2177,16 +2202,16 @@ function CatalogVarietyCard({
       </div>
 
       {variety.tags.length || variety.synonyms?.length ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {variety.tags.map((tag) => (
-            <span key={`${variety.id}-${tag}`} className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
+      <div className="mt-4 flex flex-wrap gap-2">
+        {variety.tags.map((tag) => (
+            <span key={`${variety.id}-${tag}`} className="max-w-full rounded-md bg-white px-3 py-1 text-xs font-semibold break-words">
               {tag}
             </span>
           ))}
           {(variety.synonyms ?? []).map((synonym) => (
             <span
               key={synonym.id}
-              className="rounded-full border border-[var(--border)] bg-transparent px-3 py-1 text-xs font-semibold"
+              className="max-w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-1 text-xs font-semibold break-words"
             >
               {synonym.name}
             </span>
@@ -2214,7 +2239,7 @@ function CatalogVarietyCard({
             ))}
           </div>
         ) : (
-          <p className="mt-3 rounded-xl bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
+          <p className="mt-3 rounded-md bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
             {t.catalog.noBatches}
           </p>
         )}
@@ -2233,7 +2258,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
+    <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
       <div className="mb-5">
         <h2 className="max-w-[20ch] text-xl font-semibold tracking-tight text-balance md:text-2xl">{title}</h2>
         <p className="mt-2 max-w-[40rem] text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{subtitle}</p>
@@ -2306,7 +2331,7 @@ function DataForm({
       {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
       {state.success ? <Alert tone="success">{state.success}</Alert> : null}
       {children}
-      <button className="w-fit rounded-full bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white">
+      <button className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit">
         {submitLabel}
       </button>
     </form>
@@ -2315,9 +2340,9 @@ function DataForm({
 
 function EmptyState({ title, copy }: { title: string; copy: string }) {
   return (
-    <div className="rounded-[1.5rem] border border-dashed border-[var(--border)] bg-white/60 px-5 py-8 text-center">
-      <h3 className="text-lg font-semibold">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">{copy}</p>
+    <div className="rounded-lg border border-dashed border-[var(--border)] bg-white/60 px-5 py-8 text-center">
+      <h3 className="mx-auto max-w-[24ch] text-lg font-semibold text-balance">{title}</h3>
+      <p className="mx-auto mt-2 max-w-[42ch] text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">{copy}</p>
     </div>
   );
 }
@@ -2331,8 +2356,8 @@ function Alert({
 }) {
   const styles =
     tone === "danger"
-      ? "mt-4 rounded-2xl border border-red-300/40 bg-red-50 px-4 py-3 text-sm text-red-700"
-      : "mt-4 rounded-2xl border border-emerald-300/40 bg-emerald-50 px-4 py-3 text-sm text-emerald-700";
+      ? "mt-4 rounded-lg border border-red-300/40 bg-red-50 px-4 py-3 text-sm text-red-700"
+      : "mt-4 rounded-lg border border-emerald-300/40 bg-emerald-50 px-4 py-3 text-sm text-emerald-700";
 
   return <p className={styles}>{children}</p>;
 }
@@ -2352,7 +2377,7 @@ function WarningPill({
         : "border-sky-300/50 bg-sky-50 text-sky-700";
 
   return (
-    <span className={classNames("rounded-full border px-3 py-1 text-xs font-semibold", classes)}>
+    <span className={classNames("rounded-md border px-3 py-1 text-xs font-semibold", classes)}>
       {children}
     </span>
   );
@@ -2376,7 +2401,7 @@ function SeedBatchCard({
   t: AppMessages;
 }) {
   return (
-    <article className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4">
+    <article className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold">{varietyName}</h3>
@@ -2384,7 +2409,7 @@ function SeedBatchCard({
             {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()} · {seedBatch.storageLocation || t.seedBatch.noStorageLocation}
           </p>
         </div>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
+        <span className="rounded-md bg-white px-3 py-1 text-xs font-semibold">
           {seedBatch.harvestYear ? `${t.seedBatch.harvestPrefix} ${seedBatch.harvestYear}` : t.seedBatch.yearUnknown}
         </span>
       </div>
@@ -2405,7 +2430,7 @@ function SeedBatchCard({
           <div className="mt-2 grid gap-2">
             {germinationTests.length ? (
               germinationTests.slice(0, 2).map((entry) => (
-                <div key={entry.id} className="rounded-xl bg-white px-3 py-3 text-sm">
+                <div key={entry.id} className="rounded-md bg-white px-3 py-3 text-sm">
                   <p className="font-medium">{formatDate(entry.testedAt, locale, t.common.notSet)}</p>
                   <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
                     {entry.germinatedCount}/{entry.sampleSize} {t.seedBatch.germinated}
@@ -2415,7 +2440,7 @@ function SeedBatchCard({
                 </div>
               ))
             ) : (
-              <p className="rounded-xl bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
+              <p className="rounded-md bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
                 {t.seedBatch.noGerminationTests}
               </p>
             )}
@@ -2429,7 +2454,7 @@ function SeedBatchCard({
           <div className="mt-2 grid gap-2">
             {adjustments.length ? (
               adjustments.slice(0, 2).map((entry) => (
-                <div key={entry.id} className="rounded-xl bg-white px-3 py-3 text-sm">
+                <div key={entry.id} className="rounded-md bg-white px-3 py-3 text-sm">
                   <p className="font-medium">{labelPlantingType(entry.type, t)}</p>
                   <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
                     {formatDate(entry.effectiveDate, locale, t.common.notSet)}
@@ -2439,7 +2464,7 @@ function SeedBatchCard({
                 </div>
               ))
             ) : (
-              <p className="rounded-xl bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
+              <p className="rounded-md bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
                 {t.seedBatch.noCorrectionHistory}
               </p>
             )}

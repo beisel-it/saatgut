@@ -41,7 +41,7 @@ textarea {
 .field-input,
 .field-input-dark {
   width: 100%;
-  border-radius: 1rem;
+  border-radius: 0.65rem;
   border: 1px solid var(--border);
   padding: 0.85rem 1rem;
   transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
