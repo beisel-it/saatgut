@@ -31,6 +31,7 @@ import {
   createPlantingEvent,
   createSeedBatch,
   createSpecies,
+  createVarietyCompanion,
   createVariety,
   deleteCultivationRule,
   deleteSeedBatch,
@@ -38,6 +39,7 @@ import {
   deleteGrowingProfile,
   deletePlantingEvent,
   deleteSpecies,
+  deleteVarietyCompanion,
   deleteVarietyRepresentativeImage,
   deleteVariety,
   fetchApiTokens,
@@ -460,6 +462,7 @@ export function SaatgutApp() {
     name: "",
     description: "",
     heirloom: false,
+    companionIds: [] as string[],
     tags: "",
     germinationNotes: "",
     preferredLocation: "",
@@ -473,6 +476,7 @@ export function SaatgutApp() {
     name: "",
     description: "",
     heirloom: false,
+    companionIds: [] as string[],
     tags: "",
     germinationNotes: "",
     preferredLocation: "",
@@ -575,6 +579,7 @@ export function SaatgutApp() {
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogCategory, setCatalogCategory] = useState<Species["category"] | "ALL">("ALL");
   const [catalogView, setCatalogView] = useState<"ALL" | "ON_HAND" | "ATTENTION">("ALL");
+  const [catalogCompanionId, setCatalogCompanionId] = useState("");
   const [catalogAddOpen, setCatalogAddOpen] = useState(false);
   const [catalogToolsOpen, setCatalogToolsOpen] = useState(false);
   const [printScope, setPrintScope] = useState<"ALL" | "DIGEST" | "VARIETIES" | "BATCHES">("ALL");
@@ -676,6 +681,14 @@ export function SaatgutApp() {
 
   const varietiesById = useMemo(
     () => new Map((dashboard?.varieties ?? []).map((variety) => [variety.id, variety])),
+    [dashboard?.varieties],
+  );
+  const selectableCompanionVarieties = useMemo(
+    () =>
+      (dashboard?.varieties ?? []).map((variety) => ({
+        id: variety.id,
+        label: `${variety.name}${variety.species?.commonName ? ` · ${variety.species.commonName}` : ""}`,
+      })),
     [dashboard?.varieties],
   );
 
@@ -816,6 +829,9 @@ export function SaatgutApp() {
           .toLowerCase();
         const matchesQuery = !normalizedQuery || searchText.includes(normalizedQuery);
         const matchesCategory = catalogCategory === "ALL" || species?.category === catalogCategory;
+        const matchesCompanion =
+          !catalogCompanionId ||
+          (variety.companionVarieties ?? []).some((companion) => companion.id === catalogCompanionId);
         const matchesView =
           catalogView === "ALL" ||
           (catalogView === "ON_HAND" ? seedBatches.length > 0 : warnings.length > 0);
@@ -828,13 +844,15 @@ export function SaatgutApp() {
           latestTest,
           matchesQuery,
           matchesCategory,
+          matchesCompanion,
           matchesView,
         };
       })
-      .filter((entry) => entry.matchesQuery && entry.matchesCategory && entry.matchesView)
+      .filter((entry) => entry.matchesQuery && entry.matchesCategory && entry.matchesCompanion && entry.matchesView)
       .sort((left, right) => left.variety.name.localeCompare(right.variety.name));
   }, [
     catalogCategory,
+    catalogCompanionId,
     catalogView,
     dashboard?.seedBatches,
     dashboard?.species,
@@ -1063,7 +1081,7 @@ export function SaatgutApp() {
     setVarietyState(initialFormState);
 
     try {
-      await createVariety({
+      const createdVariety = await createVariety({
         speciesId: varietyForm.speciesId,
         name: varietyForm.name,
         description: varietyForm.description || null,
@@ -1075,11 +1093,19 @@ export function SaatgutApp() {
         notes: varietyForm.notes || null,
         synonyms: parseTags(varietyForm.synonyms),
       });
+      if (varietyForm.companionIds.length) {
+        await Promise.all(
+          varietyForm.companionIds.map((companionVarietyId) =>
+            createVarietyCompanion(createdVariety.id, companionVarietyId),
+          ),
+        );
+      }
       setVarietyForm({
         speciesId: "",
         name: "",
         description: "",
         heirloom: false,
+        companionIds: [],
         tags: "",
         germinationNotes: "",
         preferredLocation: "",
@@ -1174,6 +1200,7 @@ export function SaatgutApp() {
       name: variety.name,
       description: variety.description ?? "",
       heirloom: variety.heirloom,
+      companionIds: (variety.companionVarieties ?? []).map((companion) => companion.id),
       tags: variety.tags.join(", "),
       germinationNotes: variety.germinationNotes ?? "",
       preferredLocation: variety.preferredLocation ?? "",
@@ -1206,6 +1233,20 @@ export function SaatgutApp() {
         notes: varietyEditForm.notes || null,
         synonyms: parseTags(varietyEditForm.synonyms),
       });
+      const existingCompanionIds = new Set(
+        ((dashboard?.varieties ?? []).find((variety) => variety.id === varietyEditId)?.companionVarieties ?? []).map(
+          (companion) => companion.id,
+        ),
+      );
+      const nextCompanionIds = new Set(varietyEditForm.companionIds);
+      await Promise.all([
+        ...Array.from(nextCompanionIds)
+          .filter((companionId) => !existingCompanionIds.has(companionId))
+          .map((companionId) => createVarietyCompanion(varietyEditId, companionId)),
+        ...Array.from(existingCompanionIds)
+          .filter((companionId) => !nextCompanionIds.has(companionId))
+          .map((companionId) => deleteVarietyCompanion(varietyEditId, companionId)),
+      ]);
       setVarietyEditState({ error: null, success: t.statuses.varietyUpdated, fieldErrors: {} });
       setVarietyEditId("");
       await loadDashboard();
@@ -3004,6 +3045,16 @@ export function SaatgutApp() {
                                 fieldErrors={varietyState.fieldErrors}
                                 t={t}
                               />
+                              <CompanionSelector
+                                label={t.forms.companionVarieties}
+                                hint={t.catalog.companionSelectorHint}
+                                selectedIds={varietyForm.companionIds}
+                                options={selectableCompanionVarieties}
+                                onChange={(companionIds) =>
+                                  setVarietyForm((current) => ({ ...current, companionIds }))
+                                }
+                                t={t}
+                              />
                               <Field label={t.forms.description} name="description" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
                                 <textarea
                                   className="field-input min-h-24"
@@ -3085,6 +3136,16 @@ export function SaatgutApp() {
                                         fieldErrors={varietyEditState.fieldErrors}
                                         t={t}
                                       />
+                                      <CompanionSelector
+                                        label={t.forms.companionVarieties}
+                                        hint={t.catalog.companionSelectorHint}
+                                        selectedIds={varietyEditForm.companionIds}
+                                        options={selectableCompanionVarieties.filter((option) => option.id !== variety.id)}
+                                        onChange={(companionIds) =>
+                                          setVarietyEditForm((current) => ({ ...current, companionIds }))
+                                        }
+                                        t={t}
+                                      />
                                       <Field label={t.forms.description} name="description" fieldErrors={varietyEditState.fieldErrors} optional optionalLabel={t.common.optional}>
                                         <textarea
                                           className="field-input min-h-24"
@@ -3123,6 +3184,11 @@ export function SaatgutApp() {
                                         <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.72)]">
                                           {((dashboard?.species ?? []).find((species) => species.id === variety.speciesId)?.commonName) ?? t.common.notSet}
                                         </p>
+                                        {(variety.companionVarieties ?? []).length ? (
+                                          <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.68)]">
+                                            {t.catalog.companionSummaryLabel} {(variety.companionVarieties ?? []).map((companion) => companion.name).join(", ")}
+                                          </p>
+                                        ) : null}
                                       </div>
                                       <div className="flex flex-wrap gap-2">
                                         <button type="button" onClick={() => startVarietyEdit(variety)} className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold">
@@ -3486,7 +3552,7 @@ export function SaatgutApp() {
 
               <Panel title={t.catalog.browseTitle} subtitle={t.catalog.browseSubtitle}>
                 <div className="grid gap-4">
-                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_repeat(2,minmax(0,0.7fr))]">
+                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,0.7fr))]">
                     <label className="grid gap-2 text-sm font-medium text-[var(--foreground)]">
                       <span>{t.catalog.searchLabel}</span>
                       <input
@@ -3525,6 +3591,21 @@ export function SaatgutApp() {
                         <option value="ALL">{t.catalog.filterAll}</option>
                         <option value="ON_HAND">{t.catalog.filterOnHand}</option>
                         <option value="ATTENTION">{t.catalog.filterAttention}</option>
+                      </select>
+                    </label>
+                    <label className="grid gap-2 text-sm font-medium text-[var(--foreground)]">
+                      <span>{t.catalog.companionFilterLabel}</span>
+                      <select
+                        className="field-input"
+                        value={catalogCompanionId}
+                        onChange={(event) => setCatalogCompanionId(event.target.value)}
+                      >
+                        <option value="">{t.catalog.filterAll}</option>
+                        {selectableCompanionVarieties.map((variety) => (
+                          <option key={variety.id} value={variety.id}>
+                            {variety.label}
+                          </option>
+                        ))}
                       </select>
                     </label>
                   </div>
@@ -4094,6 +4175,10 @@ export function SaatgutApp() {
                               variety={(dashboard?.varieties ?? []).find((variety) => variety.id === ruleEditForm.varietyId) ?? null}
                               t={t}
                             />
+                            <CompanionVarietiesPanel
+                              variety={(dashboard?.varieties ?? []).find((variety) => variety.id === ruleEditForm.varietyId) ?? null}
+                              t={t}
+                            />
                             <RuleGrid form={ruleEditForm} setForm={setRuleEditForm} t={t} />
                             <div className="flex flex-wrap gap-3">
                               <button className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit">{t.common.saveChanges}</button>
@@ -4116,6 +4201,11 @@ export function SaatgutApp() {
                               <p>{t.rules.harvest}: {nullableRange(rule.harvestStartDays, rule.harvestEndDays, t.rules.daysAfter, t.common.notDefined)}</p>
                             </div>
                             <CropGuidancePanel
+                              className="mt-4"
+                              variety={(dashboard?.varieties ?? []).find((variety) => variety.id === rule.variety.id) ?? null}
+                              t={t}
+                            />
+                            <CompanionVarietiesPanel
                               className="mt-4"
                               variety={(dashboard?.varieties ?? []).find((variety) => variety.id === rule.variety.id) ?? null}
                               t={t}
@@ -4152,6 +4242,10 @@ export function SaatgutApp() {
                     </select>
                   </Field>
                   <CropGuidancePanel
+                    variety={(dashboard?.varieties ?? []).find((variety) => variety.id === ruleForm.varietyId) ?? null}
+                    t={t}
+                  />
+                  <CompanionVarietiesPanel
                     variety={(dashboard?.varieties ?? []).find((variety) => variety.id === ruleForm.varietyId) ?? null}
                     t={t}
                   />
@@ -5588,6 +5682,7 @@ function CatalogVarietyCard({
     name: string;
     description: string;
     heirloom: boolean;
+    companionIds: string[];
     tags: string;
     germinationNotes: string;
     preferredLocation: string;
@@ -5601,6 +5696,7 @@ function CatalogVarietyCard({
     name: string;
     description: string;
     heirloom: boolean;
+    companionIds: string[];
     tags: string;
     germinationNotes: string;
     preferredLocation: string;
@@ -5847,6 +5943,7 @@ function CatalogVarietyCard({
         ) : null}
 
         <CropGuidancePanel className="mt-4" guidance={guidance} t={t} />
+        <CompanionVarietiesPanel className="mt-4" variety={variety} t={t} />
 
         <section className="mt-4 rounded-lg border border-[var(--border)] bg-white/72 px-4 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -6530,6 +6627,108 @@ function CropGuidancePanel({
             </p>
             <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.76)]">{item.value}</p>
           </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CompanionSelector({
+  label,
+  hint,
+  selectedIds,
+  options,
+  onChange,
+  t,
+}: {
+  label: string;
+  hint: string;
+  selectedIds: string[];
+  options: Array<{ id: string; label: string }>;
+  onChange: (nextIds: string[]) => void;
+  t: AppMessages;
+}) {
+  const [draftId, setDraftId] = useState("");
+  const selectedOptions = options.filter((option) => selectedIds.includes(option.id));
+  const availableOptions = options.filter((option) => !selectedIds.includes(option.id));
+
+  function addDraft() {
+    if (!draftId) return;
+    onChange([...selectedIds, draftId]);
+    setDraftId("");
+  }
+
+  return (
+    <div className="grid gap-3 rounded-lg border border-[var(--border)] bg-white/72 p-4">
+      <div>
+        <p className="text-sm font-medium text-[var(--foreground)]">{label}</p>
+        <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">{hint}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {selectedOptions.length ? selectedOptions.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => onChange(selectedIds.filter((id) => id !== option.id))}
+            className="rounded-md border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-xs font-semibold"
+          >
+            {option.label} · {t.common.delete}
+          </button>
+        )) : (
+          <span className="text-sm text-[color:rgba(24,49,40,0.68)]">{t.catalog.noCompanionLinks}</span>
+        )}
+      </div>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <select
+          className="field-input"
+          value={draftId}
+          onChange={(event) => setDraftId(event.target.value)}
+        >
+          <option value="">{t.catalog.addCompanionAction}</option>
+          {availableOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={addDraft}
+          disabled={!draftId}
+          className="rounded-lg border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {t.catalog.addCompanionAction}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CompanionVarietiesPanel({
+  variety,
+  className,
+  t,
+}: {
+  variety: Variety | null;
+  className?: string;
+  t: AppMessages;
+}) {
+  const companions = variety?.companionVarieties ?? [];
+  if (!companions.length) return null;
+
+  return (
+    <div className={classNames("rounded-lg border border-[var(--border)] bg-white/72 px-4 py-4", className)}>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+        {t.rules.companionVarietiesTitle}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+        {t.rules.companionVarietiesSubtitle}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {companions.map((companion) => (
+          <span key={companion.id} className="rounded-md border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-sm font-medium">
+            {companion.name}
+          </span>
         ))}
       </div>
     </div>

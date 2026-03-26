@@ -363,6 +363,12 @@ const de = {
     savingImage: "Bild wird gespeichert…",
     noVarietyImage: "Noch kein repräsentatives Sortenbild hinterlegt.",
     noImageCaption: "Keine zusätzliche Bildbeschreibung hinterlegt.",
+    companionFilterLabel: "Gute Nachbarn",
+    companionSelectorHint:
+      "Wähle Sorten aus, die sich in Mischkultur oder direkter Nachbarschaft bewährt haben.",
+    companionSummaryLabel: "Gute Nachbarn:",
+    noCompanionLinks: "Noch keine strukturierten Nachbarpflanzen verknüpft.",
+    addCompanionAction: "Nachbarpflanze hinzufügen",
   },
   profiles: {
     eyebrow: "Saison und Standort",
@@ -502,6 +508,9 @@ const de = {
     germinationTitle: "Keimbedingungen",
     preferredLocationTitle: "Bester Standort",
     companionPlantingTitle: "Gute Nachbarschaft",
+    companionVarietiesTitle: "Strukturierte Nachbarpflanzen",
+    companionVarietiesSubtitle:
+      "Diese verknüpften Sorten passen laut Deinem Katalog gut in die Nähe oder in denselben Mischkulturplan.",
   },
   plantings: {
     eyebrow: "Aussaat und Ernte",
@@ -594,6 +603,7 @@ const de = {
     preferredLocationPlaceholder: "Zum Beispiel: sonniges Beet, Gewächshaus oder halbschattiger Rand.",
     companionPlantingNotes: "Mischkultur-Hinweise",
     companionPlantingNotesPlaceholder: "Zum Beispiel: gut neben Basilikum oder nicht direkt nach Nachtschattengewächsen.",
+    companionVarieties: "Passende Nachbarpflanzen",
     notes: "Notizen",
     species: "Art",
     variety: "Sorte",
@@ -1101,6 +1111,12 @@ const en: AppMessages = {
     savingImage: "Saving image…",
     noVarietyImage: "No representative variety image yet.",
     noImageCaption: "No additional image note added yet.",
+    companionFilterLabel: "Good neighbors",
+    companionSelectorHint:
+      "Choose varieties that work well nearby or in the same companion-planting plan.",
+    companionSummaryLabel: "Good neighbors:",
+    noCompanionLinks: "No structured companion links yet.",
+    addCompanionAction: "Add companion variety",
   },
   profiles: {
     eyebrow: "Season and site",
@@ -1240,6 +1256,9 @@ const en: AppMessages = {
     germinationTitle: "Germination conditions",
     preferredLocationTitle: "Preferred site",
     companionPlantingTitle: "Companion planting",
+    companionVarietiesTitle: "Structured companion varieties",
+    companionVarietiesSubtitle:
+      "These linked varieties are recorded in your catalog as good neighbors for the same bed or mixed planting plan.",
   },
   plantings: {
     eyebrow: "Sowing and harvest",
@@ -1331,6 +1350,7 @@ const en: AppMessages = {
     preferredLocationPlaceholder: "For example: full-sun bed, greenhouse bench, or light shade edge.",
     companionPlantingNotes: "Companion planting notes",
     companionPlantingNotesPlaceholder: "For example: pairs well with basil or avoid after other nightshades.",
+    companionVarieties: "Suitable companion varieties",
     notes: "Notes",
     species: "Species",
     variety: "Variety",
