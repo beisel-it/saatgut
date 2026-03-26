@@ -3626,8 +3626,8 @@ function ScreenHeader({
       <h2
         className={classNames(
           compact
-            ? classNames(eyebrow ? "mt-1.5" : "mt-0", "max-w-[24ch] text-[1.75rem] font-semibold tracking-tight text-balance leading-tight md:text-[2rem]")
-            : classNames(eyebrow ? "mt-2" : "mt-0", "max-w-[18ch] text-[2.2rem] font-semibold tracking-tight text-balance leading-[1.05] md:text-[2.85rem]"),
+            ? classNames(eyebrow ? "mt-1.5" : "mt-0", "w-full text-[1.75rem] font-semibold tracking-tight text-balance leading-tight md:max-w-[28ch] md:text-[2rem]")
+            : classNames(eyebrow ? "mt-2" : "mt-0", "w-full text-[2.2rem] font-semibold tracking-tight text-balance leading-[1.05] md:max-w-[24ch] md:text-[2.85rem]"),
           titleClassName,
         )}
       >
@@ -3742,9 +3742,9 @@ function ResponsiveModal({
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-5 py-4 md:px-6">
-            <div className="min-w-0">
-              <h3 className="max-w-[18ch] text-[1.5rem] font-semibold tracking-tight leading-tight">{title}</h3>
-              <p className="mt-2 max-w-[42ch] text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{subtitle}</p>
+            <div className="flex-1">
+              <h3 className="w-full text-[1.5rem] font-semibold tracking-tight leading-tight md:max-w-[28ch]">{title}</h3>
+              <p className="mt-2 w-full text-sm leading-6 text-[color:rgba(24,49,40,0.72)] md:max-w-[44ch]">{subtitle}</p>
             </div>
             <button
               type="button"
@@ -4321,8 +4321,8 @@ function Panel({
   return (
     <section className={classNames("rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6", className)}>
       <div className="mb-5">
-        <h2 className="max-w-[20ch] text-xl font-semibold tracking-tight text-balance md:text-2xl">{title}</h2>
-        <p className="mt-2 max-w-[40rem] text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{subtitle}</p>
+        <h2 className="w-full text-xl font-semibold tracking-tight text-balance md:max-w-[28ch] md:text-2xl">{title}</h2>
+        <p className="mt-2 w-full text-sm leading-6 text-[color:rgba(24,49,40,0.72)] md:max-w-[44rem]">{subtitle}</p>
       </div>
       {children}
     </section>
