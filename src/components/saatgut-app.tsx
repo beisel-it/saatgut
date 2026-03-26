@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import {
   browserSupportsWebAuthn,
@@ -1980,6 +1981,15 @@ export function SaatgutApp() {
                 </button>
               </form>
             )}
+
+            <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/12 pt-4 text-xs text-white/66">
+              <Link href="/api-reference" className="underline decoration-white/35 underline-offset-4">
+                {t.docs.apiReferenceLink}
+              </Link>
+              <a href="/api/v1/openapi.json" className="underline decoration-white/35 underline-offset-4">
+                {t.docs.rawOpenApi}
+              </a>
+            </div>
           </section>
         </div>
       </main>
@@ -2065,6 +2075,15 @@ export function SaatgutApp() {
           >
             {authPending ? t.common.signingOut : t.common.signOut}
           </button>
+
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/58">
+            <Link href="/api-reference" className="underline decoration-white/24 underline-offset-4">
+              {t.docs.apiReferenceLink}
+            </Link>
+            <a href="/api/v1/openapi.json" className="underline decoration-white/24 underline-offset-4">
+              {t.docs.rawOpenApi}
+            </a>
+          </div>
         </aside>
 
         <section className="min-w-0 space-y-4">
@@ -2143,6 +2162,15 @@ export function SaatgutApp() {
                   >
                     {authPending ? t.common.signingOut : t.common.signOut}
                   </button>
+
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/58">
+                    <Link href="/api-reference" className="underline decoration-white/24 underline-offset-4">
+                      {t.docs.apiReferenceLink}
+                    </Link>
+                    <a href="/api/v1/openapi.json" className="underline decoration-white/24 underline-offset-4">
+                      {t.docs.rawOpenApi}
+                    </a>
+                  </div>
                 </div>
               ) : null}
             </div>
