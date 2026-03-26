@@ -1,4 +1,4 @@
-# Saatgut
+# Saatgut 🌱
 
 ![Next.js](https://img.shields.io/badge/Next.js-15-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
@@ -9,7 +9,7 @@
 
 Saatgut is a self-hosted seed-bank and cultivation journal web app for running a practical home-growing workflow: catalog varieties, track seed batches, define frost-date-based growing profiles, derive a 14-day calendar, record planting activity, and manage seed quality signals such as germination tests and stock corrections.
 
-## What Is Shipped
+## ✨ What Is Shipped
 
 The current implementation includes:
 
@@ -25,7 +25,7 @@ The current implementation includes:
 
 The core web UI is focused on seed-bank and planning workflows. Some operational surfaces are currently API-first rather than fully represented in the main page UI.
 
-## Stack
+## 🧰 Stack
 
 - Next.js 15 App Router
 - TypeScript
@@ -36,7 +36,7 @@ The core web UI is focused on seed-bank and planning workflows. Some operational
 - Playwright
 - Docker Compose
 
-## Project Layout
+## 🗂️ Project Layout
 
 ```text
 src/app/                    App Router pages and API routes
@@ -50,7 +50,7 @@ scripts/                    Operational scripts such as PostgreSQL backup
 tests/                      Vitest and Playwright coverage
 ```
 
-## Local Development
+## 🚀 Local Development
 
 1. Copy `.env.example` to `.env.local`.
 2. Install dependencies and generate the Prisma client:
@@ -80,7 +80,7 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-## Docker Compose
+## 🐳 Docker Compose
 
 Run the app and database together with:
 
@@ -94,7 +94,7 @@ Notes:
 - The bundled PostgreSQL image reconciles `POSTGRES_PASSWORD` onto the persisted role during startup, which helps avoid stale-password issues on reused volumes.
 - This setup is intended to be self-hosting friendly and Portainer-friendly, but the README does not claim production hardening beyond the shipped health checks and container wiring.
 
-## Verification
+## ✅ Verification
 
 Run the baseline checks with:
 
@@ -111,7 +111,7 @@ Browser-level coverage is available via:
 npm run test:e2e
 ```
 
-## API Surface
+## 🔌 API Surface
 
 Selected shipped endpoints:
 
@@ -136,7 +136,7 @@ Selected shipped endpoints:
 - `/api/v1/openapi.json`
 - `/api/v1/mcp`
 
-## Operations
+## 🛠️ Operations
 
 Create a PostgreSQL dump with:
 
@@ -146,7 +146,7 @@ npm run backup:db
 
 Backups are written to `backups/`.
 
-## Environment Notes
+## ⚙️ Environment Notes
 
 Important variables in `.env.example`:
 
