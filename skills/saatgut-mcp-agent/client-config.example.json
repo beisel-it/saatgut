@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "saatgut": {
+      "transport": "streamable-http",
+      "url": "http://localhost:3000/api/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer sa_..."
+      }
+    }
+  }
+}

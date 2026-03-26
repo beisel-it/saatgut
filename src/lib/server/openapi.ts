@@ -3,9 +3,9 @@ export function getOpenApiDocument() {
     openapi: "3.1.0",
     info: {
       title: "Saatgut API",
-      version: "1.0.0-v1-ops",
+      version: "1.1.0-v1-mcp",
       description:
-        "Internal REST contract for the Saatgut seed-bank, journal, reminder, export, and admin APIs.",
+        "Internal REST contract for the Saatgut seed-bank, journal, reminder, export, admin, and MCP APIs.",
     },
     servers: [{ url: "/api/v1" }],
     components: {
@@ -162,6 +162,17 @@ export function getOpenApiDocument() {
           summary: "Generate the OpenAPI document for the current API surface",
           security: [],
           responses: { "200": { description: "OpenAPI document" } },
+        },
+      },
+      "/mcp": {
+        get: {
+          summary: "Describe the MCP endpoint metadata and security expectations",
+          security: [],
+          responses: { "200": { description: "MCP endpoint metadata" } },
+        },
+        post: {
+          summary: "Serve the Saatgut MCP JSON-RPC endpoint over HTTP",
+          responses: { "200": { description: "MCP JSON-RPC response" } },
         },
       },
     },
