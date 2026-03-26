@@ -34,9 +34,11 @@ import {
   createVariety,
   deleteCultivationRule,
   deleteSeedBatch,
+  deleteSeedBatchPhoto,
   deleteGrowingProfile,
   deletePlantingEvent,
   deleteSpecies,
+  deleteVarietyRepresentativeImage,
   deleteVariety,
   fetchApiTokens,
   fetchDashboardData,
@@ -61,6 +63,8 @@ import {
   updateVariety,
   updateProfilePhenology,
   upsertCultivationRule,
+  uploadSeedBatchPhoto,
+  uploadVarietyRepresentativeImage,
 } from "@/lib/client/api";
 import { getIntlLocale, type AppMessages, type Locale } from "@/lib/i18n";
 import type {
@@ -77,6 +81,7 @@ import type {
   SessionSnapshot,
   Species,
   UserInvite,
+  MediaAsset,
   Variety,
   WorkspaceMember,
 } from "@/lib/client/types";
@@ -3570,6 +3575,7 @@ export function SaatgutApp() {
                             id: seedBatch.id,
                             label: `${entry.variety.name} · ${seedBatch.source ?? t.common.batchFallback}`,
                           })}
+                        onMediaChanged={loadDashboard}
                         locale={locale}
                         t={t}
                       />
@@ -5566,6 +5572,7 @@ function CatalogVarietyCard({
   onDeleteVariety,
   onEditSeedBatch,
   onDeleteSeedBatch,
+  onMediaChanged,
   locale,
   t,
 }: {
@@ -5607,6 +5614,7 @@ function CatalogVarietyCard({
   onDeleteVariety: (variety: Variety) => void;
   onEditSeedBatch: (seedBatch: SeedBatch) => void;
   onDeleteSeedBatch: (seedBatch: SeedBatch) => void;
+  onMediaChanged: () => Promise<void>;
   locale: Locale;
   t: AppMessages;
 }) {
@@ -5615,11 +5623,78 @@ function CatalogVarietyCard({
     (sum, seedBatch) => sum + (warningsByBatch.get(seedBatch.id) ?? []).filter((warning) => warning.level !== "info").length,
     0,
   );
+  const [imageForm, setImageForm] = useState({
+    file: null as File | null,
+    altText: variety.representativeImage?.altText ?? "",
+    caption: variety.representativeImage?.caption ?? "",
+  });
+  const [imageState, setImageState] = useState<FormState>(initialFormState);
+  const [imagePending, startImageTransition] = useTransition();
+
+  useEffect(() => {
+    setImageForm({
+      file: null,
+      altText: variety.representativeImage?.altText ?? "",
+      caption: variety.representativeImage?.caption ?? "",
+    });
+  }, [variety.id, variety.representativeImage?.id, variety.representativeImage?.altText, variety.representativeImage?.caption]);
+
+  function submitRepresentativeImage(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!imageForm.file) {
+      setImageState({
+        error: t.apiErrors.MEDIA_FILE_MISSING,
+        success: null,
+        fieldErrors: {},
+      });
+      return;
+    }
+    const selectedFile = imageForm.file;
+
+    setImageState(initialFormState);
+    startImageTransition(() => {
+      void uploadVarietyRepresentativeImage(variety.id, {
+        file: selectedFile,
+        altText: imageForm.altText || null,
+        caption: imageForm.caption || null,
+      })
+        .then(async () => {
+          setImageForm((current) => ({ ...current, file: null }));
+          setImageState({ error: null, success: t.statuses.varietyImageSaved, fieldErrors: {} });
+          await onMediaChanged();
+        })
+        .catch((error) => setImageState(toFormState(error, t)));
+    });
+  }
+
+  function removeRepresentativeImage() {
+    setImageState(initialFormState);
+    startImageTransition(() => {
+      void deleteVarietyRepresentativeImage(variety.id)
+        .then(async () => {
+          setImageForm({ file: null, altText: "", caption: "" });
+          setImageState({ error: null, success: t.statuses.varietyImageRemoved, fieldErrors: {} });
+          await onMediaChanged();
+        })
+        .catch((error) => setImageState(toFormState(error, t)));
+    });
+  }
 
   return (
     <details className="group rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4 open:bg-white">
       <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-4">
-        <div className="max-w-3xl min-w-0">
+        <div className="flex max-w-4xl min-w-0 items-start gap-4">
+          {variety.representativeImage ? (
+            <div className="hidden h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-[var(--border)] bg-white sm:block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={variety.representativeImage.contentUrl}
+                alt={variety.representativeImage.altText || variety.name}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          ) : null}
+          <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-xl font-semibold break-words">{variety.name}</h3>
             {variety.heirloom ? (
@@ -5637,6 +5712,7 @@ function CatalogVarietyCard({
             {seedBatches.length} {t.catalog.batchesOnHand} · {warningCount} {t.catalog.needsAttention} · {t.catalog.latestCheck}{" "}
             {latestTest ? formatDate(latestTest.testedAt, locale, t.common.notSet) : t.common.notSet}
           </p>
+          </div>
         </div>
         <span className="rounded-md border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)] group-open:hidden">
           {t.catalog.expandItem}
@@ -5772,6 +5848,92 @@ function CatalogVarietyCard({
 
         <CropGuidancePanel className="mt-4" guidance={guidance} t={t} />
 
+        <section className="mt-4 rounded-lg border border-[var(--border)] bg-white/72 px-4 py-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                {t.catalog.varietyImageTitle}
+              </p>
+              <p className="mt-1 max-w-[42rem] text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                {t.catalog.varietyImageSubtitle}
+              </p>
+            </div>
+            {variety.representativeImage ? (
+              <button
+                type="button"
+                onClick={removeRepresentativeImage}
+                disabled={imagePending}
+                className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {t.catalog.removeImage}
+              </button>
+            ) : null}
+          </div>
+          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-3">
+              {variety.representativeImage ? (
+                <>
+                  <div className="overflow-hidden rounded-md border border-[var(--border)] bg-white">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={variety.representativeImage.contentUrl}
+                      alt={variety.representativeImage.altText || variety.name}
+                      className="h-56 w-full object-cover"
+                    />
+                  </div>
+                  <p className="mt-3 text-sm font-medium text-[var(--foreground)]">
+                    {variety.representativeImage.altText || variety.name}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                    {variety.representativeImage.caption || t.catalog.noImageCaption}
+                  </p>
+                </>
+              ) : (
+                <div className="flex h-56 items-center justify-center rounded-md border border-dashed border-[var(--border)] bg-white px-4 text-center text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                  {t.catalog.noVarietyImage}
+                </div>
+              )}
+            </div>
+            <form className="grid gap-4" onSubmit={submitRepresentativeImage}>
+              {imageState.error ? <Alert tone="danger">{imageState.error}</Alert> : null}
+              {imageState.success ? <Alert tone="success">{imageState.success}</Alert> : null}
+              <Field label={t.forms.imageFile} name="file" fieldErrors={imageState.fieldErrors} optionalLabel={t.common.optional}>
+                <input
+                  className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[var(--foreground)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) =>
+                    setImageForm((current) => ({ ...current, file: event.target.files?.[0] ?? null }))
+                  }
+                />
+              </Field>
+              <Field label={t.forms.altText} name="altText" fieldErrors={imageState.fieldErrors} optional optionalLabel={t.common.optional}>
+                <input
+                  className="field-input"
+                  value={imageForm.altText}
+                  onChange={(event) => setImageForm((current) => ({ ...current, altText: event.target.value }))}
+                  placeholder={t.forms.altTextPlaceholder}
+                />
+              </Field>
+              <Field label={t.forms.caption} name="caption" fieldErrors={imageState.fieldErrors} optional optionalLabel={t.common.optional}>
+                <textarea
+                  className="field-input min-h-24"
+                  value={imageForm.caption}
+                  onChange={(event) => setImageForm((current) => ({ ...current, caption: event.target.value }))}
+                  placeholder={t.forms.captionPlaceholder}
+                />
+              </Field>
+              <button className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit" disabled={imagePending}>
+                {imagePending
+                  ? t.catalog.savingImage
+                  : variety.representativeImage
+                    ? t.catalog.replaceImage
+                    : t.catalog.uploadImage}
+              </button>
+            </form>
+          </div>
+        </section>
+
         <div className="mt-5">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
             {t.catalog.batchListTitle}
@@ -5786,6 +5948,7 @@ function CatalogVarietyCard({
                   warnings={warningsByBatch.get(seedBatch.id) ?? []}
                   germinationTests={seedBatch.germinationTests ?? []}
                   adjustments={seedBatch.stockTransactions?.filter((transaction) => transaction.type !== "INITIAL_STOCK") ?? []}
+                  onMediaChanged={onMediaChanged}
                   onEdit={() => onEditSeedBatch(seedBatch)}
                   onDelete={() => onDeleteSeedBatch(seedBatch)}
                   locale={locale}
@@ -5947,6 +6110,7 @@ function SeedBatchCard({
   warnings,
   germinationTests,
   adjustments,
+  onMediaChanged,
   onEdit,
   onDelete,
   locale,
@@ -5957,11 +6121,76 @@ function SeedBatchCard({
   warnings: NonNullable<SeedBatch["storageWarnings"]>;
   germinationTests: NonNullable<SeedBatch["germinationTests"]>;
   adjustments: NonNullable<SeedBatch["stockTransactions"]>;
+  onMediaChanged: () => Promise<void>;
   onEdit: () => void;
   onDelete: () => void;
   locale: Locale;
   t: AppMessages;
 }) {
+  const [photoForm, setPhotoForm] = useState({
+    kind: "SEED_BATCH_PACKET" as MediaAsset["kind"],
+    file: null as File | null,
+    altText: "",
+    caption: "",
+  });
+  const [photoState, setPhotoState] = useState<FormState>(initialFormState);
+  const [photoPending, startPhotoTransition] = useTransition();
+  const packetPhoto =
+    [...(seedBatch.photos ?? [])]
+      .filter((photo) => photo.kind === "SEED_BATCH_PACKET")
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] ?? null;
+  const referencePhoto =
+    [...(seedBatch.photos ?? [])]
+      .filter((photo) => photo.kind === "SEED_BATCH_REFERENCE")
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] ?? null;
+
+  async function replacePhotoOfKind(kind: "SEED_BATCH_PACKET" | "SEED_BATCH_REFERENCE", file: File, altText: string, caption: string) {
+    const existing = (seedBatch.photos ?? []).filter((photo) => photo.kind === kind);
+    await Promise.all(existing.map((photo) => deleteSeedBatchPhoto(seedBatch.id, photo.id)));
+    await uploadSeedBatchPhoto(seedBatch.id, {
+      file,
+      kind,
+      altText: altText || null,
+      caption: caption || null,
+    });
+  }
+
+  function submitBatchPhoto(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!photoForm.file) {
+      setPhotoState({ error: t.apiErrors.MEDIA_FILE_MISSING, success: null, fieldErrors: {} });
+      return;
+    }
+
+    setPhotoState(initialFormState);
+    startPhotoTransition(() => {
+      void replacePhotoOfKind(
+        photoForm.kind as "SEED_BATCH_PACKET" | "SEED_BATCH_REFERENCE",
+        photoForm.file as File,
+        photoForm.altText,
+        photoForm.caption,
+      )
+        .then(async () => {
+          setPhotoForm({ kind: photoForm.kind, file: null, altText: "", caption: "" });
+          setPhotoState({ error: null, success: t.statuses.batchPhotoSaved, fieldErrors: {} });
+          await onMediaChanged();
+        })
+        .catch((error) => setPhotoState(toFormState(error, t)));
+    });
+  }
+
+  function removePhoto(photo: MediaAsset) {
+    setPhotoState(initialFormState);
+    startPhotoTransition(() => {
+      void deleteSeedBatchPhoto(seedBatch.id, photo.id)
+        .then(async () => {
+          setPhotoState({ error: null, success: t.statuses.batchPhotoRemoved, fieldErrors: {} });
+          await onMediaChanged();
+        })
+        .catch((error) => setPhotoState(toFormState(error, t)));
+    });
+  }
+
   return (
     <article className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -5994,6 +6223,84 @@ function SeedBatchCard({
             {getWarningTitle(warning.code, warning.title, t)}
           </WarningPill>
         ))}
+      </div>
+
+      <div className="mt-4 rounded-lg border border-[var(--border)] bg-white/72 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+              {t.seedBatch.photosTitle}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+              {t.seedBatch.photosSubtitle}
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <MediaSlot
+            asset={packetPhoto}
+            title={t.seedBatch.packetPhotoTitle}
+            emptyCopy={t.seedBatch.noPacketPhoto}
+            removeLabel={t.catalog.removeImage}
+            onRemove={packetPhoto ? () => removePhoto(packetPhoto) : undefined}
+            t={t}
+          />
+          <MediaSlot
+            asset={referencePhoto}
+            title={t.seedBatch.referencePhotoTitle}
+            emptyCopy={t.seedBatch.noReferencePhoto}
+            removeLabel={t.catalog.removeImage}
+            onRemove={referencePhoto ? () => removePhoto(referencePhoto) : undefined}
+            t={t}
+          />
+        </div>
+        <form className="mt-4 grid gap-4" onSubmit={submitBatchPhoto}>
+          {photoState.error ? <Alert tone="danger">{photoState.error}</Alert> : null}
+          {photoState.success ? <Alert tone="success">{photoState.success}</Alert> : null}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label={t.forms.photoKind} name="kind" fieldErrors={photoState.fieldErrors} optionalLabel={t.common.optional}>
+              <select
+                className="field-input"
+                value={photoForm.kind}
+                onChange={(event) =>
+                  setPhotoForm((current) => ({ ...current, kind: event.target.value as MediaAsset["kind"] }))
+                }
+              >
+                <option value="SEED_BATCH_PACKET">{t.seedBatch.packetPhotoTitle}</option>
+                <option value="SEED_BATCH_REFERENCE">{t.seedBatch.referencePhotoTitle}</option>
+              </select>
+            </Field>
+            <Field label={t.forms.imageFile} name="file" fieldErrors={photoState.fieldErrors} optionalLabel={t.common.optional}>
+              <input
+                className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[var(--foreground)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) =>
+                  setPhotoForm((current) => ({ ...current, file: event.target.files?.[0] ?? null }))
+                }
+              />
+            </Field>
+          </div>
+          <Field label={t.forms.altText} name="altText" fieldErrors={photoState.fieldErrors} optional optionalLabel={t.common.optional}>
+            <input
+              className="field-input"
+              value={photoForm.altText}
+              onChange={(event) => setPhotoForm((current) => ({ ...current, altText: event.target.value }))}
+              placeholder={t.forms.altTextPlaceholder}
+            />
+          </Field>
+          <Field label={t.forms.caption} name="caption" fieldErrors={photoState.fieldErrors} optional optionalLabel={t.common.optional}>
+            <textarea
+              className="field-input min-h-24"
+              value={photoForm.caption}
+              onChange={(event) => setPhotoForm((current) => ({ ...current, caption: event.target.value }))}
+              placeholder={t.forms.captionPlaceholder}
+            />
+          </Field>
+          <button className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit" disabled={photoPending}>
+            {photoPending ? t.catalog.savingImage : t.seedBatch.savePhoto}
+          </button>
+        </form>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -6225,6 +6532,61 @@ function CropGuidancePanel({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function MediaSlot({
+  asset,
+  title,
+  emptyCopy,
+  removeLabel,
+  onRemove,
+  t,
+}: {
+  asset: MediaAsset | null;
+  title: string;
+  emptyCopy: string;
+  removeLabel: string;
+  onRemove?: () => void;
+  t: AppMessages;
+}) {
+  return (
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-[var(--foreground)]">{title}</p>
+        {asset && onRemove ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="rounded-md border border-red-300/50 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700"
+          >
+            {removeLabel}
+          </button>
+        ) : null}
+      </div>
+      {asset ? (
+        <>
+          <div className="mt-3 overflow-hidden rounded-md border border-[var(--border)] bg-white">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={asset.contentUrl}
+              alt={asset.altText || title}
+              className="h-44 w-full object-cover"
+            />
+          </div>
+          <p className="mt-3 text-sm font-medium text-[var(--foreground)]">
+            {asset.altText || asset.originalFilename}
+          </p>
+          <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+            {asset.caption || t.catalog.noImageCaption}
+          </p>
+        </>
+      ) : (
+        <div className="mt-3 flex h-44 items-center justify-center rounded-md border border-dashed border-[var(--border)] bg-white px-4 text-center text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+          {emptyCopy}
+        </div>
+      )}
     </div>
   );
 }
