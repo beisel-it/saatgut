@@ -7,15 +7,14 @@ QA should target the seed-bank MVP only. The earlier waitlist slice is obsolete 
 ## Current Readiness Assessment
 
 1. Product direction is explicit in `reference.md` and the roadmap docs.
-2. The repository still needs a runnable integrated application for executable QA.
-3. `package.json` does not yet define the install, dev, lint, test, or e2e scripts implied by the roadmap and README.
-4. The runtime scaffold for the selected stack is not present yet: there is no Next.js app setup, Prisma schema, Docker Compose file, or Playwright/Vitest configuration.
-5. Automated checks must target auth, catalog, profiles, calendar, and planting flows once the runtime scaffold exists.
+2. The runtime scaffold is now present and baseline verification passes for `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`.
+3. The repository includes the expected seed-bank MVP baseline pieces: Next.js app shell, Prisma schema and migrations, Docker Compose, health route, and Vitest configuration.
+4. Executable QA for the product flow is still blocked on missing feature implementation for auth, catalog, seed batches, growing profiles, cultivation rules, calendar logic, and planting writes.
+5. Automated checks still need to expand from the current health smoke test to the MVP flows described in the roadmap.
 
 ## Minimum Unblock Conditions
 
-- a documented app startup command
-- a documented automated test command
-- package scripts that implement those documented commands
 - a deterministic sign-in path
 - one end-to-end path covering variety, batch, profile, calendar, and planting work
+- API and UI surfaces for catalog, seed batches, profiles, rules, calendar, and planting flows
+- automated coverage for unit, integration, and end-to-end MVP scenarios beyond the current health check
