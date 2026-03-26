@@ -62,8 +62,8 @@ A gardener signs in, sees the next practical garden work derived from the active
 
 For the next disciplines, this UX definition implies:
 
-- `frontend-dev`: build a single responsive landing page with one form and an in-place success state
-- `backend-dev`: provide one endpoint or mock action that accepts email plus interest area
-- `tester`: verify validation, submission success, failure recovery, and mobile usability
+- `frontend-dev`: build the authenticated dashboard, upcoming calendar list, and planting capture surface
+- `backend-dev`: provide the auth, calendar, seed-batch, and planting endpoints required by the main workflow
+- `tester`: verify sign-in, calendar rendering, planting validation, stock deduction, failure recovery, and mobile usability
 
-This keeps the first runnable slice small while still proving the full loop from interface to data handling.
+This keeps the first runnable slice small while still proving the full loop from authenticated planning to recorded planting work.
