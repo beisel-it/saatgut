@@ -668,15 +668,13 @@ export function SaatgutApp() {
       <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(127,155,71,0.22),transparent_32%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-5 py-8 md:px-10 md:py-12">
         <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-8 shadow-[var(--shadow)] md:p-10">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[var(--accent-strong)]">
-              {t.common.brand}
-            </p>
-            <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight md:text-6xl">
-              {t.auth.heroTitle}
-            </h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-[color:rgba(24,49,40,0.78)] md:text-lg">
-              {t.auth.heroCopy}
-            </p>
+            <ScreenHeader
+              eyebrow={t.common.brand}
+              title={t.auth.heroTitle}
+              subtitle={t.auth.heroSubtitle}
+              supportingCopy={t.auth.heroCopy}
+              titleClassName="max-w-[12ch] md:max-w-[13ch]"
+            />
           </section>
 
           <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(24,49,40,0.94)] p-6 text-white shadow-[var(--shadow)] md:p-8">
@@ -735,9 +733,12 @@ export function SaatgutApp() {
             </div>
 
             <div className="mt-6">
-              <h2 className="text-2xl font-semibold">
+              <h2 className="max-w-[18ch] text-2xl font-semibold tracking-tight text-balance">
                 {authMode === "register" ? t.auth.registerTitle : t.auth.loginTitle}
               </h2>
+              <p className="mt-2 max-w-[38ch] text-sm leading-6 text-white/72">
+                {authMode === "register" ? t.auth.registerSubtitle : t.auth.loginSubtitle}
+              </p>
             </div>
 
             {sessionError ? <Alert tone="danger">{sessionError}</Alert> : null}
@@ -888,14 +889,12 @@ export function SaatgutApp() {
         <section className="space-y-4">
           <header className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-7">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--accent-strong)]">
-                  {t.dashboard.heroEyebrow}
-                </p>
-                <h2 className="mt-2 text-3xl font-semibold tracking-tight md:text-5xl">
-                  {t.dashboard.heroTitle}
-                </h2>
-              </div>
+              <ScreenHeader
+                eyebrow={t.dashboard.heroEyebrow}
+                title={t.dashboard.heroTitle}
+                subtitle={t.dashboard.heroSubtitle}
+                titleClassName="max-w-[14ch] md:max-w-[15ch]"
+              />
               <button
                 type="button"
                 onClick={() =>
@@ -921,7 +920,7 @@ export function SaatgutApp() {
                 key={stat.label}
                 className="rounded-[1.5rem] border border-[var(--border)] bg-white/80 p-5 shadow-[var(--shadow)]"
               >
-                <p className="text-sm uppercase tracking-[0.2em] text-[color:rgba(24,49,40,0.58)]">
+                <p className="max-w-[16ch] text-balance text-xs font-semibold uppercase leading-5 tracking-[0.16em] text-[color:rgba(24,49,40,0.58)] sm:text-sm">
                   {stat.label}
                 </p>
                 <p className="mt-2 text-3xl font-semibold">{stat.value}</p>
@@ -1016,7 +1015,7 @@ export function SaatgutApp() {
                         .flatMap((seedBatch) => [
                           ...(seedBatch.germinationTests ?? []).slice(0, 1).map((test) => ({
                             key: test.id,
-                            title: `Keimung ${test.germinationRate ?? "?"}%`,
+                            title: `${t.seedBatch.germinationTestsTitle} ${test.germinationRate ?? "?"}%`,
                             subtitle: `${varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback} · ${formatDate(test.testedAt, locale, t.common.notSet)}`,
                           })),
                           ...(seedBatch.stockTransactions ?? [])
@@ -1053,7 +1052,16 @@ export function SaatgutApp() {
           ) : null}
 
           {view === "catalog" ? (
-            <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+            <div className="space-y-4">
+              <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
+                <ScreenHeader
+                  eyebrow={t.catalog.eyebrow}
+                  title={t.catalog.heroTitle}
+                  subtitle={t.catalog.heroSubtitle}
+                  titleClassName="max-w-[16ch]"
+                />
+              </section>
+              <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
               <div className="space-y-4">
                 <Panel title={t.catalog.speciesTitle} subtitle={t.catalog.speciesSubtitle}>
                   <DataForm state={speciesState} onSubmit={submitSpecies} submitLabel={t.catalog.saveSpecies}>
@@ -1483,11 +1491,21 @@ export function SaatgutApp() {
                   </div>
                 </Panel>
               </div>
+              </div>
             </div>
           ) : null}
 
           {view === "profiles" ? (
-            <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+            <div className="space-y-4">
+              <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
+                <ScreenHeader
+                  eyebrow={t.profiles.eyebrow}
+                  title={t.profiles.heroTitle}
+                  subtitle={t.profiles.heroSubtitle}
+                  titleClassName="max-w-[16ch]"
+                />
+              </section>
+              <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
               <Panel title={t.profiles.title} subtitle={t.profiles.subtitle}>
                 <DataForm state={profileState} onSubmit={submitProfile} submitLabel={t.profiles.saveProfile}>
                   <Field label={t.forms.profileName} name="name" fieldErrors={profileState.fieldErrors} optionalLabel={t.common.optional}>
@@ -1642,11 +1660,21 @@ export function SaatgutApp() {
                   )}
                 </Panel>
               </div>
+              </div>
             </div>
           ) : null}
 
           {view === "rules" ? (
-            <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+            <div className="space-y-4">
+              <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
+                <ScreenHeader
+                  eyebrow={t.rules.eyebrow}
+                  title={t.rules.heroTitle}
+                  subtitle={t.rules.heroSubtitle}
+                  titleClassName="max-w-[16ch]"
+                />
+              </section>
+              <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
               <Panel title={t.rules.title} subtitle={t.rules.subtitle}>
                 <DataForm state={ruleState} onSubmit={submitRule} submitLabel={t.rules.saveRule}>
                   <Field label={t.forms.variety} name="varietyId" fieldErrors={ruleState.fieldErrors} optionalLabel={t.common.optional}>
@@ -1694,11 +1722,21 @@ export function SaatgutApp() {
                   />
                 )}
               </Panel>
+              </div>
             </div>
           ) : null}
 
           {view === "plantings" ? (
-            <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+            <div className="space-y-4">
+              <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
+                <ScreenHeader
+                  eyebrow={t.plantings.eyebrow}
+                  title={t.plantings.heroTitle}
+                  subtitle={t.plantings.heroSubtitle}
+                  titleClassName="max-w-[16ch]"
+                />
+              </section>
+              <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
               <Panel title={t.plantings.title} subtitle={t.plantings.subtitle}>
                 <DataForm state={plantingState} onSubmit={submitPlanting} submitLabel={t.plantings.savePlanting}>
                   <Field label={t.forms.variety} name="varietyId" fieldErrors={plantingState.fieldErrors} optionalLabel={t.common.optional}>
@@ -1866,11 +1904,50 @@ export function SaatgutApp() {
                   />
                 )}
               </Panel>
+              </div>
             </div>
           ) : null}
         </section>
       </div>
     </main>
+  );
+}
+
+function ScreenHeader({
+  eyebrow,
+  title,
+  subtitle,
+  supportingCopy,
+  titleClassName,
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  supportingCopy?: string;
+  titleClassName?: string;
+}) {
+  return (
+    <div>
+      <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--accent-strong)]">
+        {eyebrow}
+      </p>
+      <h2
+        className={classNames(
+          "mt-2 max-w-[15ch] text-3xl font-semibold tracking-tight text-balance md:text-4xl",
+          titleClassName,
+        )}
+      >
+        {title}
+      </h2>
+      <p className="mt-2 max-w-[34rem] text-base leading-7 text-[color:rgba(24,49,40,0.82)] md:text-lg">
+        {subtitle}
+      </p>
+      {supportingCopy ? (
+        <p className="mt-3 max-w-[38rem] text-sm leading-6 text-[color:rgba(24,49,40,0.68)] md:text-base">
+          {supportingCopy}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -1886,8 +1963,8 @@ function Panel({
   return (
     <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
       <div className="mb-5">
-        <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
-        <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{subtitle}</p>
+        <h2 className="max-w-[20ch] text-xl font-semibold tracking-tight text-balance md:text-2xl">{title}</h2>
+        <p className="mt-2 max-w-[40rem] text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{subtitle}</p>
       </div>
       {children}
     </section>
