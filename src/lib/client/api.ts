@@ -8,6 +8,7 @@ import type {
   GerminationTest,
   JournalEntry,
   Membership,
+  PasskeyCredential,
   PlantingEvent,
   ReminderTask,
   SeedBatch,
@@ -99,6 +100,33 @@ export function loginUser(input: { email: string; password: string }) {
   });
 }
 
+export function beginPasskeySignup(input: { email: string; workspaceName?: string }) {
+  return request<{ options: unknown }>("/api/v1/auth/passkeys/register/options", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function completePasskeySignup(input: { response: unknown }) {
+  return request<{ user: User; membership: Membership }>("/api/v1/auth/passkeys/register/verify", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function beginPasskeyLogin() {
+  return request<{ options: unknown }>("/api/v1/auth/passkeys/login/options", {
+    method: "POST",
+  });
+}
+
+export function completePasskeyLogin(input: { response: unknown }) {
+  return request<{ user: User; membership: Membership }>("/api/v1/auth/passkeys/login/verify", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export function logoutUser() {
   return request<{ ok: true }>("/api/v1/auth/session", { method: "DELETE" });
 }
@@ -108,6 +136,19 @@ export function changeUserPassword(input: {
   newPassword: string;
 }) {
   return request<{ user: User }>("/api/v1/auth/password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function beginPasskeyEnrollment() {
+  return request<{ options: unknown }>("/api/v1/auth/passkeys/enroll/options", {
+    method: "POST",
+  });
+}
+
+export function completePasskeyEnrollment(input: { response: unknown }) {
+  return request<{ passkey: PasskeyCredential }>("/api/v1/auth/passkeys/enroll/verify", {
     method: "POST",
     body: JSON.stringify(input),
   });

@@ -61,6 +61,11 @@ const de = {
     OWNER_ROLE_UPDATE_BLOCKED: "Die Inhaberrolle kann hier nicht geändert werden.",
     SELF_REMOVAL_BLOCKED: "Du kannst Deinen eigenen Arbeitsbereichszugang hier nicht entfernen.",
     OWNER_REMOVAL_BLOCKED: "Inhaber:innen können über diese Oberfläche nicht entfernt werden.",
+    EMAIL_IN_USE: "Für diese E-Mail-Adresse gibt es bereits einen Zugang.",
+    PASSKEY_CEREMONY_MISSING: "Der Passkey-Vorgang ist abgelaufen. Bitte starte ihn noch einmal.",
+    PASSKEY_ALREADY_REGISTERED: "Dieser Passkey ist bereits mit einem Konto verbunden.",
+    INVALID_PASSKEY: "Die Passkey-Anmeldung konnte nicht bestätigt werden.",
+    NO_WORKSPACE: "Für dieses Konto wurde kein Arbeitsbereich gefunden.",
   },
   statuses: {
     sessionLoadFailed: "Die Sitzung konnte nicht geladen werden.",
@@ -84,6 +89,7 @@ const de = {
     stockCorrectionApplied: "Bestandskorrektur übernommen.",
     stockReversalApplied: "Korrekturstorno übernommen.",
     passwordChanged: "Passwort aktualisiert.",
+    passkeyEnrolled: "Passkey hinzugefügt.",
     workspaceInviteCreated: "Einladung erstellt.",
     workspaceMemberUpdated: "Mitgliedsrolle aktualisiert.",
     workspaceMemberRemoved: "Mitglied entfernt.",
@@ -102,6 +108,17 @@ const de = {
     email: "E-Mail",
     password: "Passwort",
     workspaceName: "Name des Arbeitsbereichs",
+    passkeyPrimaryRegister: "Mit Passkey Arbeitsbereich anlegen",
+    passkeyPrimaryLogin: "Mit Passkey anmelden",
+    passkeyDivider: "oder mit E-Mail und Passwort",
+    passkeyRegisterHint:
+      "Der Passkey wird direkt auf diesem Gerät oder in Deinem Passwortmanager angelegt und ersetzt das erste Passwort nicht automatisch.",
+    passkeyLoginHint:
+      "Nutze einen vorhandenen Passkey, wenn Du Dich ohne Passwort an diesem Gerät oder über Deinen Passwortmanager anmelden willst.",
+    passkeyUnavailable:
+      "Passkeys werden auf diesem Gerät oder in diesem Browser gerade nicht unterstützt.",
+    passkeyReadyLabel: "Passkey bereit",
+    passkeyDeviceReadyLabel: "Geräte-Passkey verfügbar",
     createWorkspace: "Arbeitsbereich anlegen",
     creatingWorkspace: "Arbeitsbereich wird angelegt…",
     signIn: "Anmelden",
@@ -292,6 +309,22 @@ const de = {
     confirmPassword: "Neues Passwort bestätigen",
     passwordHint: "Das neue Passwort muss mindestens acht Zeichen lang sein.",
     changePassword: "Passwort aktualisieren",
+    passkeysTitle: "Passkeys hinzufügen",
+    passkeysSubtitle:
+      "Lege zusätzliche Passkeys für schnelle Anmeldungen auf diesem Gerät oder in Deinem Passwortmanager an.",
+    passkeysAction: "Passkey hinzufügen",
+    passkeysAdding: "Passkey wird hinzugefügt…",
+    passkeysHint:
+      "Die aktuelle Backend-Version unterstützt das Hinzufügen neuer Passkeys. Eine vollständige Liste oder das Entfernen einzelner Passkeys folgt erst mit einem eigenen Verwaltungsvertrag.",
+    passkeysReady: "Dieses Gerät kann Passkeys verwenden.",
+    passkeysNotReady: "Auf diesem Gerät ist gerade keine Passkey-Erstellung verfügbar.",
+    latestPasskeyTitle: "Zuletzt hinzugefügter Passkey",
+    latestPasskeySubtitle:
+      "Diese Angaben stammen aus der letzten erfolgreichen Passkey-Einrichtung in dieser Sitzung.",
+    lastUsed: "Zuletzt verwendet",
+    createdAt: "Hinzugefügt",
+    deviceType: "Gerätetyp",
+    backedUp: "Synchronisiert",
     inviteTitle: "Mitgärtner:in einladen",
     inviteSubtitle:
       "Verschicke einen Zugang für diesen Arbeitsbereich. Die Einladung kann Mitglied- oder Lesezugriff vergeben.",
@@ -633,6 +666,11 @@ const en: AppMessages = {
     OWNER_ROLE_UPDATE_BLOCKED: "Workspace ownership cannot be changed here.",
     SELF_REMOVAL_BLOCKED: "You cannot remove your own workspace access here.",
     OWNER_REMOVAL_BLOCKED: "Workspace owners cannot be removed here.",
+    EMAIL_IN_USE: "An account already exists for this email address.",
+    PASSKEY_CEREMONY_MISSING: "The passkey flow expired. Start it again.",
+    PASSKEY_ALREADY_REGISTERED: "That passkey is already connected to an account.",
+    INVALID_PASSKEY: "The passkey sign-in could not be verified.",
+    NO_WORKSPACE: "No workspace was found for this account.",
   },
   statuses: {
     sessionLoadFailed: "Failed to load session.",
@@ -656,6 +694,7 @@ const en: AppMessages = {
     stockCorrectionApplied: "Stock correction applied.",
     stockReversalApplied: "Correction reversal applied.",
     passwordChanged: "Password updated.",
+    passkeyEnrolled: "Passkey added.",
     workspaceInviteCreated: "Invite created.",
     workspaceMemberUpdated: "Member role updated.",
     workspaceMemberRemoved: "Member removed.",
@@ -674,6 +713,17 @@ const en: AppMessages = {
     email: "Email",
     password: "Password",
     workspaceName: "Workspace name",
+    passkeyPrimaryRegister: "Create workspace with passkey",
+    passkeyPrimaryLogin: "Sign in with passkey",
+    passkeyDivider: "or use email and password",
+    passkeyRegisterHint:
+      "Create a passkey on this device or in your password manager first. It does not automatically replace password sign-in for every browser yet.",
+    passkeyLoginHint:
+      "Use an existing passkey to sign in without typing your password on this device or through your password manager.",
+    passkeyUnavailable:
+      "Passkeys are not currently available in this browser or on this device.",
+    passkeyReadyLabel: "Passkey ready",
+    passkeyDeviceReadyLabel: "Device passkey available",
     createWorkspace: "Create workspace",
     creatingWorkspace: "Creating workspace…",
     signIn: "Sign in",
@@ -864,6 +914,22 @@ const en: AppMessages = {
     confirmPassword: "Confirm new password",
     passwordHint: "Your new password must be at least eight characters long.",
     changePassword: "Update password",
+    passkeysTitle: "Add passkeys",
+    passkeysSubtitle:
+      "Create additional passkeys for faster sign-in on this device or through your password manager.",
+    passkeysAction: "Add passkey",
+    passkeysAdding: "Adding passkey…",
+    passkeysHint:
+      "The current backend contract supports adding new passkeys. A full list and per-passkey removal will follow in a later management contract.",
+    passkeysReady: "This device can create and use passkeys.",
+    passkeysNotReady: "Passkey creation is not currently available on this device.",
+    latestPasskeyTitle: "Most recently added passkey",
+    latestPasskeySubtitle:
+      "These details reflect the latest successful passkey enrollment in this session.",
+    lastUsed: "Last used",
+    createdAt: "Added",
+    deviceType: "Device type",
+    backedUp: "Backed up",
     inviteTitle: "Invite a collaborator",
     inviteSubtitle:
       "Create access for this workspace. Invites can grant member or read-only access.",

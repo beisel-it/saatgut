@@ -2,12 +2,28 @@
 
 import Image from "next/image";
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
+import {
+  browserSupportsWebAuthn,
+  platformAuthenticatorIsAvailable,
+  startAuthentication,
+  startRegistration,
+  type AuthenticationResponseJSON,
+  type PublicKeyCredentialCreationOptionsJSON,
+  type PublicKeyCredentialRequestOptionsJSON,
+  type RegistrationResponseJSON,
+} from "@simplewebauthn/browser";
 
 import { useI18n } from "@/components/i18n-provider";
 import {
   adjustSeedBatchStock,
   ApiClientError,
+  beginPasskeyEnrollment,
+  beginPasskeyLogin,
+  beginPasskeySignup,
   changeUserPassword,
+  completePasskeyEnrollment,
+  completePasskeyLogin,
+  completePasskeySignup,
   createGrowingProfile,
   createGerminationTest,
   createPlantingEvent,
@@ -44,6 +60,7 @@ import type {
   CalendarItem,
   DashboardData,
   GrowingProfile,
+  PasskeyCredential,
   PlantingEvent,
   SeedBatch,
   SeedBatchTransaction,
@@ -171,6 +188,14 @@ function labelMembershipRole(value: string, t: AppMessages) {
   return t.membershipRoles[value as keyof typeof t.membershipRoles] ?? value;
 }
 
+function labelPasskeyDeviceType(value: PasskeyCredential["deviceType"], locale: Locale) {
+  if (locale === "de") {
+    return value === "MULTI_DEVICE" ? "Mehrgeräte-Passkey" : "Nur auf diesem Gerät";
+  }
+
+  return value === "MULTI_DEVICE" ? "Multi-device passkey" : "Single-device passkey";
+}
+
 function labelSpeciesCategory(value: Species["category"], t: AppMessages) {
   return t.enums.speciesCategory[value];
 }
@@ -292,6 +317,7 @@ export function SaatgutApp() {
   const [sessionLoading, setSessionLoading] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [authState, setAuthState] = useState<FormState>(initialFormState);
+  const [passkeyEnrollState, setPasskeyEnrollState] = useState<FormState>(initialFormState);
   const [packetIntakeState, setPacketIntakeState] = useState<FormState>(initialFormState);
   const [speciesState, setSpeciesState] = useState<FormState>(initialFormState);
   const [varietyState, setVarietyState] = useState<FormState>(initialFormState);
@@ -312,6 +338,9 @@ export function SaatgutApp() {
   const [authPending, startAuthTransition] = useTransition();
   const [refreshPending, startRefreshTransition] = useTransition();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [webAuthnReady, setWebAuthnReady] = useState(false);
+  const [platformPasskeyReady, setPlatformPasskeyReady] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceState, setWorkspaceState] = useState<FormState>(initialFormState);
@@ -329,6 +358,7 @@ export function SaatgutApp() {
     expiresAt: string;
     token: string;
   } | null>(null);
+  const [latestEnrolledPasskey, setLatestEnrolledPasskey] = useState<PasskeyCredential | null>(null);
 
   const [registerForm, setRegisterForm] = useState({
     email: "",
@@ -537,6 +567,39 @@ export function SaatgutApp() {
       cancelled = true;
     };
   }, [t.statuses.sessionLoadFailed]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function detectPasskeySupport() {
+      try {
+        const supported = await browserSupportsWebAuthn();
+        if (cancelled) return;
+        setWebAuthnReady(supported);
+
+        if (!supported) {
+          setPlatformPasskeyReady(false);
+          return;
+        }
+
+        const platformReady = await platformAuthenticatorIsAvailable();
+        if (!cancelled) {
+          setPlatformPasskeyReady(platformReady);
+        }
+      } catch {
+        if (!cancelled) {
+          setWebAuthnReady(false);
+          setPlatformPasskeyReady(false);
+        }
+      }
+    }
+
+    void detectPasskeySupport();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const activeProfile = useMemo(
     () => dashboard?.profiles.find((profile) => profile.isActive) ?? null,
@@ -750,6 +813,74 @@ export function SaatgutApp() {
         })
         .catch((error) => setAuthState(toFormState(error, t)));
     });
+  }
+
+  async function applyAuthenticatedSession(nextSession: SessionSnapshot) {
+    setSession(nextSession);
+    await loadDashboard();
+  }
+
+  async function handlePasskeyRegister() {
+    setAuthState(initialFormState);
+
+    if (!webAuthnReady) {
+      setAuthState({
+        error: t.auth.passkeyUnavailable,
+        success: null,
+        fieldErrors: {},
+      });
+      return;
+    }
+
+    setPasskeyBusy(true);
+
+    try {
+      const begin = await beginPasskeySignup({
+        email: registerForm.email,
+        workspaceName: registerForm.workspaceName || undefined,
+      });
+      const credential = await startRegistration({
+        optionsJSON: begin.options as PublicKeyCredentialCreationOptionsJSON,
+      });
+      const result = await completePasskeySignup({
+        response: credential satisfies RegistrationResponseJSON,
+      });
+      await applyAuthenticatedSession(result);
+    } catch (error) {
+      setAuthState(toFormState(error, t));
+    } finally {
+      setPasskeyBusy(false);
+    }
+  }
+
+  async function handlePasskeyLogin() {
+    setAuthState(initialFormState);
+
+    if (!webAuthnReady) {
+      setAuthState({
+        error: t.auth.passkeyUnavailable,
+        success: null,
+        fieldErrors: {},
+      });
+      return;
+    }
+
+    setPasskeyBusy(true);
+
+    try {
+      const begin = await beginPasskeyLogin();
+      const credential = await startAuthentication({
+        optionsJSON: begin.options as PublicKeyCredentialRequestOptionsJSON,
+      });
+      const result = await completePasskeyLogin({
+        response: credential satisfies AuthenticationResponseJSON,
+      });
+      await applyAuthenticatedSession(result);
+    } catch (error) {
+      setAuthState(toFormState(error, t));
+    } finally {
+      setPasskeyBusy(false);
+    }
   }
 
   async function handleLogout() {
@@ -1422,6 +1553,7 @@ export function SaatgutApp() {
     setWorkspaceState(initialFormState);
     setInviteState(initialFormState);
     setMemberState(initialFormState);
+    setPasskeyEnrollState(initialFormState);
     setInviteCopied(false);
     if (canManageWorkspace) {
       void loadWorkspaceCollaboration();
@@ -1508,6 +1640,41 @@ export function SaatgutApp() {
       });
     } catch (error) {
       setPasswordState(toFormState(error, t));
+    }
+  }
+
+  async function handlePasskeyEnrollment() {
+    setPasskeyEnrollState(initialFormState);
+
+    if (!webAuthnReady) {
+      setPasskeyEnrollState({
+        error: t.auth.passkeyUnavailable,
+        success: null,
+        fieldErrors: {},
+      });
+      return;
+    }
+
+    setPasskeyBusy(true);
+
+    try {
+      const begin = await beginPasskeyEnrollment();
+      const credential = await startRegistration({
+        optionsJSON: begin.options as PublicKeyCredentialCreationOptionsJSON,
+      });
+      const result = await completePasskeyEnrollment({
+        response: credential satisfies RegistrationResponseJSON,
+      });
+      setLatestEnrolledPasskey(result.passkey);
+      setPasskeyEnrollState({
+        error: null,
+        success: t.statuses.passkeyEnrolled,
+        fieldErrors: {},
+      });
+    } catch (error) {
+      setPasskeyEnrollState(toFormState(error, t));
+    } finally {
+      setPasskeyBusy(false);
     }
   }
 
@@ -1661,6 +1828,28 @@ export function SaatgutApp() {
                     }
                   />
                 </Field>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handlePasskeyRegister();
+                  }}
+                  className="w-full rounded-lg bg-white px-5 py-3 font-semibold text-[var(--foreground)] sm:w-fit"
+                  disabled={passkeyBusy}
+                >
+                  {passkeyBusy ? t.auth.creatingWorkspace : t.auth.passkeyPrimaryRegister}
+                </button>
+                <div className="grid gap-2 rounded-lg border border-white/12 bg-white/6 px-4 py-3 text-sm leading-6 text-white/72">
+                  <p>{t.auth.passkeyRegisterHint}</p>
+                  <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.18em] text-white/56">
+                    <span>{webAuthnReady ? t.auth.passkeyReadyLabel : t.auth.passkeyUnavailable}</span>
+                    {platformPasskeyReady ? <span>{t.auth.passkeyDeviceReadyLabel}</span> : null}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-xs uppercase tracking-[0.22em] text-white/44">
+                  <span className="h-px flex-1 bg-white/12" />
+                  <span>{t.auth.passkeyDivider}</span>
+                  <span className="h-px flex-1 bg-white/12" />
+                </div>
                 <Field label={t.auth.password} name="password" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional} tone="inverse">
                   <input
                     className="field-input-dark"
@@ -1684,12 +1873,34 @@ export function SaatgutApp() {
                     }
                   />
                 </Field>
-                <button className="w-full rounded-lg bg-white px-5 py-3 font-semibold text-[var(--foreground)] sm:w-fit" disabled={authPending}>
+                <button className="w-full rounded-lg border border-white/14 bg-transparent px-5 py-3 font-semibold text-white sm:w-fit" disabled={authPending}>
                   {authPending ? t.auth.creatingWorkspace : t.auth.createWorkspace}
                 </button>
               </form>
             ) : (
               <form className="mt-6 grid gap-4" onSubmit={handleLogin}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handlePasskeyLogin();
+                  }}
+                  className="w-full rounded-lg bg-white px-5 py-3 font-semibold text-[var(--foreground)] sm:w-fit"
+                  disabled={passkeyBusy}
+                >
+                  {passkeyBusy ? t.auth.signingIn : t.auth.passkeyPrimaryLogin}
+                </button>
+                <div className="grid gap-2 rounded-lg border border-white/12 bg-white/6 px-4 py-3 text-sm leading-6 text-white/72">
+                  <p>{t.auth.passkeyLoginHint}</p>
+                  <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.18em] text-white/56">
+                    <span>{webAuthnReady ? t.auth.passkeyReadyLabel : t.auth.passkeyUnavailable}</span>
+                    {platformPasskeyReady ? <span>{t.auth.passkeyDeviceReadyLabel}</span> : null}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-xs uppercase tracking-[0.22em] text-white/44">
+                  <span className="h-px flex-1 bg-white/12" />
+                  <span>{t.auth.passkeyDivider}</span>
+                  <span className="h-px flex-1 bg-white/12" />
+                </div>
                 <Field label={t.auth.email} name="email" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional} tone="inverse">
                   <input
                     className="field-input-dark"
@@ -1710,7 +1921,7 @@ export function SaatgutApp() {
                     }
                   />
                 </Field>
-                <button className="w-full rounded-lg bg-white px-5 py-3 font-semibold text-[var(--foreground)] sm:w-fit" disabled={authPending}>
+                <button className="w-full rounded-lg border border-white/14 bg-transparent px-5 py-3 font-semibold text-white sm:w-fit" disabled={authPending}>
                   {authPending ? t.auth.signingIn : t.auth.signIn}
                 </button>
               </form>
@@ -3849,6 +4060,56 @@ export function SaatgutApp() {
                       {labelMembershipRole(session.membership.role, t)} · {t.workspace.userRoleLabel}: {session.user.role}
                     </p>
                   </article>
+                </div>
+
+                <div className="mt-5 rounded-lg border border-[var(--border)] bg-white/80 p-4 md:p-5">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold tracking-tight">{t.workspace.passkeysTitle}</h3>
+                    <p className="mt-2 max-w-[44ch] text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                      {t.workspace.passkeysSubtitle}
+                    </p>
+                  </div>
+                  {passkeyEnrollState.error ? <Alert tone="danger">{passkeyEnrollState.error}</Alert> : null}
+                  {passkeyEnrollState.success ? <Alert tone="success">{passkeyEnrollState.success}</Alert> : null}
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,0.88fr)_minmax(18rem,0.72fr)]">
+                    <div className="grid gap-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handlePasskeyEnrollment();
+                        }}
+                        className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit"
+                        disabled={passkeyBusy}
+                      >
+                        {passkeyBusy ? t.workspace.passkeysAdding : t.workspace.passkeysAction}
+                      </button>
+                      <div className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                        <p>{t.workspace.passkeysHint}</p>
+                        <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.56)]">
+                          <span>{webAuthnReady ? t.workspace.passkeysReady : t.workspace.passkeysNotReady}</span>
+                          {platformPasskeyReady ? <span>{t.auth.passkeyDeviceReadyLabel}</span> : null}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4">
+                      <h4 className="text-base font-semibold tracking-tight">{t.workspace.latestPasskeyTitle}</h4>
+                      <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                        {t.workspace.latestPasskeySubtitle}
+                      </p>
+                      {latestEnrolledPasskey ? (
+                        <div className="mt-4 grid gap-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                          <p>{t.workspace.deviceType}: {labelPasskeyDeviceType(latestEnrolledPasskey.deviceType, locale)}</p>
+                          <p>{t.workspace.backedUp}: {latestEnrolledPasskey.backedUp ? t.common.yes : t.common.no}</p>
+                          <p>{t.workspace.createdAt}: {formatDate(latestEnrolledPasskey.createdAt, locale, t.common.notSet)}</p>
+                          <p>{t.workspace.lastUsed}: {formatDate(latestEnrolledPasskey.lastUsedAt, locale, t.common.notSet)}</p>
+                        </div>
+                      ) : (
+                        <p className="mt-4 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                          {t.workspace.passkeysHint}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-5 rounded-lg border border-[var(--border)] bg-white/80 p-4 md:p-5">

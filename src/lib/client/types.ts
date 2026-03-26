@@ -36,6 +36,16 @@ export type SessionSnapshot = {
   membership: Membership;
 };
 
+export type PasskeyCredential = {
+  id: string;
+  deviceType: "SINGLE_DEVICE" | "MULTI_DEVICE";
+  backedUp: boolean;
+  transports: string[];
+  lastUsedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Species = {
   id: string;
   workspaceId: string;
