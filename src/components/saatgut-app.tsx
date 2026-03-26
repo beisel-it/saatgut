@@ -200,6 +200,32 @@ function chunkArray<T>(values: T[], size: number) {
   return chunks;
 }
 
+function normalizeLookupValue(value: string | null | undefined) {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gi, " ")
+    .trim();
+}
+
+function inferPacketNames(packetLabel: string) {
+  const trimmed = packetLabel.trim();
+  const cleaned = trimmed.replace(/\s+/g, " ");
+  const parts = cleaned.split(" ").filter(Boolean);
+
+  if (parts.length === 0) {
+    return { speciesName: "", varietyName: "" };
+  }
+
+  if (parts.length === 1) {
+    return { speciesName: parts[0], varietyName: parts[0] };
+  }
+
+  const speciesName = parts[parts.length - 1];
+  const varietyName = parts.slice(0, -1).join(" ");
+
+  return { speciesName, varietyName: varietyName || cleaned };
+}
+
 export function SaatgutApp() {
   const { locale, setLocale, t } = useI18n();
   const [authMode, setAuthMode] = useState<AuthMode>("register");
@@ -209,6 +235,7 @@ export function SaatgutApp() {
   const [sessionLoading, setSessionLoading] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [authState, setAuthState] = useState<FormState>(initialFormState);
+  const [packetIntakeState, setPacketIntakeState] = useState<FormState>(initialFormState);
   const [speciesState, setSpeciesState] = useState<FormState>(initialFormState);
   const [varietyState, setVarietyState] = useState<FormState>(initialFormState);
   const [seedBatchState, setSeedBatchState] = useState<FormState>(initialFormState);
@@ -235,6 +262,15 @@ export function SaatgutApp() {
     commonName: "",
     latinName: "",
     category: "VEGETABLE" as Species["category"],
+    notes: "",
+  });
+  const [packetIntakeForm, setPacketIntakeForm] = useState({
+    packetName: "",
+    quantity: "",
+    unit: "PACKETS" as (typeof seedUnits)[number],
+    source: "",
+    harvestYear: "",
+    storageLocation: "",
     notes: "",
   });
   const [varietyForm, setVarietyForm] = useState({
@@ -646,6 +682,82 @@ export function SaatgutApp() {
       await loadDashboard();
     } catch (error) {
       setSeedBatchState(toFormState(error, t));
+    }
+  }
+
+  async function submitPacketIntake(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPacketIntakeState(initialFormState);
+
+    try {
+      const packetLabel = packetIntakeForm.packetName.trim();
+      const inferred = inferPacketNames(packetLabel);
+      const normalizedPacket = normalizeLookupValue(packetLabel);
+      const normalizedSpecies = normalizeLookupValue(inferred.speciesName);
+      const normalizedVariety = normalizeLookupValue(inferred.varietyName);
+
+      let species =
+        (dashboard?.species ?? []).find(
+          (entry) =>
+            normalizeLookupValue(entry.commonName) === normalizedSpecies ||
+            normalizeLookupValue(entry.latinName) === normalizedSpecies,
+        ) ?? null;
+
+      if (!species) {
+        species = await createSpecies({
+          commonName: inferred.speciesName || packetLabel,
+          latinName: null,
+          category: "VEGETABLE",
+          notes: null,
+        });
+      }
+
+      let variety =
+        (dashboard?.varieties ?? []).find((entry) => {
+          const synonyms = (entry.synonyms ?? []).map((synonym) => normalizeLookupValue(synonym.name));
+          return (
+            normalizeLookupValue(entry.name) === normalizedVariety ||
+            normalizeLookupValue(entry.name) === normalizedPacket ||
+            synonyms.includes(normalizedVariety) ||
+            synonyms.includes(normalizedPacket)
+          );
+        }) ?? null;
+
+      if (!variety) {
+        variety = await createVariety({
+          speciesId: species.id,
+          name: inferred.varietyName || packetLabel,
+          description: null,
+          heirloom: false,
+          tags: [],
+          notes: null,
+          synonyms: normalizedVariety !== normalizedPacket && packetLabel ? [packetLabel] : [],
+        });
+      }
+
+      await createSeedBatch({
+        varietyId: variety.id,
+        source: packetIntakeForm.source || null,
+        harvestYear: packetIntakeForm.harvestYear ? Number(packetIntakeForm.harvestYear) : null,
+        quantity: Number(packetIntakeForm.quantity),
+        unit: packetIntakeForm.unit,
+        storageLocation: packetIntakeForm.storageLocation || null,
+        notes: packetIntakeForm.notes || null,
+      });
+
+      setPacketIntakeForm({
+        packetName: "",
+        quantity: "",
+        unit: "PACKETS",
+        source: "",
+        harvestYear: "",
+        storageLocation: "",
+        notes: "",
+      });
+      setPacketIntakeState({ error: null, success: t.catalog.intakeSaved, fieldErrors: {} });
+      await loadDashboard();
+    } catch (error) {
+      setPacketIntakeState(toFormState(error, t));
     }
   }
 
@@ -1368,126 +1480,234 @@ export function SaatgutApp() {
 
                   <Panel title={t.catalog.toolsTitle} subtitle={t.catalog.toolsSubtitle}>
                     <div className="grid gap-3">
-                      <CollapsiblePanel title={t.catalog.speciesToolTitle} actionLabel={t.catalog.toolsOpen}>
-                        <DataForm state={speciesState} onSubmit={submitSpecies} submitLabel={t.catalog.saveSpecies}>
-                          <Field label={t.forms.commonName} name="commonName" fieldErrors={speciesState.fieldErrors} optionalLabel={t.common.optional}>
+                      <div className="rounded-lg border border-[var(--border)] bg-white/70 p-4">
+                        <div className="mb-4">
+                          <h3 className="max-w-[22ch] text-lg font-semibold tracking-tight">{t.catalog.intakeTitle}</h3>
+                          <p className="mt-2 max-w-[42ch] text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                            {t.catalog.intakeSubtitle}
+                          </p>
+                        </div>
+                        <DataForm state={packetIntakeState} onSubmit={submitPacketIntake} submitLabel={t.catalog.saveSeedBatch}>
+                          <Field label={t.catalog.intakePacketLabel} name="packetName" fieldErrors={packetIntakeState.fieldErrors} optionalLabel={t.common.optional}>
                             <input
                               className="field-input"
-                              value={speciesForm.commonName}
+                              value={packetIntakeForm.packetName}
                               onChange={(event) =>
-                                setSpeciesForm((current) => ({ ...current, commonName: event.target.value }))
+                                setPacketIntakeForm((current) => ({ ...current, packetName: event.target.value }))
                               }
+                              placeholder={t.catalog.intakePacketPlaceholder}
                             />
                           </Field>
-                          <Field label={t.forms.latinName} name="latinName" fieldErrors={speciesState.fieldErrors} optional optionalLabel={t.common.optional}>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <Field label={t.forms.quantity} name="quantity" fieldErrors={packetIntakeState.fieldErrors} optionalLabel={t.common.optional}>
+                              <input
+                                className="field-input"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={packetIntakeForm.quantity}
+                                onChange={(event) =>
+                                  setPacketIntakeForm((current) => ({ ...current, quantity: event.target.value }))
+                                }
+                              />
+                            </Field>
+                            <Field label={t.forms.unit} name="unit" fieldErrors={packetIntakeState.fieldErrors} optionalLabel={t.common.optional}>
+                              <select
+                                className="field-input"
+                                value={packetIntakeForm.unit}
+                                onChange={(event) =>
+                                  setPacketIntakeForm((current) => ({
+                                    ...current,
+                                    unit: event.target.value as (typeof seedUnits)[number],
+                                  }))
+                                }
+                              >
+                                {seedUnits.map((unit) => (
+                                  <option key={unit} value={unit}>
+                                    {labelSeedUnit(unit, t)}
+                                  </option>
+                                ))}
+                              </select>
+                            </Field>
+                          </div>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <Field label={t.forms.source} name="source" fieldErrors={packetIntakeState.fieldErrors} optional optionalLabel={t.common.optional}>
+                              <input
+                                className="field-input"
+                                value={packetIntakeForm.source}
+                                onChange={(event) =>
+                                  setPacketIntakeForm((current) => ({ ...current, source: event.target.value }))
+                                }
+                                placeholder={t.catalog.intakeSourcePlaceholder}
+                              />
+                            </Field>
+                            <Field label={t.forms.harvestYear} name="harvestYear" fieldErrors={packetIntakeState.fieldErrors} optional optionalLabel={t.common.optional}>
+                              <input
+                                className="field-input"
+                                type="number"
+                                min="1900"
+                                max="2100"
+                                value={packetIntakeForm.harvestYear}
+                                onChange={(event) =>
+                                  setPacketIntakeForm((current) => ({ ...current, harvestYear: event.target.value }))
+                                }
+                              />
+                            </Field>
+                          </div>
+                          <Field label={t.forms.storageLocation} name="storageLocation" fieldErrors={packetIntakeState.fieldErrors} optional optionalLabel={t.common.optional}>
                             <input
                               className="field-input"
-                              value={speciesForm.latinName}
+                              value={packetIntakeForm.storageLocation}
                               onChange={(event) =>
-                                setSpeciesForm((current) => ({ ...current, latinName: event.target.value }))
-                              }
-                            />
-                          </Field>
-                          <Field label={t.forms.category} name="category" fieldErrors={speciesState.fieldErrors} optionalLabel={t.common.optional}>
-                            <select
-                              className="field-input"
-                              value={speciesForm.category}
-                              onChange={(event) =>
-                                setSpeciesForm((current) => ({
+                                setPacketIntakeForm((current) => ({
                                   ...current,
-                                  category: event.target.value as Species["category"],
+                                  storageLocation: event.target.value,
                                 }))
                               }
-                            >
-                              {speciesCategories.map((category) => (
-                                <option key={category} value={category}>
-                                  {labelSpeciesCategory(category, t)}
-                                </option>
-                              ))}
-                            </select>
+                            />
                           </Field>
-                          <Field label={t.forms.notes} name="notes" fieldErrors={speciesState.fieldErrors} optional optionalLabel={t.common.optional}>
+                          <Field label={t.forms.notes} name="notes" fieldErrors={packetIntakeState.fieldErrors} optional optionalLabel={t.common.optional}>
                             <textarea
                               className="field-input min-h-24"
-                              value={speciesForm.notes}
+                              value={packetIntakeForm.notes}
                               onChange={(event) =>
-                                setSpeciesForm((current) => ({ ...current, notes: event.target.value }))
+                                setPacketIntakeForm((current) => ({ ...current, notes: event.target.value }))
                               }
                             />
                           </Field>
+                          <p className="max-w-[44ch] text-sm leading-6 text-[color:rgba(24,49,40,0.62)]">
+                            {t.catalog.intakeCreateHint}
+                          </p>
                         </DataForm>
-                      </CollapsiblePanel>
+                      </div>
 
-                      <CollapsiblePanel title={t.catalog.varietiesToolTitle} actionLabel={t.catalog.toolsOpen}>
-                        <DataForm state={varietyState} onSubmit={submitVariety} submitLabel={t.catalog.saveVariety}>
-                          <Field label={t.forms.species} name="speciesId" fieldErrors={varietyState.fieldErrors} optionalLabel={t.common.optional}>
-                            <select
-                              className="field-input"
-                              value={varietyForm.speciesId}
-                              onChange={(event) =>
-                                setVarietyForm((current) => ({ ...current, speciesId: event.target.value }))
-                              }
-                            >
-                              <option value="">{t.common.selectSpecies}</option>
-                              {(dashboard?.species ?? []).map((species) => (
-                                <option key={species.id} value={species.id}>
-                                  {species.commonName}
-                                </option>
-                              ))}
-                            </select>
-                          </Field>
-                          <Field label={t.forms.varietyName} name="name" fieldErrors={varietyState.fieldErrors} optionalLabel={t.common.optional}>
-                            <input
-                              className="field-input"
-                              value={varietyForm.name}
-                              onChange={(event) =>
-                                setVarietyForm((current) => ({ ...current, name: event.target.value }))
-                              }
-                            />
-                          </Field>
-                          <Field label={t.forms.tags} name="tags" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
-                            <input
-                              className="field-input"
-                              value={varietyForm.tags}
-                              onChange={(event) =>
-                                setVarietyForm((current) => ({ ...current, tags: event.target.value }))
-                              }
-                              placeholder={t.forms.tagsPlaceholder}
-                            />
-                          </Field>
-                          <Field label={t.forms.synonyms} name="synonyms" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
-                            <input
-                              className="field-input"
-                              value={varietyForm.synonyms}
-                              onChange={(event) =>
-                                setVarietyForm((current) => ({ ...current, synonyms: event.target.value }))
-                              }
-                              placeholder={t.forms.synonymsPlaceholder}
-                            />
-                          </Field>
-                          <label className="flex items-center gap-3 text-sm font-medium text-[var(--foreground)]">
-                            <input
-                              type="checkbox"
-                              checked={varietyForm.heirloom}
-                              onChange={(event) =>
-                                setVarietyForm((current) => ({ ...current, heirloom: event.target.checked }))
-                              }
-                            />
-                            {t.catalog.heirloom}
-                          </label>
-                          <Field label={t.forms.description} name="description" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
-                            <textarea
-                              className="field-input min-h-24"
-                              value={varietyForm.description}
-                              onChange={(event) =>
-                                setVarietyForm((current) => ({ ...current, description: event.target.value }))
-                              }
-                            />
-                          </Field>
-                        </DataForm>
-                      </CollapsiblePanel>
+                      <CollapsiblePanel title={t.catalog.intakeAdvancedTitle} actionLabel={t.catalog.advancedOpen}>
+                        <div className="mb-4">
+                          <p className="max-w-[44ch] text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                            {t.catalog.intakeAdvancedSubtitle}
+                          </p>
+                        </div>
+                        <div className="grid gap-3">
+                          <CollapsiblePanel title={t.catalog.speciesToolTitle} actionLabel={t.catalog.toolsOpen}>
+                            <DataForm state={speciesState} onSubmit={submitSpecies} submitLabel={t.catalog.saveSpecies}>
+                              <Field label={t.forms.commonName} name="commonName" fieldErrors={speciesState.fieldErrors} optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  value={speciesForm.commonName}
+                                  onChange={(event) =>
+                                    setSpeciesForm((current) => ({ ...current, commonName: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                              <Field label={t.forms.latinName} name="latinName" fieldErrors={speciesState.fieldErrors} optional optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  value={speciesForm.latinName}
+                                  onChange={(event) =>
+                                    setSpeciesForm((current) => ({ ...current, latinName: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                              <Field label={t.forms.category} name="category" fieldErrors={speciesState.fieldErrors} optionalLabel={t.common.optional}>
+                                <select
+                                  className="field-input"
+                                  value={speciesForm.category}
+                                  onChange={(event) =>
+                                    setSpeciesForm((current) => ({
+                                      ...current,
+                                      category: event.target.value as Species["category"],
+                                    }))
+                                  }
+                                >
+                                  {speciesCategories.map((category) => (
+                                    <option key={category} value={category}>
+                                      {labelSpeciesCategory(category, t)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </Field>
+                              <Field label={t.forms.notes} name="notes" fieldErrors={speciesState.fieldErrors} optional optionalLabel={t.common.optional}>
+                                <textarea
+                                  className="field-input min-h-24"
+                                  value={speciesForm.notes}
+                                  onChange={(event) =>
+                                    setSpeciesForm((current) => ({ ...current, notes: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                            </DataForm>
+                          </CollapsiblePanel>
 
-                      <CollapsiblePanel title={t.catalog.batchesToolTitle} actionLabel={t.catalog.toolsOpen}>
+                          <CollapsiblePanel title={t.catalog.varietiesToolTitle} actionLabel={t.catalog.toolsOpen}>
+                            <DataForm state={varietyState} onSubmit={submitVariety} submitLabel={t.catalog.saveVariety}>
+                              <Field label={t.forms.species} name="speciesId" fieldErrors={varietyState.fieldErrors} optionalLabel={t.common.optional}>
+                                <select
+                                  className="field-input"
+                                  value={varietyForm.speciesId}
+                                  onChange={(event) =>
+                                    setVarietyForm((current) => ({ ...current, speciesId: event.target.value }))
+                                  }
+                                >
+                                  <option value="">{t.common.selectSpecies}</option>
+                                  {(dashboard?.species ?? []).map((species) => (
+                                    <option key={species.id} value={species.id}>
+                                      {species.commonName}
+                                    </option>
+                                  ))}
+                                </select>
+                              </Field>
+                              <Field label={t.forms.varietyName} name="name" fieldErrors={varietyState.fieldErrors} optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  value={varietyForm.name}
+                                  onChange={(event) =>
+                                    setVarietyForm((current) => ({ ...current, name: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                              <Field label={t.forms.tags} name="tags" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  value={varietyForm.tags}
+                                  onChange={(event) =>
+                                    setVarietyForm((current) => ({ ...current, tags: event.target.value }))
+                                  }
+                                  placeholder={t.forms.tagsPlaceholder}
+                                />
+                              </Field>
+                              <Field label={t.forms.synonyms} name="synonyms" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  value={varietyForm.synonyms}
+                                  onChange={(event) =>
+                                    setVarietyForm((current) => ({ ...current, synonyms: event.target.value }))
+                                  }
+                                  placeholder={t.forms.synonymsPlaceholder}
+                                />
+                              </Field>
+                              <label className="flex items-center gap-3 text-sm font-medium text-[var(--foreground)]">
+                                <input
+                                  type="checkbox"
+                                  checked={varietyForm.heirloom}
+                                  onChange={(event) =>
+                                    setVarietyForm((current) => ({ ...current, heirloom: event.target.checked }))
+                                  }
+                                />
+                                {t.catalog.heirloom}
+                              </label>
+                              <Field label={t.forms.description} name="description" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
+                                <textarea
+                                  className="field-input min-h-24"
+                                  value={varietyForm.description}
+                                  onChange={(event) =>
+                                    setVarietyForm((current) => ({ ...current, description: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                            </DataForm>
+                          </CollapsiblePanel>
+
+                          <CollapsiblePanel title={t.catalog.batchesToolTitle} actionLabel={t.catalog.toolsOpen}>
                         <div className="grid gap-4">
                           <DataForm state={seedBatchState} onSubmit={submitSeedBatch} submitLabel={t.catalog.saveSeedBatch}>
                             <Field label={t.forms.variety} name="varietyId" fieldErrors={seedBatchState.fieldErrors} optionalLabel={t.common.optional}>
@@ -1778,6 +1998,8 @@ export function SaatgutApp() {
                               </button>
                             </form>
                           </div>
+                        </div>
+                          </CollapsiblePanel>
                         </div>
                       </CollapsiblePanel>
                     </div>

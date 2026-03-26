@@ -155,7 +155,20 @@ const de = {
     toolsTitle: "Katalogwerkzeuge",
     toolsSubtitle:
       "Anlegen, nachpflegen und Bestände anpassen, wenn Du aktiv etwas ändern willst.",
+    intakeTitle: "Neue Saatgutpackung erfassen",
+    intakeSubtitle:
+      "Gib einfach den Namen von der Packung ein. Die App ordnet Art, Sorte und Charge in einem Schritt zu oder legt sie an.",
+    intakePacketLabel: "Name auf der Packung",
+    intakePacketPlaceholder: "Zum Beispiel: Brandywine Tomato F1",
+    intakeSourcePlaceholder: "Zum Beispiel: Dreschflegel, Tausch, eigener Kauf",
+    intakeCreateHint:
+      "Vorhandene Arten und Sorten werden wiederverwendet, wenn der Name dazu passt. Sonst wird der fehlende Teil automatisch angelegt.",
+    intakeAdvancedTitle: "Erweiterte Pflege",
+    intakeAdvancedSubtitle:
+      "Nur öffnen, wenn Du Arten, Sorten oder Chargen bewusst getrennt pflegen willst.",
+    intakeSaved: "Saatgutpackung erfasst.",
     toolsOpen: "Öffnen",
+    advancedOpen: "Erweitert",
     speciesToolTitle: "Arten anlegen",
     varietiesToolTitle: "Sorten anlegen",
     batchesToolTitle: "Chargen pflegen",
@@ -600,7 +613,20 @@ const en: AppMessages = {
     toolsTitle: "Catalog tools",
     toolsSubtitle:
       "Create, maintain, and adjust stock only when you need to change something.",
+    intakeTitle: "Add a newly bought seed packet",
+    intakeSubtitle:
+      "Enter the name from the packet and the app will link or create the species, variety, and batch in one guided step.",
+    intakePacketLabel: "Packet name",
+    intakePacketPlaceholder: "For example: Brandywine Tomato F1",
+    intakeSourcePlaceholder: "For example: local nursery, swap, shop order",
+    intakeCreateHint:
+      "Existing species and varieties are reused when the name fits. Missing parts are created automatically.",
+    intakeAdvancedTitle: "Advanced maintenance",
+    intakeAdvancedSubtitle:
+      "Open this only when you intentionally want to manage species, varieties, or batches separately.",
+    intakeSaved: "Seed packet added.",
     toolsOpen: "Open",
+    advancedOpen: "Advanced",
     speciesToolTitle: "Add species",
     varietiesToolTitle: "Add varieties",
     batchesToolTitle: "Manage batches",
