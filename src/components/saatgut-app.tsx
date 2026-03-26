@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 
+import { useI18n } from "@/components/i18n-provider";
 import {
   adjustSeedBatchStock,
   ApiClientError,
@@ -20,6 +21,7 @@ import {
   updateProfilePhenology,
   upsertCultivationRule,
 } from "@/lib/client/api";
+import { getIntlLocale, type AppMessages, type Locale } from "@/lib/i18n";
 import type {
   CalendarItem,
   DashboardData,
@@ -67,43 +69,15 @@ const speciesCategories: Species["category"][] = [
 
 const seedUnits = ["SEEDS", "PACKETS", "GRAMS"] as const;
 const plantingTypes = ["SOW_INDOORS", "SOW_OUTDOORS", "TRANSPLANT", "HARVEST"] as const;
-const phenologyStages: Array<{ id: string; label: string; hint: string }> = [
-  {
-    id: "late-winter",
-    label: "Late winter",
-    hint: "Use when the season still behaves like winter and protection-first planning matters.",
-  },
-  {
-    id: "first-spring",
-    label: "First spring",
-    hint: "Early flowering signals and soil wake-up. Good for cautious ramp-up.",
-  },
-  {
-    id: "full-spring",
-    label: "Full spring",
-    hint: "Growth is reliable and sowing windows usually widen quickly.",
-  },
-  {
-    id: "early-summer",
-    label: "Early summer",
-    hint: "Transplanting and first harvests overlap. Watch water stress.",
-  },
-  {
-    id: "high-summer",
-    label: "High summer",
-    hint: "Peak growth and harvest period. Storage and succession timing matter most.",
-  },
-  {
-    id: "late-summer",
-    label: "Late summer",
-    hint: "Seed saving and autumn succession decisions become more important.",
-  },
-  {
-    id: "early-autumn",
-    label: "Early autumn",
-    hint: "Shift attention to final harvests, seed cleanup, and storage checks.",
-  },
-];
+const phenologyStageIds = [
+  "late-winter",
+  "first-spring",
+  "full-spring",
+  "early-summer",
+  "high-summer",
+  "late-summer",
+  "early-autumn",
+] as const;
 
 function classNames(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -113,54 +87,66 @@ function toIsoDate(dateValue: string) {
   return new Date(`${dateValue}T00:00:00.000Z`).toISOString();
 }
 
-function formatDate(value: string | null) {
-  if (!value) return "Not set";
-  return new Intl.DateTimeFormat("en", {
+function formatDate(value: string | null, locale: Locale, fallback: string) {
+  if (!value) return fallback;
+  return new Intl.DateTimeFormat(getIntlLocale(locale), {
     month: "short",
     day: "numeric",
     year: "numeric",
   }).format(new Date(value));
 }
 
-function formatCalendarDate(item: CalendarItem) {
-  if (item.kind === "window") return formatDate(item.recommendedDate);
-  if (item.kind === "recorded") return formatDate(item.date);
-  return formatDate(item.dateStart);
+function formatCalendarDate(item: CalendarItem, locale: Locale, fallback: string) {
+  if (item.kind === "window") return formatDate(item.recommendedDate, locale, fallback);
+  if (item.kind === "recorded") return formatDate(item.date, locale, fallback);
+  return formatDate(item.dateStart, locale, fallback);
 }
 
-function labelPlantingType(value: string) {
-  return value
-    .toLowerCase()
-    .split("_")
-    .map((part) => part[0]?.toUpperCase() + part.slice(1))
-    .join(" ");
+function labelPlantingType(value: string, t: AppMessages) {
+  return t.enums.plantingType[value as keyof typeof t.enums.plantingType] ?? value;
 }
 
-function summarizeCalendarItem(item: CalendarItem) {
+function labelMembershipRole(value: string, t: AppMessages) {
+  return t.membershipRoles[value as keyof typeof t.membershipRoles] ?? value;
+}
+
+function labelSpeciesCategory(value: Species["category"], t: AppMessages) {
+  return t.enums.speciesCategory[value];
+}
+
+function labelSeedUnit(value: (typeof seedUnits)[number], t: AppMessages) {
+  return t.enums.seedUnit[value];
+}
+
+function getWarningTitle(code: string, fallback: string, t: AppMessages) {
+  return t.warningTitles[code as keyof typeof t.warningTitles] ?? fallback;
+}
+
+function summarizeCalendarItem(item: CalendarItem, locale: Locale, t: AppMessages) {
   if (item.kind === "window") {
-    return `${item.speciesName} · ${formatDate(item.windowStart)} to ${formatDate(item.windowEnd)}`;
+    return `${item.speciesName} · ${formatDate(item.windowStart, locale, t.common.notSet)} ${t.calendar.rangeSeparator} ${formatDate(item.windowEnd, locale, t.common.notSet)}`;
   }
 
   if (item.kind === "recorded") {
-    return `${labelPlantingType(item.event.type)} recorded`;
+    return `${labelPlantingType(item.event.type, t)} ${t.calendar.recordedSuffix}`;
   }
 
   return item.dateEnd
-    ? `${formatDate(item.dateStart)} to ${formatDate(item.dateEnd)}`
-    : formatDate(item.dateStart);
+    ? `${formatDate(item.dateStart, locale, t.common.notSet)} ${t.calendar.rangeSeparator} ${formatDate(item.dateEnd, locale, t.common.notSet)}`
+    : formatDate(item.dateStart, locale, t.common.notSet);
 }
 
-function toFormState(error: unknown): FormState {
+function toFormState(error: unknown, t: AppMessages): FormState {
   if (error instanceof ApiClientError) {
     return {
-      error: error.message,
+      error: t.apiErrors[error.code as keyof typeof t.apiErrors] ?? error.message,
       success: null,
       fieldErrors: error.fieldErrors,
     };
   }
 
   return {
-    error: error instanceof Error ? error.message : "Something went wrong.",
+    error: error instanceof Error ? error.message : t.statuses.genericError,
     success: null,
     fieldErrors: {},
   };
@@ -173,13 +159,14 @@ function parseTags(value: string) {
     .filter(Boolean);
 }
 
-function nullableRange(start: number | null, end: number | null, suffix: string) {
-  if (start === null && end === null) return "Not defined";
-  if (start !== null && end !== null) return `${start} to ${end} ${suffix}`;
+function nullableRange(start: number | null, end: number | null, suffix: string, fallback = "") {
+  if (start === null && end === null) return fallback;
+  if (start !== null && end !== null) return `${start}–${end} ${suffix}`;
   return `${start ?? end} ${suffix}`;
 }
 
 export function SaatgutApp() {
+  const { locale, setLocale, t } = useI18n();
   const [authMode, setAuthMode] = useState<AuthMode>("register");
   const [view, setView] = useState<ViewId>("dashboard");
   const [session, setSession] = useState<SessionSnapshot | null>(null);
@@ -309,7 +296,7 @@ export function SaatgutApp() {
           setSession(null);
           setDashboard(null);
         } else {
-          setSessionError(error instanceof Error ? error.message : "Failed to load session.");
+          setSessionError(error instanceof Error ? error.message : t.statuses.sessionLoadFailed);
         }
       } finally {
         if (!cancelled) {
@@ -323,7 +310,7 @@ export function SaatgutApp() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t.statuses.sessionLoadFailed]);
 
   const activeProfile = useMemo(
     () => dashboard?.profiles.find((profile) => profile.isActive) ?? null,
@@ -370,7 +357,7 @@ export function SaatgutApp() {
           setSession(result);
           await loadDashboard();
         })
-        .catch((error) => setAuthState(toFormState(error)));
+        .catch((error) => setAuthState(toFormState(error, t)));
     });
   }
 
@@ -384,7 +371,7 @@ export function SaatgutApp() {
           setSession(result);
           await loadDashboard();
         })
-        .catch((error) => setAuthState(toFormState(error)));
+        .catch((error) => setAuthState(toFormState(error, t)));
     });
   }
 
@@ -399,7 +386,7 @@ export function SaatgutApp() {
           setView("dashboard");
         })
         .catch((error) =>
-          setSessionError(error instanceof Error ? error.message : "Failed to log out."),
+          setSessionError(error instanceof Error ? error.message : t.statuses.logoutFailed),
         );
     });
   }
@@ -421,10 +408,10 @@ export function SaatgutApp() {
         category: "VEGETABLE",
         notes: "",
       });
-      setSpeciesState({ error: null, success: "Species saved.", fieldErrors: {} });
+      setSpeciesState({ error: null, success: t.statuses.speciesSaved, fieldErrors: {} });
       await loadDashboard();
     } catch (error) {
-      setSpeciesState(toFormState(error));
+      setSpeciesState(toFormState(error, t));
     }
   }
 
@@ -451,10 +438,10 @@ export function SaatgutApp() {
         notes: "",
         synonyms: "",
       });
-      setVarietyState({ error: null, success: "Variety saved.", fieldErrors: {} });
+      setVarietyState({ error: null, success: t.statuses.varietySaved, fieldErrors: {} });
       await loadDashboard();
     } catch (error) {
-      setVarietyState(toFormState(error));
+      setVarietyState(toFormState(error, t));
     }
   }
 
@@ -481,10 +468,10 @@ export function SaatgutApp() {
         storageLocation: "",
         notes: "",
       });
-      setSeedBatchState({ error: null, success: "Seed batch saved.", fieldErrors: {} });
+      setSeedBatchState({ error: null, success: t.statuses.seedBatchSaved, fieldErrors: {} });
       await loadDashboard();
     } catch (error) {
-      setSeedBatchState(toFormState(error));
+      setSeedBatchState(toFormState(error, t));
     }
   }
 
@@ -511,10 +498,10 @@ export function SaatgutApp() {
         notes: "",
         isActive: true,
       });
-      setProfileState({ error: null, success: "Growing profile saved.", fieldErrors: {} });
+      setProfileState({ error: null, success: t.statuses.profileSaved, fieldErrors: {} });
       await loadDashboard();
     } catch (error) {
-      setProfileState(toFormState(error));
+      setProfileState(toFormState(error, t));
     }
   }
 
@@ -538,10 +525,10 @@ export function SaatgutApp() {
           ? Number(ruleForm.successionIntervalDays)
           : null,
       });
-      setRuleState({ error: null, success: "Cultivation rule saved.", fieldErrors: {} });
+      setRuleState({ error: null, success: t.statuses.cultivationRuleSaved, fieldErrors: {} });
       await loadDashboard();
     } catch (error) {
-      setRuleState(toFormState(error));
+      setRuleState(toFormState(error, t));
     }
   }
 
@@ -572,10 +559,10 @@ export function SaatgutApp() {
         locationNote: "",
         notes: "",
       });
-      setPlantingState({ error: null, success: "Planting event saved.", fieldErrors: {} });
+      setPlantingState({ error: null, success: t.statuses.plantingSaved, fieldErrors: {} });
       await loadDashboard();
     } catch (error) {
-      setPlantingState(toFormState(error));
+      setPlantingState(toFormState(error, t));
     }
   }
 
@@ -599,12 +586,12 @@ export function SaatgutApp() {
       });
       setGerminationState({
         error: null,
-        success: "Germination test logged.",
+        success: t.statuses.germinationLogged,
         fieldErrors: {},
       });
       await loadDashboard();
     } catch (error) {
-      setGerminationState(toFormState(error));
+      setGerminationState(toFormState(error, t));
     }
   }
 
@@ -628,12 +615,12 @@ export function SaatgutApp() {
       });
       setCorrectionState({
         error: null,
-        success: "Stock correction applied.",
+        success: t.statuses.stockCorrectionApplied,
         fieldErrors: {},
       });
       await loadDashboard();
     } catch (error) {
-      setCorrectionState(toFormState(error));
+      setCorrectionState(toFormState(error, t));
     }
   }
 
@@ -654,12 +641,12 @@ export function SaatgutApp() {
       });
       setCorrectionState({
         error: null,
-        success: "Correction reversal applied.",
+        success: t.statuses.stockReversalApplied,
         fieldErrors: {},
       });
       await loadDashboard();
     } catch (error) {
-      setCorrectionState(toFormState(error));
+      setCorrectionState(toFormState(error, t));
     }
   }
 
@@ -668,9 +655,9 @@ export function SaatgutApp() {
       <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(127,155,71,0.18),transparent_30%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-6 py-10">
         <div className="mx-auto max-w-5xl rounded-[2rem] border border-[var(--border)] bg-white/70 p-10 shadow-[var(--shadow)]">
           <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--accent-strong)]">
-            Saatgut
+            {t.common.brand}
           </p>
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight">Loading your workspace…</h1>
+          <h1 className="mt-4 text-4xl font-semibold tracking-tight">{t.common.loadingWorkspace}</h1>
         </div>
       </main>
     );
@@ -682,19 +669,43 @@ export function SaatgutApp() {
         <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-8 shadow-[var(--shadow)] md:p-10">
             <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[var(--accent-strong)]">
-              Saatgut
+              {t.common.brand}
             </p>
             <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight md:text-6xl">
-              Run your seed bank, calendar, and batch quality decisions from one field-ready workspace.
+              {t.auth.heroTitle}
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-[color:rgba(24,49,40,0.78)] md:text-lg">
-              Sign in to manage varieties, storage-sensitive seed batches, frost-date planning,
-              germination checks, and stock history without returning to paper notes.
+              {t.auth.heroCopy}
             </p>
           </section>
 
           <section className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(24,49,40,0.94)] p-6 text-white shadow-[var(--shadow)] md:p-8">
-            <div className="inline-flex rounded-full bg-white/10 p-1 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="inline-flex rounded-full bg-white/10 p-1 text-sm">
+                <button
+                  type="button"
+                  className={classNames(
+                    "rounded-full px-3 py-2 transition",
+                    locale === "de" && "bg-white text-[var(--foreground)]",
+                  )}
+                  onClick={() => setLocale("de")}
+                >
+                  {t.locale.de}
+                </button>
+                <button
+                  type="button"
+                  className={classNames(
+                    "rounded-full px-3 py-2 transition",
+                    locale === "en" && "bg-white text-[var(--foreground)]",
+                  )}
+                  onClick={() => setLocale("en")}
+                >
+                  {t.locale.en}
+                </button>
+              </div>
+              <span className="text-xs uppercase tracking-[0.24em] text-white/60">{t.locale.switchLabel}</span>
+            </div>
+            <div className="mt-6 inline-flex rounded-full bg-white/10 p-1 text-sm">
               <button
                 type="button"
                 className={classNames(
@@ -706,7 +717,7 @@ export function SaatgutApp() {
                   setAuthState(initialFormState);
                 }}
               >
-                Create workspace
+                {t.auth.createWorkspaceTab}
               </button>
               <button
                 type="button"
@@ -719,13 +730,13 @@ export function SaatgutApp() {
                   setAuthState(initialFormState);
                 }}
               >
-                Sign in
+                {t.auth.signInTab}
               </button>
             </div>
 
             <div className="mt-6">
               <h2 className="text-2xl font-semibold">
-                {authMode === "register" ? "Set up your garden workspace" : "Return to your workspace"}
+                {authMode === "register" ? t.auth.registerTitle : t.auth.loginTitle}
               </h2>
             </div>
 
@@ -734,7 +745,7 @@ export function SaatgutApp() {
 
             {authMode === "register" ? (
               <form className="mt-6 grid gap-4" onSubmit={handleRegister}>
-                <Field label="Email" name="email" fieldErrors={authState.fieldErrors}>
+                <Field label={t.auth.email} name="email" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional}>
                   <input
                     className="field-input-dark"
                     type="email"
@@ -744,7 +755,7 @@ export function SaatgutApp() {
                     }
                   />
                 </Field>
-                <Field label="Password" name="password" fieldErrors={authState.fieldErrors}>
+                <Field label={t.auth.password} name="password" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional}>
                   <input
                     className="field-input-dark"
                     type="password"
@@ -754,7 +765,7 @@ export function SaatgutApp() {
                     }
                   />
                 </Field>
-                <Field label="Workspace name" name="workspaceName" fieldErrors={authState.fieldErrors} optional>
+                <Field label={t.auth.workspaceName} name="workspaceName" fieldErrors={authState.fieldErrors} optional optionalLabel={t.common.optional}>
                   <input
                     className="field-input-dark"
                     type="text"
@@ -768,12 +779,12 @@ export function SaatgutApp() {
                   />
                 </Field>
                 <button className="rounded-full bg-white px-5 py-3 font-semibold text-[var(--foreground)]" disabled={authPending}>
-                  {authPending ? "Creating workspace…" : "Create workspace"}
+                  {authPending ? t.auth.creatingWorkspace : t.auth.createWorkspace}
                 </button>
               </form>
             ) : (
               <form className="mt-6 grid gap-4" onSubmit={handleLogin}>
-                <Field label="Email" name="email" fieldErrors={authState.fieldErrors}>
+                <Field label={t.auth.email} name="email" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional}>
                   <input
                     className="field-input-dark"
                     type="email"
@@ -783,7 +794,7 @@ export function SaatgutApp() {
                     }
                   />
                 </Field>
-                <Field label="Password" name="password" fieldErrors={authState.fieldErrors}>
+                <Field label={t.auth.password} name="password" fieldErrors={authState.fieldErrors} optionalLabel={t.common.optional}>
                   <input
                     className="field-input-dark"
                     type="password"
@@ -794,7 +805,7 @@ export function SaatgutApp() {
                   />
                 </Field>
                 <button className="rounded-full bg-white px-5 py-3 font-semibold text-[var(--foreground)]" disabled={authPending}>
-                  {authPending ? "Signing in…" : "Sign in"}
+                  {authPending ? t.auth.signingIn : t.auth.signIn}
                 </button>
               </form>
             )}
@@ -805,12 +816,12 @@ export function SaatgutApp() {
   }
 
   const dashboardStats = [
-    { label: "Species", value: dashboard?.species.length ?? 0 },
-    { label: "Varieties", value: dashboard?.varieties.length ?? 0 },
-    { label: "Seed batches", value: dashboard?.seedBatches.length ?? 0 },
-    { label: "14-day items", value: dashboard?.calendar.length ?? 0 },
+    { label: t.stats.species, value: dashboard?.species.length ?? 0 },
+    { label: t.stats.varieties, value: dashboard?.varieties.length ?? 0 },
+    { label: t.stats.seedBatches, value: dashboard?.seedBatches.length ?? 0 },
+    { label: t.stats.items14Days, value: dashboard?.calendar.length ?? 0 },
     {
-      label: "Quality signals",
+      label: t.stats.qualitySignals,
       value: (dashboard?.seedBatches ?? []).reduce(
         (sum, seedBatch) =>
           sum +
@@ -819,26 +830,26 @@ export function SaatgutApp() {
         0,
       ),
     },
-    { label: "Critical storage flags", value: criticalBatchCount },
+    { label: t.stats.criticalStorageFlags, value: criticalBatchCount },
   ];
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(127,155,71,0.18),transparent_28%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-4 py-4 md:px-6 md:py-6">
       <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="rounded-[2rem] border border-[var(--border)] bg-[color:rgba(24,49,40,0.96)] p-5 text-white shadow-[var(--shadow)]">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-white/65">Saatgut</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-white/65">{t.common.brand}</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight">{session.membership.workspace.name}</h1>
           <p className="mt-2 text-sm text-white/70">
-            {session.user.email} · {session.membership.role.toLowerCase()}
+            {session.user.email} · {labelMembershipRole(session.membership.role, t)}
           </p>
 
           <nav className="mt-8 grid gap-2">
             {[
-              ["dashboard", "Dashboard"],
-              ["catalog", "Catalog"],
-              ["profiles", "Profiles"],
-              ["rules", "Rules"],
-              ["plantings", "Plantings"],
+              ["dashboard", t.nav.dashboard],
+              ["catalog", t.nav.catalog],
+              ["profiles", t.nav.profiles],
+              ["rules", t.nav.rules],
+              ["plantings", t.nav.plantings],
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -855,12 +866,12 @@ export function SaatgutApp() {
           </nav>
 
           <div className="mt-8 rounded-[1.5rem] border border-white/10 bg-white/6 p-4">
-            <p className="text-xs uppercase tracking-[0.24em] text-white/55">Active profile</p>
-            <p className="mt-2 text-lg font-semibold">{activeProfile ? activeProfile.name : "None selected"}</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-white/55">{t.dashboard.activeProfile}</p>
+            <p className="mt-2 text-lg font-semibold">{activeProfile ? activeProfile.name : t.dashboard.noActiveProfile}</p>
             <p className="mt-1 text-sm text-white/68">
               {activeProfile
-                ? `Last frost ${formatDate(activeProfile.lastFrostDate)}`
-                : "Create an active profile to unlock the calendar."}
+                ? `${t.dashboard.lastFrost} ${formatDate(activeProfile.lastFrostDate, locale, t.common.notSet)}`
+                : t.dashboard.createActiveProfile}
             </p>
           </div>
 
@@ -870,7 +881,7 @@ export function SaatgutApp() {
             className="mt-8 w-full rounded-full border border-white/14 px-4 py-3 text-sm font-semibold text-white/88"
             disabled={authPending}
           >
-            {authPending ? "Signing out…" : "Sign out"}
+            {authPending ? t.common.signingOut : t.common.signOut}
           </button>
         </aside>
 
@@ -879,10 +890,10 @@ export function SaatgutApp() {
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[var(--accent-strong)]">
-                  Batch care and planning follow-up
+                  {t.dashboard.heroEyebrow}
                 </p>
                 <h2 className="mt-2 text-3xl font-semibold tracking-tight md:text-5xl">
-                  Use journal-backed quality signals, correction logs, and profile guidance without leaving the workspace.
+                  {t.dashboard.heroTitle}
                 </h2>
               </div>
               <button
@@ -890,14 +901,14 @@ export function SaatgutApp() {
                 onClick={() =>
                   startRefreshTransition(() => {
                     void loadDashboard().catch((error) => {
-                      setSessionError(error instanceof Error ? error.message : "Failed to refresh data.");
+                      setSessionError(error instanceof Error ? error.message : t.statuses.refreshFailed);
                     });
                   })
                 }
                 className="rounded-full border border-[var(--border)] bg-white px-5 py-3 text-sm font-semibold"
                 disabled={refreshPending}
               >
-                {refreshPending ? "Refreshing…" : "Refresh workspace"}
+                {refreshPending ? t.common.refreshing : t.common.refreshWorkspace}
               </button>
             </div>
 
@@ -920,7 +931,7 @@ export function SaatgutApp() {
 
           {view === "dashboard" ? (
             <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-              <Panel title="14-day calendar" subtitle="Upcoming windows, recorded work, and harvest estimates.">
+              <Panel title={t.dashboard.calendarTitle} subtitle={t.dashboard.calendarSubtitle}>
                 {dashboard?.calendar.length ? (
                   <div className="grid gap-3">
                     {dashboard.calendar.map((item, index) => (
@@ -931,36 +942,36 @@ export function SaatgutApp() {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
-                              {item.kind}
+                              {t.dashboard.kind[item.kind]}
                             </p>
                             <h3 className="mt-1 text-lg font-semibold">
                               {item.kind === "window"
-                                ? `${item.label} · ${item.varietyName}`
+                                ? `${t.calendar.windowLabel[item.type]} · ${item.varietyName}`
                                 : item.kind === "recorded"
-                                  ? `${labelPlantingType(item.event.type)} · ${item.varietyName}`
-                                  : `${item.label} · ${item.varietyName}`}
+                                  ? `${labelPlantingType(item.event.type, t)} · ${item.varietyName}`
+                                  : `${t.calendar.windowLabel[item.type]} · ${item.varietyName}`}
                             </h3>
                           </div>
                           <p className="rounded-full bg-white px-3 py-1 text-sm font-medium">
-                            {formatCalendarDate(item)}
+                            {formatCalendarDate(item, locale, t.common.notSet)}
                           </p>
                         </div>
                         <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
-                          {summarizeCalendarItem(item)}
+                          {summarizeCalendarItem(item, locale, t)}
                         </p>
                       </article>
                     ))}
                   </div>
                 ) : (
                   <EmptyState
-                    title="No calendar items yet"
-                    copy="Add an active growing profile and cultivation rules to calculate the next 14 days."
+                    title={t.dashboard.noCalendarTitle}
+                    copy={t.dashboard.noCalendarCopy}
                   />
                 )}
               </Panel>
 
               <div className="space-y-4">
-                <Panel title="Seed quality watch" subtitle="Client-side warnings from batch age, storage notes, and journal history.">
+                <Panel title={t.dashboard.seedQualityTitle} subtitle={t.dashboard.seedQualitySubtitle}>
                   {dashboard?.seedBatches.length ? (
                     <div className="grid gap-3">
                       {dashboard.seedBatches.slice(0, 5).map((seedBatch) => {
@@ -973,15 +984,15 @@ export function SaatgutApp() {
                             className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
                           >
                             <div className="flex items-center justify-between gap-3">
-                              <h3 className="text-base font-semibold">{variety?.name ?? "Unknown variety"}</h3>
+                              <h3 className="text-base font-semibold">{variety?.name ?? t.common.unknownVariety}</h3>
                               <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
-                                {warnings.filter((warning) => warning.level !== "info").length} flags
+                                {warnings.filter((warning) => warning.level !== "info").length} {t.dashboard.flags}
                               </span>
                             </div>
                             <div className="mt-3 grid gap-2">
                               {warnings.slice(0, 2).map((warning) => (
                                 <WarningPill key={warning.title} level={warning.level}>
-                                  {warning.title}
+                                  {getWarningTitle(warning.code, warning.title, t)}
                                 </WarningPill>
                               ))}
                             </div>
@@ -990,11 +1001,11 @@ export function SaatgutApp() {
                       })}
                     </div>
                   ) : (
-                    <EmptyState title="No batch warnings yet" copy="Create seed batches to surface quality and storage insights." />
+                    <EmptyState title={t.dashboard.noBatchWarningsTitle} copy={t.dashboard.noBatchWarningsCopy} />
                   )}
                 </Panel>
 
-                <Panel title="Batch signals" subtitle="Latest germination tests and stock adjustment notes from the explicit seed-quality contract.">
+                <Panel title={t.dashboard.batchSignalsTitle} subtitle={t.dashboard.batchSignalsSubtitle}>
                   {dashboard?.seedBatches.some(
                     (seedBatch) =>
                       (seedBatch.germinationTests?.length ?? 0) > 0 ||
@@ -1005,16 +1016,16 @@ export function SaatgutApp() {
                         .flatMap((seedBatch) => [
                           ...(seedBatch.germinationTests ?? []).slice(0, 1).map((test) => ({
                             key: test.id,
-                            title: `Germination ${test.germinationRate ?? "?"}%`,
-                            subtitle: `${varietiesById.get(seedBatch.varietyId)?.name ?? "Batch"} · ${formatDate(test.testedAt)}`,
+                            title: `Keimung ${test.germinationRate ?? "?"}%`,
+                            subtitle: `${varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback} · ${formatDate(test.testedAt, locale, t.common.notSet)}`,
                           })),
                           ...(seedBatch.stockTransactions ?? [])
                             .filter((transaction) => transaction.type !== "INITIAL_STOCK")
                             .slice(0, 1)
                             .map((transaction) => ({
                               key: transaction.id,
-                              title: labelPlantingType(transaction.type),
-                              subtitle: `${varietiesById.get(seedBatch.varietyId)?.name ?? "Batch"} · ${formatDate(transaction.effectiveDate)}`,
+                              title: labelPlantingType(transaction.type, t),
+                              subtitle: `${varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback} · ${formatDate(transaction.effectiveDate, locale, t.common.notSet)}`,
                             })),
                         ])
                         .slice(0, 8)
@@ -1032,8 +1043,8 @@ export function SaatgutApp() {
                     </div>
                   ) : (
                     <EmptyState
-                      title="No quality journal entries"
-                      copy="Record germination tests or stock corrections to build a clearer seed history."
+                      title={t.dashboard.noQualityEntriesTitle}
+                      copy={t.dashboard.noQualityEntriesCopy}
                     />
                   )}
                 </Panel>
@@ -1044,27 +1055,27 @@ export function SaatgutApp() {
           {view === "catalog" ? (
             <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
               <div className="space-y-4">
-                <Panel title="Species" subtitle="Create the crop types your varieties belong to.">
-                  <DataForm state={speciesState} onSubmit={submitSpecies} submitLabel="Save species">
-                    <Field label="Common name" name="commonName" fieldErrors={speciesState.fieldErrors}>
+                <Panel title={t.catalog.speciesTitle} subtitle={t.catalog.speciesSubtitle}>
+                  <DataForm state={speciesState} onSubmit={submitSpecies} submitLabel={t.catalog.saveSpecies}>
+                    <Field label={t.forms.commonName} name="commonName" fieldErrors={speciesState.fieldErrors} optionalLabel={t.common.optional}>
                       <input
                         className="field-input"
                         value={speciesForm.commonName}
                         onChange={(event) =>
                           setSpeciesForm((current) => ({ ...current, commonName: event.target.value }))
                         }
-                      />
-                    </Field>
-                    <Field label="Latin name" name="latinName" fieldErrors={speciesState.fieldErrors} optional>
+                        />
+                      </Field>
+                    <Field label={t.forms.latinName} name="latinName" fieldErrors={speciesState.fieldErrors} optional optionalLabel={t.common.optional}>
                       <input
                         className="field-input"
                         value={speciesForm.latinName}
                         onChange={(event) =>
                           setSpeciesForm((current) => ({ ...current, latinName: event.target.value }))
                         }
-                      />
-                    </Field>
-                    <Field label="Category" name="category" fieldErrors={speciesState.fieldErrors}>
+                        />
+                      </Field>
+                    <Field label={t.forms.category} name="category" fieldErrors={speciesState.fieldErrors} optionalLabel={t.common.optional}>
                       <select
                         className="field-input"
                         value={speciesForm.category}
@@ -1077,12 +1088,12 @@ export function SaatgutApp() {
                       >
                         {speciesCategories.map((category) => (
                           <option key={category} value={category}>
-                            {category}
+                            {labelSpeciesCategory(category, t)}
                           </option>
                         ))}
                       </select>
                     </Field>
-                    <Field label="Notes" name="notes" fieldErrors={speciesState.fieldErrors} optional>
+                    <Field label={t.forms.notes} name="notes" fieldErrors={speciesState.fieldErrors} optional optionalLabel={t.common.optional}>
                       <textarea
                         className="field-input min-h-24"
                         value={speciesForm.notes}
@@ -1094,9 +1105,9 @@ export function SaatgutApp() {
                   </DataForm>
                 </Panel>
 
-                <Panel title="Varieties" subtitle="Attach heirloom notes, tags, synonyms, and species links.">
-                  <DataForm state={varietyState} onSubmit={submitVariety} submitLabel="Save variety">
-                    <Field label="Species" name="speciesId" fieldErrors={varietyState.fieldErrors}>
+                <Panel title={t.catalog.varietiesTitle} subtitle={t.catalog.varietiesSubtitle}>
+                  <DataForm state={varietyState} onSubmit={submitVariety} submitLabel={t.catalog.saveVariety}>
+                    <Field label={t.forms.species} name="speciesId" fieldErrors={varietyState.fieldErrors} optionalLabel={t.common.optional}>
                       <select
                         className="field-input"
                         value={varietyForm.speciesId}
@@ -1104,7 +1115,7 @@ export function SaatgutApp() {
                           setVarietyForm((current) => ({ ...current, speciesId: event.target.value }))
                         }
                       >
-                        <option value="">Select species</option>
+                        <option value="">{t.common.selectSpecies}</option>
                         {(dashboard?.species ?? []).map((species) => (
                           <option key={species.id} value={species.id}>
                             {species.commonName}
@@ -1112,33 +1123,33 @@ export function SaatgutApp() {
                         ))}
                       </select>
                     </Field>
-                    <Field label="Variety name" name="name" fieldErrors={varietyState.fieldErrors}>
+                    <Field label={t.forms.varietyName} name="name" fieldErrors={varietyState.fieldErrors} optionalLabel={t.common.optional}>
                       <input
                         className="field-input"
                         value={varietyForm.name}
                         onChange={(event) =>
                           setVarietyForm((current) => ({ ...current, name: event.target.value }))
                         }
-                      />
-                    </Field>
-                    <Field label="Tags" name="tags" fieldErrors={varietyState.fieldErrors} optional>
+                        />
+                      </Field>
+                    <Field label={t.forms.tags} name="tags" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
                       <input
                         className="field-input"
                         value={varietyForm.tags}
                         onChange={(event) =>
                           setVarietyForm((current) => ({ ...current, tags: event.target.value }))
                         }
-                        placeholder="heirloom, seed-saving, greenhouse"
+                        placeholder={t.forms.tagsPlaceholder}
                       />
                     </Field>
-                    <Field label="Synonyms" name="synonyms" fieldErrors={varietyState.fieldErrors} optional>
+                    <Field label={t.forms.synonyms} name="synonyms" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
                       <input
                         className="field-input"
                         value={varietyForm.synonyms}
                         onChange={(event) =>
                           setVarietyForm((current) => ({ ...current, synonyms: event.target.value }))
                         }
-                        placeholder="Comma-separated"
+                        placeholder={t.forms.synonymsPlaceholder}
                       />
                     </Field>
                     <label className="flex items-center gap-3 text-sm font-medium text-[var(--foreground)]">
@@ -1149,9 +1160,9 @@ export function SaatgutApp() {
                           setVarietyForm((current) => ({ ...current, heirloom: event.target.checked }))
                         }
                       />
-                      Heirloom or conservation variety
+                      {t.catalog.heirloom}
                     </label>
-                    <Field label="Description" name="description" fieldErrors={varietyState.fieldErrors} optional>
+                    <Field label={t.forms.description} name="description" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
                       <textarea
                         className="field-input min-h-24"
                         value={varietyForm.description}
@@ -1165,9 +1176,9 @@ export function SaatgutApp() {
               </div>
 
               <div className="space-y-4">
-                <Panel title="Seed batches" subtitle="Track stock, record germination tests, apply corrections, and reverse them when needed.">
-                  <DataForm state={seedBatchState} onSubmit={submitSeedBatch} submitLabel="Save seed batch">
-                    <Field label="Variety" name="varietyId" fieldErrors={seedBatchState.fieldErrors}>
+                <Panel title={t.catalog.seedBatchesTitle} subtitle={t.catalog.seedBatchesSubtitle}>
+                  <DataForm state={seedBatchState} onSubmit={submitSeedBatch} submitLabel={t.catalog.saveSeedBatch}>
+                    <Field label={t.forms.variety} name="varietyId" fieldErrors={seedBatchState.fieldErrors} optionalLabel={t.common.optional}>
                       <select
                         className="field-input"
                         value={seedBatchForm.varietyId}
@@ -1175,7 +1186,7 @@ export function SaatgutApp() {
                           setSeedBatchForm((current) => ({ ...current, varietyId: event.target.value }))
                         }
                       >
-                        <option value="">Select variety</option>
+                        <option value="">{t.common.selectVariety}</option>
                         {(dashboard?.varieties ?? []).map((variety) => (
                           <option key={variety.id} value={variety.id}>
                             {variety.name}
@@ -1184,7 +1195,7 @@ export function SaatgutApp() {
                       </select>
                     </Field>
                     <div className="grid gap-4 md:grid-cols-2">
-                      <Field label="Quantity" name="quantity" fieldErrors={seedBatchState.fieldErrors}>
+                      <Field label={t.forms.quantity} name="quantity" fieldErrors={seedBatchState.fieldErrors} optionalLabel={t.common.optional}>
                         <input
                           className="field-input"
                           type="number"
@@ -1196,7 +1207,7 @@ export function SaatgutApp() {
                           }
                         />
                       </Field>
-                      <Field label="Unit" name="unit" fieldErrors={seedBatchState.fieldErrors}>
+                      <Field label={t.forms.unit} name="unit" fieldErrors={seedBatchState.fieldErrors} optionalLabel={t.common.optional}>
                         <select
                           className="field-input"
                           value={seedBatchForm.unit}
@@ -1209,14 +1220,14 @@ export function SaatgutApp() {
                         >
                           {seedUnits.map((unit) => (
                             <option key={unit} value={unit}>
-                              {unit}
+                              {labelSeedUnit(unit, t)}
                             </option>
                           ))}
                         </select>
                       </Field>
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
-                      <Field label="Harvest year" name="harvestYear" fieldErrors={seedBatchState.fieldErrors} optional>
+                      <Field label={t.forms.harvestYear} name="harvestYear" fieldErrors={seedBatchState.fieldErrors} optional optionalLabel={t.common.optional}>
                         <input
                           className="field-input"
                           type="number"
@@ -1228,7 +1239,7 @@ export function SaatgutApp() {
                           }
                         />
                       </Field>
-                      <Field label="Source" name="source" fieldErrors={seedBatchState.fieldErrors} optional>
+                      <Field label={t.forms.source} name="source" fieldErrors={seedBatchState.fieldErrors} optional optionalLabel={t.common.optional}>
                         <input
                           className="field-input"
                           value={seedBatchForm.source}
@@ -1238,7 +1249,7 @@ export function SaatgutApp() {
                         />
                       </Field>
                     </div>
-                    <Field label="Storage location" name="storageLocation" fieldErrors={seedBatchState.fieldErrors} optional>
+                    <Field label={t.forms.storageLocation} name="storageLocation" fieldErrors={seedBatchState.fieldErrors} optional optionalLabel={t.common.optional}>
                       <input
                         className="field-input"
                         value={seedBatchForm.storageLocation}
@@ -1253,8 +1264,8 @@ export function SaatgutApp() {
                   </DataForm>
 
                   <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                    <DataForm state={germinationState} onSubmit={submitGermination} submitLabel="Log germination test">
-                      <Field label="Seed batch" name="seedBatchId" fieldErrors={germinationState.fieldErrors}>
+                    <DataForm state={germinationState} onSubmit={submitGermination} submitLabel={t.catalog.logGermination}>
+                      <Field label={t.forms.seedBatch} name="seedBatchId" fieldErrors={germinationState.fieldErrors} optionalLabel={t.common.optional}>
                         <select
                           className="field-input"
                           value={germinationForm.seedBatchId}
@@ -1262,15 +1273,15 @@ export function SaatgutApp() {
                             setGerminationForm((current) => ({ ...current, seedBatchId: event.target.value }))
                           }
                         >
-                          <option value="">Select batch</option>
+                          <option value="">{t.common.selectBatch}</option>
                           {(dashboard?.seedBatches ?? []).map((seedBatch) => (
                             <option key={seedBatch.id} value={seedBatch.id}>
-                              {(varietiesById.get(seedBatch.varietyId)?.name ?? "Batch")} · {seedBatch.quantity} {seedBatch.unit.toLowerCase()}
+                              {(varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback)} · {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()}
                             </option>
                           ))}
                         </select>
                       </Field>
-                      <Field label="Test date" name="entryDate" fieldErrors={germinationState.fieldErrors}>
+                      <Field label={t.forms.testDate} name="entryDate" fieldErrors={germinationState.fieldErrors} optionalLabel={t.common.optional}>
                         <input
                           className="field-input"
                           type="date"
@@ -1280,7 +1291,7 @@ export function SaatgutApp() {
                           }
                         />
                       </Field>
-                      <Field label="Sample size" name="sampleSize" fieldErrors={germinationState.fieldErrors}>
+                      <Field label={t.forms.sampleSize} name="sampleSize" fieldErrors={germinationState.fieldErrors} optionalLabel={t.common.optional}>
                         <input
                           className="field-input"
                           type="number"
@@ -1291,7 +1302,7 @@ export function SaatgutApp() {
                           }
                         />
                       </Field>
-                      <Field label="Germinated count" name="germinatedCount" fieldErrors={germinationState.fieldErrors}>
+                      <Field label={t.forms.germinatedCount} name="germinatedCount" fieldErrors={germinationState.fieldErrors} optionalLabel={t.common.optional}>
                         <input
                           className="field-input"
                           type="number"
@@ -1302,20 +1313,20 @@ export function SaatgutApp() {
                           }
                         />
                       </Field>
-                      <Field label="Result notes" name="details" fieldErrors={germinationState.fieldErrors} optional>
+                      <Field label={t.forms.resultNotes} name="details" fieldErrors={germinationState.fieldErrors} optional optionalLabel={t.common.optional}>
                         <textarea
                           className="field-input min-h-24"
                           value={germinationForm.notes}
                           onChange={(event) =>
                             setGerminationForm((current) => ({ ...current, notes: event.target.value }))
                           }
-                          placeholder="Example: 8/10 germinated after 6 days."
+                          placeholder={t.forms.resultNotesPlaceholder}
                         />
                       </Field>
                     </DataForm>
 
-                    <DataForm state={correctionState} onSubmit={submitCorrection} submitLabel="Apply correction">
-                      <Field label="Seed batch" name="seedBatchId" fieldErrors={correctionState.fieldErrors}>
+                    <DataForm state={correctionState} onSubmit={submitCorrection} submitLabel={t.catalog.applyCorrection}>
+                      <Field label={t.forms.seedBatch} name="seedBatchId" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
                         <select
                           className="field-input"
                           value={correctionForm.seedBatchId}
@@ -1323,16 +1334,16 @@ export function SaatgutApp() {
                             setCorrectionForm((current) => ({ ...current, seedBatchId: event.target.value }))
                           }
                         >
-                          <option value="">Select batch</option>
+                          <option value="">{t.common.selectBatch}</option>
                           {(dashboard?.seedBatches ?? []).map((seedBatch) => (
                             <option key={seedBatch.id} value={seedBatch.id}>
-                              {(varietiesById.get(seedBatch.varietyId)?.name ?? "Batch")} · {seedBatch.quantity} {seedBatch.unit.toLowerCase()}
+                              {(varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback)} · {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()}
                             </option>
                           ))}
                         </select>
                       </Field>
                       <div className="grid gap-4 md:grid-cols-2">
-                        <Field label="Mode" name="mode" fieldErrors={correctionState.fieldErrors}>
+                        <Field label={t.forms.mode} name="mode" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
                           <select
                             className="field-input"
                             value={correctionForm.mode}
@@ -1343,11 +1354,11 @@ export function SaatgutApp() {
                               }))
                             }
                           >
-                            <option value="ADJUST_DELTA">Adjust by delta</option>
-                            <option value="SET_ABSOLUTE">Set absolute quantity</option>
+                            <option value="ADJUST_DELTA">{t.forms.adjustByDelta}</option>
+                            <option value="SET_ABSOLUTE">{t.forms.setAbsoluteQuantity}</option>
                           </select>
                         </Field>
-                        <Field label="Entry date" name="entryDate" fieldErrors={correctionState.fieldErrors}>
+                        <Field label={t.forms.entryDate} name="entryDate" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
                           <input
                             className="field-input"
                             type="date"
@@ -1358,7 +1369,7 @@ export function SaatgutApp() {
                           />
                         </Field>
                       </div>
-                      <Field label="Quantity referenced" name="quantity" fieldErrors={correctionState.fieldErrors} optional>
+                      <Field label={t.forms.quantityReferenced} name="quantity" fieldErrors={correctionState.fieldErrors} optional optionalLabel={t.common.optional}>
                         <input
                           className="field-input"
                           type="number"
@@ -1370,26 +1381,26 @@ export function SaatgutApp() {
                           }
                         />
                       </Field>
-                      <Field label="Reason" name="reason" fieldErrors={correctionState.fieldErrors}>
+                      <Field label={t.forms.reason} name="reason" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
                         <textarea
                           className="field-input min-h-24"
                           value={correctionForm.reason}
                           onChange={(event) =>
                             setCorrectionForm((current) => ({ ...current, reason: event.target.value }))
                           }
-                          placeholder="Example: corrected after recount or reconciled against stored packets."
+                          placeholder={t.forms.reasonPlaceholder}
                         />
                       </Field>
                     </DataForm>
                   </div>
 
                   <div className="mt-4 rounded-[1.5rem] border border-[var(--border)] bg-white/70 p-4">
-                    <h3 className="text-lg font-semibold">Reverse a correction</h3>
+                    <h3 className="text-lg font-semibold">{t.catalog.reverseCorrectionTitle}</h3>
                     <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.68)]">
-                      Reverse a manual correction transaction when it should not have changed stock.
+                      {t.catalog.reverseCorrectionCopy}
                     </p>
                     <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={submitReversal}>
-                      <Field label="Seed batch" name="seedBatchId" fieldErrors={correctionState.fieldErrors}>
+                      <Field label={t.forms.seedBatch} name="seedBatchId" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
                         <select
                           className="field-input"
                           value={reversalForm.seedBatchId}
@@ -1401,15 +1412,15 @@ export function SaatgutApp() {
                             }))
                           }
                         >
-                          <option value="">Select batch</option>
+                          <option value="">{t.common.selectBatch}</option>
                           {(dashboard?.seedBatches ?? []).map((seedBatch) => (
                             <option key={seedBatch.id} value={seedBatch.id}>
-                              {(varietiesById.get(seedBatch.varietyId)?.name ?? "Batch")} · {seedBatch.quantity} {seedBatch.unit.toLowerCase()}
+                              {(varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback)} · {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()}
                             </option>
                           ))}
                         </select>
                       </Field>
-                      <Field label="Correction transaction" name="transactionId" fieldErrors={correctionState.fieldErrors}>
+                      <Field label={t.forms.correctionTransaction} name="transactionId" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
                         <select
                           className="field-input"
                           value={reversalForm.transactionId}
@@ -1417,7 +1428,7 @@ export function SaatgutApp() {
                             setReversalForm((current) => ({ ...current, transactionId: event.target.value }))
                           }
                         >
-                          <option value="">Select correction</option>
+                          <option value="">{t.common.selectCorrection}</option>
                           {((dashboard?.seedBatches ?? []).find((seedBatch) => seedBatch.id === reversalForm.seedBatchId)
                             ?.stockTransactions ?? [])
                             .filter(
@@ -1426,12 +1437,12 @@ export function SaatgutApp() {
                             )
                             .map((transaction) => (
                               <option key={transaction.id} value={transaction.id}>
-                                {formatDate(transaction.effectiveDate)} · {transaction.quantityDelta}
+                                {formatDate(transaction.effectiveDate, locale, t.common.notSet)} · {transaction.quantityDelta}
                               </option>
                             ))}
                         </select>
                       </Field>
-                      <Field label="Reversal date" name="entryDate" fieldErrors={correctionState.fieldErrors}>
+                      <Field label={t.forms.reversalDate} name="entryDate" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
                         <input
                           className="field-input"
                           type="date"
@@ -1441,7 +1452,7 @@ export function SaatgutApp() {
                           }
                         />
                       </Field>
-                      <Field label="Reason" name="reason" fieldErrors={correctionState.fieldErrors}>
+                      <Field label={t.forms.reason} name="reason" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
                         <input
                           className="field-input"
                           value={reversalForm.reason}
@@ -1451,7 +1462,7 @@ export function SaatgutApp() {
                         />
                       </Field>
                       <button className="w-fit rounded-full bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white">
-                        Reverse correction
+                        {t.catalog.reverseCorrection}
                       </button>
                     </form>
                   </div>
@@ -1461,10 +1472,12 @@ export function SaatgutApp() {
                       <SeedBatchCard
                         key={seedBatch.id}
                         seedBatch={seedBatch}
-                        varietyName={varietiesById.get(seedBatch.varietyId)?.name ?? "Unknown variety"}
+                        varietyName={varietiesById.get(seedBatch.varietyId)?.name ?? t.common.unknownVariety}
                         warnings={storageWarningsByBatch.get(seedBatch.id) ?? []}
                         germinationTests={seedBatch.germinationTests ?? []}
                         adjustments={seedBatch.stockTransactions?.filter((transaction) => transaction.type !== "INITIAL_STOCK") ?? []}
+                        locale={locale}
+                        t={t}
                       />
                     ))}
                   </div>
@@ -1475,9 +1488,9 @@ export function SaatgutApp() {
 
           {view === "profiles" ? (
             <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-              <Panel title="Growing profiles" subtitle="Manage frost dates and set persisted phenology state for local seasonal context.">
-                <DataForm state={profileState} onSubmit={submitProfile} submitLabel="Save profile">
-                  <Field label="Profile name" name="name" fieldErrors={profileState.fieldErrors}>
+              <Panel title={t.profiles.title} subtitle={t.profiles.subtitle}>
+                <DataForm state={profileState} onSubmit={submitProfile} submitLabel={t.profiles.saveProfile}>
+                  <Field label={t.forms.profileName} name="name" fieldErrors={profileState.fieldErrors} optionalLabel={t.common.optional}>
                     <input
                       className="field-input"
                       value={profileForm.name}
@@ -1487,7 +1500,7 @@ export function SaatgutApp() {
                     />
                   </Field>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <Field label="Last frost date" name="lastFrostDate" fieldErrors={profileState.fieldErrors}>
+                    <Field label={t.forms.lastFrostDate} name="lastFrostDate" fieldErrors={profileState.fieldErrors} optionalLabel={t.common.optional}>
                       <input
                         className="field-input"
                         type="date"
@@ -1497,7 +1510,7 @@ export function SaatgutApp() {
                         }
                       />
                     </Field>
-                    <Field label="First frost date" name="firstFrostDate" fieldErrors={profileState.fieldErrors}>
+                    <Field label={t.forms.firstFrostDate} name="firstFrostDate" fieldErrors={profileState.fieldErrors} optionalLabel={t.common.optional}>
                       <input
                         className="field-input"
                         type="date"
@@ -1516,9 +1529,9 @@ export function SaatgutApp() {
                         setProfileForm((current) => ({ ...current, isActive: event.target.checked }))
                       }
                     />
-                    Mark as active planning profile
+                    {t.profiles.markActive}
                   </label>
-                  <Field label="Notes" name="notes" fieldErrors={profileState.fieldErrors} optional>
+                  <Field label={t.forms.notes} name="notes" fieldErrors={profileState.fieldErrors} optional optionalLabel={t.common.optional}>
                     <textarea
                       className="field-input min-h-24"
                       value={profileForm.notes}
@@ -1531,21 +1544,21 @@ export function SaatgutApp() {
               </Panel>
 
               <div className="space-y-4">
-                <Panel title="Phenology helper" subtitle="Optional local state to reality-check the frost profile with what the garden is actually doing.">
+                <Panel title={t.profiles.helperTitle} subtitle={t.profiles.helperSubtitle}>
                   <div className="grid gap-3 md:grid-cols-2">
-                    {phenologyStages.map((stage) => (
+                    {phenologyStageIds.map((stageId) => (
                       <article
-                        key={stage.id}
+                        key={stageId}
                         className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
                       >
-                        <h3 className="text-base font-semibold">{stage.label}</h3>
-                        <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{stage.hint}</p>
+                        <h3 className="text-base font-semibold">{t.phenologyStages[stageId].label}</h3>
+                        <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{t.phenologyStages[stageId].hint}</p>
                       </article>
                     ))}
                   </div>
                 </Panel>
 
-                <Panel title="Profile summary" subtitle="The calendar uses the active profile, and phenology is now persisted on the profile contract.">
+                <Panel title={t.profiles.summaryTitle} subtitle={t.profiles.summarySubtitle}>
                   {dashboard?.profiles.length ? (
                     <div className="grid gap-3">
                       {dashboard.profiles.map((profile) => (
@@ -1562,16 +1575,16 @@ export function SaatgutApp() {
                             <h3 className="text-lg font-semibold">{profile.name}</h3>
                             {profile.isActive ? (
                               <span className="rounded-full bg-[var(--foreground)] px-3 py-1 text-xs font-semibold text-white">
-                                Active
+                                {t.common.active}
                               </span>
                             ) : null}
                           </div>
                           <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">
-                            Last frost {formatDate(profile.lastFrostDate)} · First frost {formatDate(profile.firstFrostDate)}
+                            {t.profiles.lastFrost} {formatDate(profile.lastFrostDate, locale, t.common.notSet)} · {t.profiles.firstFrost} {formatDate(profile.firstFrostDate, locale, t.common.notSet)}
                           </p>
                           <div className="mt-4 grid gap-2">
                             <label className="grid gap-2 text-sm font-medium">
-                              <span>Observed phenology stage</span>
+                              <span>{t.profiles.observedStage}</span>
                               <select
                                 className="field-input"
                                 value={profile.phenologyStage ?? ""}
@@ -1580,25 +1593,26 @@ export function SaatgutApp() {
                                     phenologyStage: event.target.value || null,
                                     phenologyObservedAt: new Date().toISOString(),
                                     phenologyNotes: profile.phenologyNotes ?? null,
-                                  }).then(loadDashboard).catch((error) => setProfileState(toFormState(error)));
+                                  }).then(loadDashboard).catch((error) => setProfileState(toFormState(error, t)));
                                 }}
                               >
-                                <option value="">None</option>
-                                {phenologyStages.map((stage) => (
-                                  <option key={stage.id} value={stage.id}>
-                                    {stage.label}
+                                <option value="">{t.profiles.none}</option>
+                                {phenologyStageIds.map((stageId) => (
+                                  <option key={stageId} value={stageId}>
+                                    {t.phenologyStages[stageId].label}
                                   </option>
                                 ))}
                               </select>
                             </label>
-                              <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
-                              {phenologyStages.find((stage) => stage.id === profile.phenologyStage)?.hint ??
-                                "Use phenology only as a reality-check against frost-date assumptions."}
+                            <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                              {(profile.phenologyStage
+                                ? t.phenologyStages[profile.phenologyStage as keyof typeof t.phenologyStages]?.hint
+                                : undefined) || t.profiles.phenologyFallback}
                             </p>
                           </div>
                           <div className="mt-3 grid gap-2">
                             <label className="grid gap-2 text-sm font-medium">
-                              <span>Phenology notes</span>
+                              <span>{t.profiles.phenologyNotes}</span>
                               <textarea
                                 className="field-input min-h-20"
                                 value={profile.phenologyNotes ?? ""}
@@ -1607,7 +1621,7 @@ export function SaatgutApp() {
                                     phenologyStage: profile.phenologyStage ?? null,
                                     phenologyObservedAt: profile.phenologyObservedAt ?? new Date().toISOString(),
                                     phenologyNotes: event.target.value || null,
-                                  }).then(loadDashboard).catch((error) => setProfileState(toFormState(error)));
+                                  }).then(loadDashboard).catch((error) => setProfileState(toFormState(error, t)));
                                 }}
                               />
                             </label>
@@ -1622,8 +1636,8 @@ export function SaatgutApp() {
                     </div>
                   ) : (
                     <EmptyState
-                      title="No growing profiles yet"
-                      copy="Create one active profile before expecting calendar windows or transplant timing."
+                      title={t.profiles.noProfilesTitle}
+                      copy={t.profiles.noProfilesCopy}
                     />
                   )}
                 </Panel>
@@ -1633,9 +1647,9 @@ export function SaatgutApp() {
 
           {view === "rules" ? (
             <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-              <Panel title="Cultivation rules" subtitle="Define frost-relative windows and harvest timing per variety.">
-                <DataForm state={ruleState} onSubmit={submitRule} submitLabel="Save rule">
-                  <Field label="Variety" name="varietyId" fieldErrors={ruleState.fieldErrors}>
+              <Panel title={t.rules.title} subtitle={t.rules.subtitle}>
+                <DataForm state={ruleState} onSubmit={submitRule} submitLabel={t.rules.saveRule}>
+                  <Field label={t.forms.variety} name="varietyId" fieldErrors={ruleState.fieldErrors} optionalLabel={t.common.optional}>
                     <select
                       className="field-input"
                       value={ruleForm.varietyId}
@@ -1643,7 +1657,7 @@ export function SaatgutApp() {
                         setRuleForm((current) => ({ ...current, varietyId: event.target.value }))
                       }
                     >
-                      <option value="">Select variety</option>
+                      <option value="">{t.common.selectVariety}</option>
                       {(dashboard?.varieties ?? []).map((variety) => (
                         <option key={variety.id} value={variety.id}>
                           {variety.name}
@@ -1651,11 +1665,11 @@ export function SaatgutApp() {
                       ))}
                     </select>
                   </Field>
-                  <RuleGrid form={ruleForm} setForm={setRuleForm} />
+                  <RuleGrid form={ruleForm} setForm={setRuleForm} t={t} />
                 </DataForm>
               </Panel>
 
-              <Panel title="Current rules" subtitle="Review the planning logic currently feeding the 14-day list.">
+              <Panel title={t.rules.currentTitle} subtitle={t.rules.currentSubtitle}>
                 {dashboard?.rules.length ? (
                   <div className="grid gap-3">
                     {dashboard.rules.map((rule) => (
@@ -1665,18 +1679,18 @@ export function SaatgutApp() {
                       >
                         <h3 className="text-lg font-semibold">{rule.variety.name}</h3>
                         <div className="mt-3 grid gap-2 text-sm text-[color:rgba(24,49,40,0.72)] md:grid-cols-2">
-                          <p>Indoor sowing: {nullableRange(rule.sowIndoorsStartWeeks, rule.sowIndoorsEndWeeks, "weeks before")}</p>
-                          <p>Outdoor sowing: {nullableRange(rule.sowOutdoorsStartWeeks, rule.sowOutdoorsEndWeeks, "weeks before")}</p>
-                          <p>Transplant: {nullableRange(rule.transplantStartWeeks, rule.transplantEndWeeks, "weeks after")}</p>
-                          <p>Harvest: {nullableRange(rule.harvestStartDays, rule.harvestEndDays, "days after")}</p>
+                          <p>{t.rules.indoorSowing}: {nullableRange(rule.sowIndoorsStartWeeks, rule.sowIndoorsEndWeeks, t.rules.weeksBefore, t.common.notDefined)}</p>
+                          <p>{t.rules.outdoorSowing}: {nullableRange(rule.sowOutdoorsStartWeeks, rule.sowOutdoorsEndWeeks, t.rules.weeksBefore, t.common.notDefined)}</p>
+                          <p>{t.rules.transplant}: {nullableRange(rule.transplantStartWeeks, rule.transplantEndWeeks, t.rules.weeksAfter, t.common.notDefined)}</p>
+                          <p>{t.rules.harvest}: {nullableRange(rule.harvestStartDays, rule.harvestEndDays, t.rules.daysAfter, t.common.notDefined)}</p>
                         </div>
                       </article>
                     ))}
                   </div>
                 ) : (
                   <EmptyState
-                    title="No rules saved yet"
-                    copy="Add at least one cultivation rule to unlock calendar windows and harvest projections."
+                    title={t.rules.noRulesTitle}
+                    copy={t.rules.noRulesCopy}
                   />
                 )}
               </Panel>
@@ -1685,9 +1699,9 @@ export function SaatgutApp() {
 
           {view === "plantings" ? (
             <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-              <Panel title="Planting events" subtitle="Log sowing, transplanting, and harvest actions with optional stock deduction.">
-                <DataForm state={plantingState} onSubmit={submitPlanting} submitLabel="Save planting event">
-                  <Field label="Variety" name="varietyId" fieldErrors={plantingState.fieldErrors}>
+              <Panel title={t.plantings.title} subtitle={t.plantings.subtitle}>
+                <DataForm state={plantingState} onSubmit={submitPlanting} submitLabel={t.plantings.savePlanting}>
+                  <Field label={t.forms.variety} name="varietyId" fieldErrors={plantingState.fieldErrors} optionalLabel={t.common.optional}>
                     <select
                       className="field-input"
                       value={plantingForm.varietyId}
@@ -1699,7 +1713,7 @@ export function SaatgutApp() {
                         }))
                       }
                     >
-                      <option value="">Select variety</option>
+                      <option value="">{t.common.selectVariety}</option>
                       {(dashboard?.varieties ?? []).map((variety) => (
                         <option key={variety.id} value={variety.id}>
                           {variety.name}
@@ -1708,7 +1722,7 @@ export function SaatgutApp() {
                     </select>
                   </Field>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <Field label="Type" name="type" fieldErrors={plantingState.fieldErrors}>
+                    <Field label={t.forms.type} name="type" fieldErrors={plantingState.fieldErrors} optionalLabel={t.common.optional}>
                       <select
                         className="field-input"
                         value={plantingForm.type}
@@ -1718,15 +1732,15 @@ export function SaatgutApp() {
                             type: event.target.value as (typeof plantingTypes)[number],
                           }))
                         }
-                      >
-                        {plantingTypes.map((type) => (
-                          <option key={type} value={type}>
-                            {labelPlantingType(type)}
-                          </option>
-                        ))}
+                        >
+                          {plantingTypes.map((type) => (
+                            <option key={type} value={type}>
+                              {labelPlantingType(type, t)}
+                            </option>
+                          ))}
                       </select>
                     </Field>
-                    <Field label="Growing profile" name="growingProfileId" fieldErrors={plantingState.fieldErrors} optional>
+                    <Field label={t.forms.growingProfile} name="growingProfileId" fieldErrors={plantingState.fieldErrors} optional optionalLabel={t.common.optional}>
                       <select
                         className="field-input"
                         value={plantingForm.growingProfileId}
@@ -1737,7 +1751,7 @@ export function SaatgutApp() {
                           }))
                         }
                       >
-                        <option value="">None</option>
+                        <option value="">{t.common.none}</option>
                         {(dashboard?.profiles ?? []).map((profile) => (
                           <option key={profile.id} value={profile.id}>
                             {profile.name}
@@ -1747,7 +1761,7 @@ export function SaatgutApp() {
                     </Field>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <Field label="Seed batch" name="seedBatchId" fieldErrors={plantingState.fieldErrors} optional>
+                    <Field label={t.forms.seedBatch} name="seedBatchId" fieldErrors={plantingState.fieldErrors} optional optionalLabel={t.common.optional}>
                       <select
                         className="field-input"
                         value={plantingForm.seedBatchId}
@@ -1755,15 +1769,15 @@ export function SaatgutApp() {
                           setPlantingForm((current) => ({ ...current, seedBatchId: event.target.value }))
                         }
                       >
-                        <option value="">None</option>
+                        <option value="">{t.common.none}</option>
                         {seedBatchesForSelectedVariety.map((seedBatch) => (
                           <option key={seedBatch.id} value={seedBatch.id}>
-                            {(varietiesById.get(seedBatch.varietyId)?.name ?? "Batch")} · {seedBatch.quantity} {seedBatch.unit.toLowerCase()}
+                            {(varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback)} · {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()}
                           </option>
                         ))}
                       </select>
                     </Field>
-                    <Field label="Quantity used" name="quantityUsed" fieldErrors={plantingState.fieldErrors} optional>
+                    <Field label={t.forms.quantityUsed} name="quantityUsed" fieldErrors={plantingState.fieldErrors} optional optionalLabel={t.common.optional}>
                       <input
                         className="field-input"
                         type="number"
@@ -1780,7 +1794,7 @@ export function SaatgutApp() {
                     </Field>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <Field label="Planned date" name="plannedDate" fieldErrors={plantingState.fieldErrors} optional>
+                    <Field label={t.forms.plannedDate} name="plannedDate" fieldErrors={plantingState.fieldErrors} optional optionalLabel={t.common.optional}>
                       <input
                         className="field-input"
                         type="date"
@@ -1793,7 +1807,7 @@ export function SaatgutApp() {
                         }
                       />
                     </Field>
-                    <Field label="Actual date" name="actualDate" fieldErrors={plantingState.fieldErrors} optional>
+                    <Field label={t.forms.actualDate} name="actualDate" fieldErrors={plantingState.fieldErrors} optional optionalLabel={t.common.optional}>
                       <input
                         className="field-input"
                         type="date"
@@ -1807,7 +1821,7 @@ export function SaatgutApp() {
                       />
                     </Field>
                   </div>
-                  <Field label="Location note" name="locationNote" fieldErrors={plantingState.fieldErrors} optional>
+                  <Field label={t.forms.locationNote} name="locationNote" fieldErrors={plantingState.fieldErrors} optional optionalLabel={t.common.optional}>
                     <input
                       className="field-input"
                       value={plantingForm.locationNote}
@@ -1819,7 +1833,7 @@ export function SaatgutApp() {
                 </DataForm>
               </Panel>
 
-              <Panel title="Event ledger" subtitle="Recent entries and quantity-aware planting history.">
+              <Panel title={t.plantings.ledgerTitle} subtitle={t.plantings.ledgerSubtitle}>
                 {dashboard?.plantings.length ? (
                   <div className="grid gap-3">
                     {dashboard.plantings.map((event) => (
@@ -1829,15 +1843,15 @@ export function SaatgutApp() {
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <h3 className="text-base font-semibold">
-                            {varietiesById.get(event.varietyId)?.name ?? "Unknown variety"}
+                            {varietiesById.get(event.varietyId)?.name ?? t.common.unknownVariety}
                           </h3>
                           <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
-                            {labelPlantingType(event.type)}
+                            {labelPlantingType(event.type, t)}
                           </span>
                         </div>
                         <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">
-                          {event.actualDate ? `Actual ${formatDate(event.actualDate)}` : `Planned ${formatDate(event.plannedDate)}`}
-                          {event.quantityUsed ? ` · Used ${event.quantityUsed}` : ""}
+                          {event.actualDate ? `${t.plantings.actual} ${formatDate(event.actualDate, locale, t.common.notSet)}` : `${t.plantings.planned} ${formatDate(event.plannedDate, locale, t.common.notSet)}`}
+                          {event.quantityUsed ? ` · ${t.plantings.used} ${event.quantityUsed}` : ""}
                         </p>
                         {event.locationNote ? (
                           <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">{event.locationNote}</p>
@@ -1847,8 +1861,8 @@ export function SaatgutApp() {
                   </div>
                 ) : (
                   <EmptyState
-                    title="No planting ledger entries"
-                    copy="Log an event to track work completed and deduct seed stock where relevant."
+                    title={t.plantings.noLedgerTitle}
+                    copy={t.plantings.noLedgerCopy}
                   />
                 )}
               </Panel>
@@ -1885,19 +1899,21 @@ function Field({
   name,
   fieldErrors,
   optional = false,
+  optionalLabel,
   children,
 }: {
   label: string;
   name: string;
   fieldErrors: Record<string, string[] | undefined>;
   optional?: boolean;
+  optionalLabel: string;
   children: React.ReactNode;
 }) {
   return (
     <label className="grid gap-2 text-sm font-medium text-[var(--foreground)]">
       <span className="flex items-center gap-2">
         {label}
-        {optional ? <span className="text-xs font-normal text-[color:rgba(24,49,40,0.56)]">Optional</span> : null}
+        {optional ? <span className="text-xs font-normal text-[color:rgba(24,49,40,0.56)]">{optionalLabel}</span> : null}
       </span>
       {children}
       {fieldErrors[name]?.[0] ? (
@@ -1981,12 +1997,16 @@ function SeedBatchCard({
   warnings,
   germinationTests,
   adjustments,
+  locale,
+  t,
 }: {
   seedBatch: SeedBatch;
   varietyName: string;
   warnings: NonNullable<SeedBatch["storageWarnings"]>;
   germinationTests: NonNullable<SeedBatch["germinationTests"]>;
   adjustments: NonNullable<SeedBatch["stockTransactions"]>;
+  locale: Locale;
+  t: AppMessages;
 }) {
   return (
     <article className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4">
@@ -1994,18 +2014,18 @@ function SeedBatchCard({
         <div>
           <h3 className="text-lg font-semibold">{varietyName}</h3>
           <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.72)]">
-            {seedBatch.quantity} {seedBatch.unit.toLowerCase()} · {seedBatch.storageLocation || "No storage location"}
+            {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()} · {seedBatch.storageLocation || t.seedBatch.noStorageLocation}
           </p>
         </div>
         <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
-          {seedBatch.harvestYear ? `Harvest ${seedBatch.harvestYear}` : "Year unknown"}
+          {seedBatch.harvestYear ? `${t.seedBatch.harvestPrefix} ${seedBatch.harvestYear}` : t.seedBatch.yearUnknown}
         </span>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
         {warnings.map((warning) => (
           <WarningPill key={`${seedBatch.id}-${warning.title}`} level={warning.level}>
-            {warning.title}
+            {getWarningTitle(warning.code, warning.title, t)}
           </WarningPill>
         ))}
       </div>
@@ -2013,15 +2033,15 @@ function SeedBatchCard({
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
-            Germination tests
+            {t.seedBatch.germinationTestsTitle}
           </p>
           <div className="mt-2 grid gap-2">
             {germinationTests.length ? (
               germinationTests.slice(0, 2).map((entry) => (
                 <div key={entry.id} className="rounded-xl bg-white px-3 py-3 text-sm">
-                  <p className="font-medium">{formatDate(entry.testedAt)}</p>
+                  <p className="font-medium">{formatDate(entry.testedAt, locale, t.common.notSet)}</p>
                   <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
-                    {entry.germinatedCount}/{entry.sampleSize} germinated
+                    {entry.germinatedCount}/{entry.sampleSize} {t.seedBatch.germinated}
                     {entry.germinationRate ? ` · ${entry.germinationRate}%` : ""}
                     {entry.notes ? ` · ${entry.notes}` : ""}
                   </p>
@@ -2029,7 +2049,7 @@ function SeedBatchCard({
               ))
             ) : (
               <p className="rounded-xl bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
-                No germination tests recorded yet.
+                {t.seedBatch.noGerminationTests}
               </p>
             )}
           </div>
@@ -2037,23 +2057,23 @@ function SeedBatchCard({
 
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
-            Corrections and undo history
+            {t.seedBatch.correctionHistoryTitle}
           </p>
           <div className="mt-2 grid gap-2">
             {adjustments.length ? (
               adjustments.slice(0, 2).map((entry) => (
                 <div key={entry.id} className="rounded-xl bg-white px-3 py-3 text-sm">
-                  <p className="font-medium">{labelPlantingType(entry.type)}</p>
+                  <p className="font-medium">{labelPlantingType(entry.type, t)}</p>
                   <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
-                    {formatDate(entry.effectiveDate)}
-                    {entry.quantityDelta ? ` · delta ${entry.quantityDelta}` : ""}
+                    {formatDate(entry.effectiveDate, locale, t.common.notSet)}
+                    {entry.quantityDelta ? ` · ${t.seedBatch.delta} ${entry.quantityDelta}` : ""}
                     {entry.reason ? ` · ${entry.reason}` : ""}
                   </p>
                 </div>
               ))
             ) : (
               <p className="rounded-xl bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
-                No correction history recorded.
+                {t.seedBatch.noCorrectionHistory}
               </p>
             )}
           </div>
@@ -2066,21 +2086,23 @@ function SeedBatchCard({
 function RuleGrid({
   form,
   setForm,
+  t,
 }: {
   form: RuleFormValues;
   setForm: React.Dispatch<React.SetStateAction<RuleFormValues>>;
+  t: AppMessages;
 }) {
   const fields: Array<[keyof RuleFormValues, string]> = [
-    ["sowIndoorsStartWeeks", "Indoor sowing start"],
-    ["sowIndoorsEndWeeks", "Indoor sowing end"],
-    ["sowOutdoorsStartWeeks", "Outdoor sowing start"],
-    ["sowOutdoorsEndWeeks", "Outdoor sowing end"],
-    ["transplantStartWeeks", "Transplant start"],
-    ["transplantEndWeeks", "Transplant end"],
-    ["harvestStartDays", "Harvest start"],
-    ["harvestEndDays", "Harvest end"],
-    ["spacingCm", "Spacing cm"],
-    ["successionIntervalDays", "Succession interval"],
+    ["sowIndoorsStartWeeks", t.forms.indoorSowingStart],
+    ["sowIndoorsEndWeeks", t.forms.indoorSowingEnd],
+    ["sowOutdoorsStartWeeks", t.forms.outdoorSowingStart],
+    ["sowOutdoorsEndWeeks", t.forms.outdoorSowingEnd],
+    ["transplantStartWeeks", t.forms.transplantStart],
+    ["transplantEndWeeks", t.forms.transplantEnd],
+    ["harvestStartDays", t.forms.harvestStart],
+    ["harvestEndDays", t.forms.harvestEnd],
+    ["spacingCm", t.forms.spacingCm],
+    ["successionIntervalDays", t.forms.successionInterval],
   ];
 
   return (

@@ -18,6 +18,7 @@ import type {
   User,
   Variety,
 } from "@/lib/client/types";
+import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n";
 
 export class ApiClientError extends Error {
   readonly code: string;
@@ -32,11 +33,22 @@ export class ApiClientError extends Error {
   }
 }
 
+function getRequestLocale(): string {
+  if (typeof document === "undefined") {
+    return DEFAULT_LOCALE;
+  }
+
+  const lang = document.documentElement.lang || DEFAULT_LOCALE;
+  return isLocale(lang) ? lang : DEFAULT_LOCALE;
+}
+
 async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      "Accept-Language": getRequestLocale(),
+      "X-Saatgut-Locale": getRequestLocale(),
       ...(init?.headers ?? {}),
     },
   });
