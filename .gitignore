@@ -17,5 +17,6 @@ test-results/
 
 .DS_Store
 *.log
+*.tsbuildinfo
 .pytest_cache/
 .venv/

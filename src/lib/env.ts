@@ -2,8 +2,11 @@ import { z } from "zod";
 
 const envSchema = z.object({
   APP_URL: z.string().url().default("http://localhost:3000"),
-  AUTH_SECRET: z.string().min(16),
-  DATABASE_URL: z.string().min(1),
+  AUTH_SECRET: z.string().min(16).default("replace-with-local-dev-secret"),
+  DATABASE_URL: z
+    .string()
+    .min(1)
+    .default("postgresql://postgres:postgres@127.0.0.1:5432/saatgut?schema=public"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 
