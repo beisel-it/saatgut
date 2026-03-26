@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 
 import { useI18n } from "@/components/i18n-provider";
 import {
@@ -28,6 +28,7 @@ import type {
   SeedBatch,
   SessionSnapshot,
   Species,
+  Variety,
 } from "@/lib/client/types";
 
 type AuthMode = "login" | "register";
@@ -257,6 +258,9 @@ export function SaatgutApp() {
     germinatedCount: "",
     notes: "",
   });
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogCategory, setCatalogCategory] = useState<Species["category"] | "ALL">("ALL");
+  const [catalogView, setCatalogView] = useState<"ALL" | "ON_HAND" | "ATTENTION">("ALL");
   const [correctionForm, setCorrectionForm] = useState({
     seedBatchId: "",
     entryDate: "",
@@ -270,6 +274,7 @@ export function SaatgutApp() {
     entryDate: "",
     reason: "",
   });
+  const deferredCatalogQuery = useDeferredValue(catalogQuery);
 
   async function loadDashboard() {
     const data = await fetchDashboardData();
@@ -342,6 +347,68 @@ export function SaatgutApp() {
       ).length,
     [storageWarningsByBatch],
   );
+
+  const catalogEntries = useMemo(() => {
+    const normalizedQuery = deferredCatalogQuery.trim().toLowerCase();
+
+    return (dashboard?.varieties ?? [])
+      .map((variety) => {
+        const species =
+          variety.species ?? (dashboard?.species ?? []).find((entry) => entry.id === variety.speciesId) ?? null;
+        const seedBatches = (dashboard?.seedBatches ?? [])
+          .filter((seedBatch) => seedBatch.varietyId === variety.id)
+          .sort((left, right) => {
+            const leftValue = left.harvestYear ?? 0;
+            const rightValue = right.harvestYear ?? 0;
+            return rightValue - leftValue;
+          });
+        const warnings = seedBatches.flatMap((seedBatch) =>
+          (storageWarningsByBatch.get(seedBatch.id) ?? []).filter((warning) => warning.level !== "info"),
+        );
+        const latestTest = seedBatches
+          .flatMap((seedBatch) => seedBatch.germinationTests ?? [])
+          .sort((left, right) => new Date(right.testedAt).getTime() - new Date(left.testedAt).getTime())[0] ?? null;
+        const searchText = [
+          variety.name,
+          variety.description,
+          variety.notes,
+          species?.commonName,
+          species?.latinName,
+          ...(variety.tags ?? []),
+          ...((variety.synonyms ?? []).map((synonym) => synonym.name)),
+          ...seedBatches.flatMap((seedBatch) => [seedBatch.source, seedBatch.storageLocation, seedBatch.notes]),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const matchesQuery = !normalizedQuery || searchText.includes(normalizedQuery);
+        const matchesCategory = catalogCategory === "ALL" || species?.category === catalogCategory;
+        const matchesView =
+          catalogView === "ALL" ||
+          (catalogView === "ON_HAND" ? seedBatches.length > 0 : warnings.length > 0);
+
+        return {
+          variety,
+          species,
+          seedBatches,
+          warnings,
+          latestTest,
+          matchesQuery,
+          matchesCategory,
+          matchesView,
+        };
+      })
+      .filter((entry) => entry.matchesQuery && entry.matchesCategory && entry.matchesView)
+      .sort((left, right) => left.variety.name.localeCompare(right.variety.name));
+  }, [
+    catalogCategory,
+    catalogView,
+    dashboard?.seedBatches,
+    dashboard?.species,
+    dashboard?.varieties,
+    deferredCatalogQuery,
+    storageWarningsByBatch,
+  ]);
 
   async function handleRegister(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1061,436 +1128,507 @@ export function SaatgutApp() {
                   titleClassName="max-w-[16ch]"
                 />
               </section>
-              <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
-              <div className="space-y-4">
-                <Panel title={t.catalog.speciesTitle} subtitle={t.catalog.speciesSubtitle}>
-                  <DataForm state={speciesState} onSubmit={submitSpecies} submitLabel={t.catalog.saveSpecies}>
-                    <Field label={t.forms.commonName} name="commonName" fieldErrors={speciesState.fieldErrors} optionalLabel={t.common.optional}>
-                      <input
-                        className="field-input"
-                        value={speciesForm.commonName}
-                        onChange={(event) =>
-                          setSpeciesForm((current) => ({ ...current, commonName: event.target.value }))
-                        }
-                        />
-                      </Field>
-                    <Field label={t.forms.latinName} name="latinName" fieldErrors={speciesState.fieldErrors} optional optionalLabel={t.common.optional}>
-                      <input
-                        className="field-input"
-                        value={speciesForm.latinName}
-                        onChange={(event) =>
-                          setSpeciesForm((current) => ({ ...current, latinName: event.target.value }))
-                        }
-                        />
-                      </Field>
-                    <Field label={t.forms.category} name="category" fieldErrors={speciesState.fieldErrors} optionalLabel={t.common.optional}>
-                      <select
-                        className="field-input"
-                        value={speciesForm.category}
-                        onChange={(event) =>
-                          setSpeciesForm((current) => ({
-                            ...current,
-                            category: event.target.value as Species["category"],
-                          }))
-                        }
-                      >
-                        {speciesCategories.map((category) => (
-                          <option key={category} value={category}>
-                            {labelSpeciesCategory(category, t)}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label={t.forms.notes} name="notes" fieldErrors={speciesState.fieldErrors} optional optionalLabel={t.common.optional}>
-                      <textarea
-                        className="field-input min-h-24"
-                        value={speciesForm.notes}
-                        onChange={(event) =>
-                          setSpeciesForm((current) => ({ ...current, notes: event.target.value }))
-                        }
-                      />
-                    </Field>
-                  </DataForm>
-                </Panel>
-
-                <Panel title={t.catalog.varietiesTitle} subtitle={t.catalog.varietiesSubtitle}>
-                  <DataForm state={varietyState} onSubmit={submitVariety} submitLabel={t.catalog.saveVariety}>
-                    <Field label={t.forms.species} name="speciesId" fieldErrors={varietyState.fieldErrors} optionalLabel={t.common.optional}>
-                      <select
-                        className="field-input"
-                        value={varietyForm.speciesId}
-                        onChange={(event) =>
-                          setVarietyForm((current) => ({ ...current, speciesId: event.target.value }))
-                        }
-                      >
-                        <option value="">{t.common.selectSpecies}</option>
-                        {(dashboard?.species ?? []).map((species) => (
-                          <option key={species.id} value={species.id}>
-                            {species.commonName}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label={t.forms.varietyName} name="name" fieldErrors={varietyState.fieldErrors} optionalLabel={t.common.optional}>
-                      <input
-                        className="field-input"
-                        value={varietyForm.name}
-                        onChange={(event) =>
-                          setVarietyForm((current) => ({ ...current, name: event.target.value }))
-                        }
-                        />
-                      </Field>
-                    <Field label={t.forms.tags} name="tags" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
-                      <input
-                        className="field-input"
-                        value={varietyForm.tags}
-                        onChange={(event) =>
-                          setVarietyForm((current) => ({ ...current, tags: event.target.value }))
-                        }
-                        placeholder={t.forms.tagsPlaceholder}
-                      />
-                    </Field>
-                    <Field label={t.forms.synonyms} name="synonyms" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
-                      <input
-                        className="field-input"
-                        value={varietyForm.synonyms}
-                        onChange={(event) =>
-                          setVarietyForm((current) => ({ ...current, synonyms: event.target.value }))
-                        }
-                        placeholder={t.forms.synonymsPlaceholder}
-                      />
-                    </Field>
-                    <label className="flex items-center gap-3 text-sm font-medium text-[var(--foreground)]">
-                      <input
-                        type="checkbox"
-                        checked={varietyForm.heirloom}
-                        onChange={(event) =>
-                          setVarietyForm((current) => ({ ...current, heirloom: event.target.checked }))
-                        }
-                      />
-                      {t.catalog.heirloom}
-                    </label>
-                    <Field label={t.forms.description} name="description" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
-                      <textarea
-                        className="field-input min-h-24"
-                        value={varietyForm.description}
-                        onChange={(event) =>
-                          setVarietyForm((current) => ({ ...current, description: event.target.value }))
-                        }
-                      />
-                    </Field>
-                  </DataForm>
-                </Panel>
-              </div>
-
-              <div className="space-y-4">
-                <Panel title={t.catalog.seedBatchesTitle} subtitle={t.catalog.seedBatchesSubtitle}>
-                  <DataForm state={seedBatchState} onSubmit={submitSeedBatch} submitLabel={t.catalog.saveSeedBatch}>
-                    <Field label={t.forms.variety} name="varietyId" fieldErrors={seedBatchState.fieldErrors} optionalLabel={t.common.optional}>
-                      <select
-                        className="field-input"
-                        value={seedBatchForm.varietyId}
-                        onChange={(event) =>
-                          setSeedBatchForm((current) => ({ ...current, varietyId: event.target.value }))
-                        }
-                      >
-                        <option value="">{t.common.selectVariety}</option>
-                        {(dashboard?.varieties ?? []).map((variety) => (
-                          <option key={variety.id} value={variety.id}>
-                            {variety.name}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <Field label={t.forms.quantity} name="quantity" fieldErrors={seedBatchState.fieldErrors} optionalLabel={t.common.optional}>
+              <div className="grid gap-4 xl:grid-cols-[0.72fr_1.28fr]">
+                <div className="space-y-4">
+                  <Panel title={t.catalog.browseTitle} subtitle={t.catalog.browseSubtitle}>
+                    <div className="grid gap-4">
+                      <label className="grid gap-2 text-sm font-medium text-[var(--foreground)]">
+                        <span>{t.catalog.searchLabel}</span>
                         <input
                           className="field-input"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={seedBatchForm.quantity}
-                          onChange={(event) =>
-                            setSeedBatchForm((current) => ({ ...current, quantity: event.target.value }))
-                          }
+                          value={catalogQuery}
+                          onChange={(event) => setCatalogQuery(event.target.value)}
+                          placeholder={t.catalog.searchPlaceholder}
                         />
-                      </Field>
-                      <Field label={t.forms.unit} name="unit" fieldErrors={seedBatchState.fieldErrors} optionalLabel={t.common.optional}>
-                        <select
-                          className="field-input"
-                          value={seedBatchForm.unit}
-                          onChange={(event) =>
-                            setSeedBatchForm((current) => ({
-                              ...current,
-                              unit: event.target.value as (typeof seedUnits)[number],
-                            }))
-                          }
-                        >
-                          {seedUnits.map((unit) => (
-                            <option key={unit} value={unit}>
-                              {labelSeedUnit(unit, t)}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <Field label={t.forms.harvestYear} name="harvestYear" fieldErrors={seedBatchState.fieldErrors} optional optionalLabel={t.common.optional}>
-                        <input
-                          className="field-input"
-                          type="number"
-                          min="1900"
-                          max="2100"
-                          value={seedBatchForm.harvestYear}
-                          onChange={(event) =>
-                            setSeedBatchForm((current) => ({ ...current, harvestYear: event.target.value }))
-                          }
-                        />
-                      </Field>
-                      <Field label={t.forms.source} name="source" fieldErrors={seedBatchState.fieldErrors} optional optionalLabel={t.common.optional}>
-                        <input
-                          className="field-input"
-                          value={seedBatchForm.source}
-                          onChange={(event) =>
-                            setSeedBatchForm((current) => ({ ...current, source: event.target.value }))
-                          }
-                        />
-                      </Field>
-                    </div>
-                    <Field label={t.forms.storageLocation} name="storageLocation" fieldErrors={seedBatchState.fieldErrors} optional optionalLabel={t.common.optional}>
-                      <input
-                        className="field-input"
-                        value={seedBatchForm.storageLocation}
-                        onChange={(event) =>
-                          setSeedBatchForm((current) => ({
-                            ...current,
-                            storageLocation: event.target.value,
-                          }))
-                        }
-                      />
-                    </Field>
-                  </DataForm>
-
-                  <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                    <DataForm state={germinationState} onSubmit={submitGermination} submitLabel={t.catalog.logGermination}>
-                      <Field label={t.forms.seedBatch} name="seedBatchId" fieldErrors={germinationState.fieldErrors} optionalLabel={t.common.optional}>
-                        <select
-                          className="field-input"
-                          value={germinationForm.seedBatchId}
-                          onChange={(event) =>
-                            setGerminationForm((current) => ({ ...current, seedBatchId: event.target.value }))
-                          }
-                        >
-                          <option value="">{t.common.selectBatch}</option>
-                          {(dashboard?.seedBatches ?? []).map((seedBatch) => (
-                            <option key={seedBatch.id} value={seedBatch.id}>
-                              {(varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback)} · {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label={t.forms.testDate} name="entryDate" fieldErrors={germinationState.fieldErrors} optionalLabel={t.common.optional}>
-                        <input
-                          className="field-input"
-                          type="date"
-                          value={germinationForm.entryDate}
-                          onChange={(event) =>
-                            setGerminationForm((current) => ({ ...current, entryDate: event.target.value }))
-                          }
-                        />
-                      </Field>
-                      <Field label={t.forms.sampleSize} name="sampleSize" fieldErrors={germinationState.fieldErrors} optionalLabel={t.common.optional}>
-                        <input
-                          className="field-input"
-                          type="number"
-                          min="0"
-                          value={germinationForm.sampleSize}
-                          onChange={(event) =>
-                            setGerminationForm((current) => ({ ...current, sampleSize: event.target.value }))
-                          }
-                        />
-                      </Field>
-                      <Field label={t.forms.germinatedCount} name="germinatedCount" fieldErrors={germinationState.fieldErrors} optionalLabel={t.common.optional}>
-                        <input
-                          className="field-input"
-                          type="number"
-                          min="0"
-                          value={germinationForm.germinatedCount}
-                          onChange={(event) =>
-                            setGerminationForm((current) => ({ ...current, germinatedCount: event.target.value }))
-                          }
-                        />
-                      </Field>
-                      <Field label={t.forms.resultNotes} name="details" fieldErrors={germinationState.fieldErrors} optional optionalLabel={t.common.optional}>
-                        <textarea
-                          className="field-input min-h-24"
-                          value={germinationForm.notes}
-                          onChange={(event) =>
-                            setGerminationForm((current) => ({ ...current, notes: event.target.value }))
-                          }
-                          placeholder={t.forms.resultNotesPlaceholder}
-                        />
-                      </Field>
-                    </DataForm>
-
-                    <DataForm state={correctionState} onSubmit={submitCorrection} submitLabel={t.catalog.applyCorrection}>
-                      <Field label={t.forms.seedBatch} name="seedBatchId" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
-                        <select
-                          className="field-input"
-                          value={correctionForm.seedBatchId}
-                          onChange={(event) =>
-                            setCorrectionForm((current) => ({ ...current, seedBatchId: event.target.value }))
-                          }
-                        >
-                          <option value="">{t.common.selectBatch}</option>
-                          {(dashboard?.seedBatches ?? []).map((seedBatch) => (
-                            <option key={seedBatch.id} value={seedBatch.id}>
-                              {(varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback)} · {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
+                      </label>
                       <div className="grid gap-4 md:grid-cols-2">
-                        <Field label={t.forms.mode} name="mode" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
+                        <label className="grid gap-2 text-sm font-medium text-[var(--foreground)]">
+                          <span>{t.catalog.categoryFilterLabel}</span>
                           <select
                             className="field-input"
-                            value={correctionForm.mode}
+                            value={catalogCategory}
                             onChange={(event) =>
-                              setCorrectionForm((current) => ({
-                                ...current,
-                                mode: event.target.value as "SET_ABSOLUTE" | "ADJUST_DELTA",
-                              }))
+                              setCatalogCategory(event.target.value as Species["category"] | "ALL")
                             }
                           >
-                            <option value="ADJUST_DELTA">{t.forms.adjustByDelta}</option>
-                            <option value="SET_ABSOLUTE">{t.forms.setAbsoluteQuantity}</option>
-                          </select>
-                        </Field>
-                        <Field label={t.forms.entryDate} name="entryDate" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
-                          <input
-                            className="field-input"
-                            type="date"
-                            value={correctionForm.entryDate}
-                            onChange={(event) =>
-                              setCorrectionForm((current) => ({ ...current, entryDate: event.target.value }))
-                            }
-                          />
-                        </Field>
-                      </div>
-                      <Field label={t.forms.quantityReferenced} name="quantity" fieldErrors={correctionState.fieldErrors} optional optionalLabel={t.common.optional}>
-                        <input
-                          className="field-input"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={correctionForm.quantity}
-                          onChange={(event) =>
-                            setCorrectionForm((current) => ({ ...current, quantity: event.target.value }))
-                          }
-                        />
-                      </Field>
-                      <Field label={t.forms.reason} name="reason" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
-                        <textarea
-                          className="field-input min-h-24"
-                          value={correctionForm.reason}
-                          onChange={(event) =>
-                            setCorrectionForm((current) => ({ ...current, reason: event.target.value }))
-                          }
-                          placeholder={t.forms.reasonPlaceholder}
-                        />
-                      </Field>
-                    </DataForm>
-                  </div>
-
-                  <div className="mt-4 rounded-[1.5rem] border border-[var(--border)] bg-white/70 p-4">
-                    <h3 className="text-lg font-semibold">{t.catalog.reverseCorrectionTitle}</h3>
-                    <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.68)]">
-                      {t.catalog.reverseCorrectionCopy}
-                    </p>
-                    <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={submitReversal}>
-                      <Field label={t.forms.seedBatch} name="seedBatchId" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
-                        <select
-                          className="field-input"
-                          value={reversalForm.seedBatchId}
-                          onChange={(event) =>
-                            setReversalForm((current) => ({
-                              ...current,
-                              seedBatchId: event.target.value,
-                              transactionId: "",
-                            }))
-                          }
-                        >
-                          <option value="">{t.common.selectBatch}</option>
-                          {(dashboard?.seedBatches ?? []).map((seedBatch) => (
-                            <option key={seedBatch.id} value={seedBatch.id}>
-                              {(varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback)} · {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label={t.forms.correctionTransaction} name="transactionId" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
-                        <select
-                          className="field-input"
-                          value={reversalForm.transactionId}
-                          onChange={(event) =>
-                            setReversalForm((current) => ({ ...current, transactionId: event.target.value }))
-                          }
-                        >
-                          <option value="">{t.common.selectCorrection}</option>
-                          {((dashboard?.seedBatches ?? []).find((seedBatch) => seedBatch.id === reversalForm.seedBatchId)
-                            ?.stockTransactions ?? [])
-                            .filter(
-                              (transaction) =>
-                                transaction.type === "MANUAL_CORRECTION" && !transaction.reversalOfId,
-                            )
-                            .map((transaction) => (
-                              <option key={transaction.id} value={transaction.id}>
-                                {formatDate(transaction.effectiveDate, locale, t.common.notSet)} · {transaction.quantityDelta}
+                            <option value="ALL">{t.catalog.filterAll}</option>
+                            {speciesCategories.map((category) => (
+                              <option key={category} value={category}>
+                                {labelSpeciesCategory(category, t)}
                               </option>
                             ))}
-                        </select>
-                      </Field>
-                      <Field label={t.forms.reversalDate} name="entryDate" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
-                        <input
-                          className="field-input"
-                          type="date"
-                          value={reversalForm.entryDate}
-                          onChange={(event) =>
-                            setReversalForm((current) => ({ ...current, entryDate: event.target.value }))
-                          }
+                          </select>
+                        </label>
+                        <label className="grid gap-2 text-sm font-medium text-[var(--foreground)]">
+                          <span>{t.catalog.stateFilterLabel}</span>
+                          <select
+                            className="field-input"
+                            value={catalogView}
+                            onChange={(event) =>
+                              setCatalogView(event.target.value as "ALL" | "ON_HAND" | "ATTENTION")
+                            }
+                          >
+                            <option value="ALL">{t.catalog.filterAll}</option>
+                            <option value="ON_HAND">{t.catalog.filterOnHand}</option>
+                            <option value="ATTENTION">{t.catalog.filterAttention}</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <CatalogSummaryCard
+                          label={t.stats.varieties}
+                          value={catalogEntries.length}
                         />
-                      </Field>
-                      <Field label={t.forms.reason} name="reason" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
-                        <input
-                          className="field-input"
-                          value={reversalForm.reason}
-                          onChange={(event) =>
-                            setReversalForm((current) => ({ ...current, reason: event.target.value }))
-                          }
+                        <CatalogSummaryCard
+                          label={t.stats.seedBatches}
+                          value={catalogEntries.reduce((sum, entry) => sum + entry.seedBatches.length, 0)}
                         />
-                      </Field>
-                      <button className="w-fit rounded-full bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white">
-                        {t.catalog.reverseCorrection}
-                      </button>
-                    </form>
-                  </div>
+                        <CatalogSummaryCard
+                          label={t.catalog.needsAttention}
+                          value={catalogEntries.filter((entry) => entry.warnings.length > 0).length}
+                        />
+                      </div>
+                    </div>
+                  </Panel>
 
-                  <div className="mt-6 grid gap-3">
-                    {(dashboard?.seedBatches ?? []).map((seedBatch) => (
-                      <SeedBatchCard
-                        key={seedBatch.id}
-                        seedBatch={seedBatch}
-                        varietyName={varietiesById.get(seedBatch.varietyId)?.name ?? t.common.unknownVariety}
-                        warnings={storageWarningsByBatch.get(seedBatch.id) ?? []}
-                        germinationTests={seedBatch.germinationTests ?? []}
-                        adjustments={seedBatch.stockTransactions?.filter((transaction) => transaction.type !== "INITIAL_STOCK") ?? []}
-                        locale={locale}
-                        t={t}
-                      />
-                    ))}
-                  </div>
+                  <Panel title={t.catalog.toolsTitle} subtitle={t.catalog.toolsSubtitle}>
+                    <div className="grid gap-3">
+                      <CollapsiblePanel title={t.catalog.speciesToolTitle}>
+                        <DataForm state={speciesState} onSubmit={submitSpecies} submitLabel={t.catalog.saveSpecies}>
+                          <Field label={t.forms.commonName} name="commonName" fieldErrors={speciesState.fieldErrors} optionalLabel={t.common.optional}>
+                            <input
+                              className="field-input"
+                              value={speciesForm.commonName}
+                              onChange={(event) =>
+                                setSpeciesForm((current) => ({ ...current, commonName: event.target.value }))
+                              }
+                            />
+                          </Field>
+                          <Field label={t.forms.latinName} name="latinName" fieldErrors={speciesState.fieldErrors} optional optionalLabel={t.common.optional}>
+                            <input
+                              className="field-input"
+                              value={speciesForm.latinName}
+                              onChange={(event) =>
+                                setSpeciesForm((current) => ({ ...current, latinName: event.target.value }))
+                              }
+                            />
+                          </Field>
+                          <Field label={t.forms.category} name="category" fieldErrors={speciesState.fieldErrors} optionalLabel={t.common.optional}>
+                            <select
+                              className="field-input"
+                              value={speciesForm.category}
+                              onChange={(event) =>
+                                setSpeciesForm((current) => ({
+                                  ...current,
+                                  category: event.target.value as Species["category"],
+                                }))
+                              }
+                            >
+                              {speciesCategories.map((category) => (
+                                <option key={category} value={category}>
+                                  {labelSpeciesCategory(category, t)}
+                                </option>
+                              ))}
+                            </select>
+                          </Field>
+                          <Field label={t.forms.notes} name="notes" fieldErrors={speciesState.fieldErrors} optional optionalLabel={t.common.optional}>
+                            <textarea
+                              className="field-input min-h-24"
+                              value={speciesForm.notes}
+                              onChange={(event) =>
+                                setSpeciesForm((current) => ({ ...current, notes: event.target.value }))
+                              }
+                            />
+                          </Field>
+                        </DataForm>
+                      </CollapsiblePanel>
+
+                      <CollapsiblePanel title={t.catalog.varietiesToolTitle}>
+                        <DataForm state={varietyState} onSubmit={submitVariety} submitLabel={t.catalog.saveVariety}>
+                          <Field label={t.forms.species} name="speciesId" fieldErrors={varietyState.fieldErrors} optionalLabel={t.common.optional}>
+                            <select
+                              className="field-input"
+                              value={varietyForm.speciesId}
+                              onChange={(event) =>
+                                setVarietyForm((current) => ({ ...current, speciesId: event.target.value }))
+                              }
+                            >
+                              <option value="">{t.common.selectSpecies}</option>
+                              {(dashboard?.species ?? []).map((species) => (
+                                <option key={species.id} value={species.id}>
+                                  {species.commonName}
+                                </option>
+                              ))}
+                            </select>
+                          </Field>
+                          <Field label={t.forms.varietyName} name="name" fieldErrors={varietyState.fieldErrors} optionalLabel={t.common.optional}>
+                            <input
+                              className="field-input"
+                              value={varietyForm.name}
+                              onChange={(event) =>
+                                setVarietyForm((current) => ({ ...current, name: event.target.value }))
+                              }
+                            />
+                          </Field>
+                          <Field label={t.forms.tags} name="tags" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
+                            <input
+                              className="field-input"
+                              value={varietyForm.tags}
+                              onChange={(event) =>
+                                setVarietyForm((current) => ({ ...current, tags: event.target.value }))
+                              }
+                              placeholder={t.forms.tagsPlaceholder}
+                            />
+                          </Field>
+                          <Field label={t.forms.synonyms} name="synonyms" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
+                            <input
+                              className="field-input"
+                              value={varietyForm.synonyms}
+                              onChange={(event) =>
+                                setVarietyForm((current) => ({ ...current, synonyms: event.target.value }))
+                              }
+                              placeholder={t.forms.synonymsPlaceholder}
+                            />
+                          </Field>
+                          <label className="flex items-center gap-3 text-sm font-medium text-[var(--foreground)]">
+                            <input
+                              type="checkbox"
+                              checked={varietyForm.heirloom}
+                              onChange={(event) =>
+                                setVarietyForm((current) => ({ ...current, heirloom: event.target.checked }))
+                              }
+                            />
+                            {t.catalog.heirloom}
+                          </label>
+                          <Field label={t.forms.description} name="description" fieldErrors={varietyState.fieldErrors} optional optionalLabel={t.common.optional}>
+                            <textarea
+                              className="field-input min-h-24"
+                              value={varietyForm.description}
+                              onChange={(event) =>
+                                setVarietyForm((current) => ({ ...current, description: event.target.value }))
+                              }
+                            />
+                          </Field>
+                        </DataForm>
+                      </CollapsiblePanel>
+
+                      <CollapsiblePanel title={t.catalog.batchesToolTitle}>
+                        <div className="grid gap-4">
+                          <DataForm state={seedBatchState} onSubmit={submitSeedBatch} submitLabel={t.catalog.saveSeedBatch}>
+                            <Field label={t.forms.variety} name="varietyId" fieldErrors={seedBatchState.fieldErrors} optionalLabel={t.common.optional}>
+                              <select
+                                className="field-input"
+                                value={seedBatchForm.varietyId}
+                                onChange={(event) =>
+                                  setSeedBatchForm((current) => ({ ...current, varietyId: event.target.value }))
+                                }
+                              >
+                                <option value="">{t.common.selectVariety}</option>
+                                {(dashboard?.varieties ?? []).map((variety) => (
+                                  <option key={variety.id} value={variety.id}>
+                                    {variety.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </Field>
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <Field label={t.forms.quantity} name="quantity" fieldErrors={seedBatchState.fieldErrors} optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={seedBatchForm.quantity}
+                                  onChange={(event) =>
+                                    setSeedBatchForm((current) => ({ ...current, quantity: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                              <Field label={t.forms.unit} name="unit" fieldErrors={seedBatchState.fieldErrors} optionalLabel={t.common.optional}>
+                                <select
+                                  className="field-input"
+                                  value={seedBatchForm.unit}
+                                  onChange={(event) =>
+                                    setSeedBatchForm((current) => ({
+                                      ...current,
+                                      unit: event.target.value as (typeof seedUnits)[number],
+                                    }))
+                                  }
+                                >
+                                  {seedUnits.map((unit) => (
+                                    <option key={unit} value={unit}>
+                                      {labelSeedUnit(unit, t)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </Field>
+                            </div>
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <Field label={t.forms.harvestYear} name="harvestYear" fieldErrors={seedBatchState.fieldErrors} optional optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  type="number"
+                                  min="1900"
+                                  max="2100"
+                                  value={seedBatchForm.harvestYear}
+                                  onChange={(event) =>
+                                    setSeedBatchForm((current) => ({ ...current, harvestYear: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                              <Field label={t.forms.source} name="source" fieldErrors={seedBatchState.fieldErrors} optional optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  value={seedBatchForm.source}
+                                  onChange={(event) =>
+                                    setSeedBatchForm((current) => ({ ...current, source: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                            </div>
+                            <Field label={t.forms.storageLocation} name="storageLocation" fieldErrors={seedBatchState.fieldErrors} optional optionalLabel={t.common.optional}>
+                              <input
+                                className="field-input"
+                                value={seedBatchForm.storageLocation}
+                                onChange={(event) =>
+                                  setSeedBatchForm((current) => ({
+                                    ...current,
+                                    storageLocation: event.target.value,
+                                  }))
+                                }
+                              />
+                            </Field>
+                          </DataForm>
+
+                          <div className="grid gap-4 lg:grid-cols-2">
+                            <DataForm state={germinationState} onSubmit={submitGermination} submitLabel={t.catalog.logGermination}>
+                              <Field label={t.forms.seedBatch} name="seedBatchId" fieldErrors={germinationState.fieldErrors} optionalLabel={t.common.optional}>
+                                <select
+                                  className="field-input"
+                                  value={germinationForm.seedBatchId}
+                                  onChange={(event) =>
+                                    setGerminationForm((current) => ({ ...current, seedBatchId: event.target.value }))
+                                  }
+                                >
+                                  <option value="">{t.common.selectBatch}</option>
+                                  {(dashboard?.seedBatches ?? []).map((seedBatch) => (
+                                    <option key={seedBatch.id} value={seedBatch.id}>
+                                      {(varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback)} · {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()}
+                                    </option>
+                                  ))}
+                                </select>
+                              </Field>
+                              <Field label={t.forms.testDate} name="entryDate" fieldErrors={germinationState.fieldErrors} optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  type="date"
+                                  value={germinationForm.entryDate}
+                                  onChange={(event) =>
+                                    setGerminationForm((current) => ({ ...current, entryDate: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                              <Field label={t.forms.sampleSize} name="sampleSize" fieldErrors={germinationState.fieldErrors} optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  type="number"
+                                  min="0"
+                                  value={germinationForm.sampleSize}
+                                  onChange={(event) =>
+                                    setGerminationForm((current) => ({ ...current, sampleSize: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                              <Field label={t.forms.germinatedCount} name="germinatedCount" fieldErrors={germinationState.fieldErrors} optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  type="number"
+                                  min="0"
+                                  value={germinationForm.germinatedCount}
+                                  onChange={(event) =>
+                                    setGerminationForm((current) => ({ ...current, germinatedCount: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                              <Field label={t.forms.resultNotes} name="details" fieldErrors={germinationState.fieldErrors} optional optionalLabel={t.common.optional}>
+                                <textarea
+                                  className="field-input min-h-24"
+                                  value={germinationForm.notes}
+                                  onChange={(event) =>
+                                    setGerminationForm((current) => ({ ...current, notes: event.target.value }))
+                                  }
+                                  placeholder={t.forms.resultNotesPlaceholder}
+                                />
+                              </Field>
+                            </DataForm>
+
+                            <DataForm state={correctionState} onSubmit={submitCorrection} submitLabel={t.catalog.applyCorrection}>
+                              <Field label={t.forms.seedBatch} name="seedBatchId" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
+                                <select
+                                  className="field-input"
+                                  value={correctionForm.seedBatchId}
+                                  onChange={(event) =>
+                                    setCorrectionForm((current) => ({ ...current, seedBatchId: event.target.value }))
+                                  }
+                                >
+                                  <option value="">{t.common.selectBatch}</option>
+                                  {(dashboard?.seedBatches ?? []).map((seedBatch) => (
+                                    <option key={seedBatch.id} value={seedBatch.id}>
+                                      {(varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback)} · {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()}
+                                    </option>
+                                  ))}
+                                </select>
+                              </Field>
+                              <div className="grid gap-4 md:grid-cols-2">
+                                <Field label={t.forms.mode} name="mode" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
+                                  <select
+                                    className="field-input"
+                                    value={correctionForm.mode}
+                                    onChange={(event) =>
+                                      setCorrectionForm((current) => ({
+                                        ...current,
+                                        mode: event.target.value as "SET_ABSOLUTE" | "ADJUST_DELTA",
+                                      }))
+                                    }
+                                  >
+                                    <option value="ADJUST_DELTA">{t.forms.adjustByDelta}</option>
+                                    <option value="SET_ABSOLUTE">{t.forms.setAbsoluteQuantity}</option>
+                                  </select>
+                                </Field>
+                                <Field label={t.forms.entryDate} name="entryDate" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
+                                  <input
+                                    className="field-input"
+                                    type="date"
+                                    value={correctionForm.entryDate}
+                                    onChange={(event) =>
+                                      setCorrectionForm((current) => ({ ...current, entryDate: event.target.value }))
+                                    }
+                                  />
+                                </Field>
+                              </div>
+                              <Field label={t.forms.quantityReferenced} name="quantity" fieldErrors={correctionState.fieldErrors} optional optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={correctionForm.quantity}
+                                  onChange={(event) =>
+                                    setCorrectionForm((current) => ({ ...current, quantity: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                              <Field label={t.forms.reason} name="reason" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
+                                <textarea
+                                  className="field-input min-h-24"
+                                  value={correctionForm.reason}
+                                  onChange={(event) =>
+                                    setCorrectionForm((current) => ({ ...current, reason: event.target.value }))
+                                  }
+                                  placeholder={t.forms.reasonPlaceholder}
+                                />
+                              </Field>
+                            </DataForm>
+                          </div>
+
+                          <div className="rounded-[1.5rem] border border-[var(--border)] bg-white/70 p-4">
+                            <h3 className="text-lg font-semibold">{t.catalog.reverseCorrectionTitle}</h3>
+                            <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.68)]">
+                              {t.catalog.reverseCorrectionCopy}
+                            </p>
+                            <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={submitReversal}>
+                              <Field label={t.forms.seedBatch} name="seedBatchId" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
+                                <select
+                                  className="field-input"
+                                  value={reversalForm.seedBatchId}
+                                  onChange={(event) =>
+                                    setReversalForm((current) => ({
+                                      ...current,
+                                      seedBatchId: event.target.value,
+                                      transactionId: "",
+                                    }))
+                                  }
+                                >
+                                  <option value="">{t.common.selectBatch}</option>
+                                  {(dashboard?.seedBatches ?? []).map((seedBatch) => (
+                                    <option key={seedBatch.id} value={seedBatch.id}>
+                                      {(varietiesById.get(seedBatch.varietyId)?.name ?? t.common.batchFallback)} · {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()}
+                                    </option>
+                                  ))}
+                                </select>
+                              </Field>
+                              <Field label={t.forms.correctionTransaction} name="transactionId" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
+                                <select
+                                  className="field-input"
+                                  value={reversalForm.transactionId}
+                                  onChange={(event) =>
+                                    setReversalForm((current) => ({ ...current, transactionId: event.target.value }))
+                                  }
+                                >
+                                  <option value="">{t.common.selectCorrection}</option>
+                                  {((dashboard?.seedBatches ?? []).find((seedBatch) => seedBatch.id === reversalForm.seedBatchId)
+                                    ?.stockTransactions ?? [])
+                                    .filter(
+                                      (transaction) =>
+                                        transaction.type === "MANUAL_CORRECTION" && !transaction.reversalOfId,
+                                    )
+                                    .map((transaction) => (
+                                      <option key={transaction.id} value={transaction.id}>
+                                        {formatDate(transaction.effectiveDate, locale, t.common.notSet)} · {transaction.quantityDelta}
+                                      </option>
+                                    ))}
+                                </select>
+                              </Field>
+                              <Field label={t.forms.reversalDate} name="entryDate" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  type="date"
+                                  value={reversalForm.entryDate}
+                                  onChange={(event) =>
+                                    setReversalForm((current) => ({ ...current, entryDate: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                              <Field label={t.forms.reason} name="reason" fieldErrors={correctionState.fieldErrors} optionalLabel={t.common.optional}>
+                                <input
+                                  className="field-input"
+                                  value={reversalForm.reason}
+                                  onChange={(event) =>
+                                    setReversalForm((current) => ({ ...current, reason: event.target.value }))
+                                  }
+                                />
+                              </Field>
+                              <button className="w-fit rounded-full bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white">
+                                {t.catalog.reverseCorrection}
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+                      </CollapsiblePanel>
+                    </div>
+                  </Panel>
+                </div>
+
+                <Panel title={t.catalog.inventoryTitle} subtitle={t.catalog.inventorySubtitle}>
+                  {catalogEntries.length ? (
+                    <div className="grid gap-4">
+                      {catalogEntries.map((entry) => (
+                        <CatalogVarietyCard
+                          key={entry.variety.id}
+                          variety={entry.variety}
+                          species={entry.species}
+                          seedBatches={entry.seedBatches}
+                          warningsByBatch={storageWarningsByBatch}
+                          latestTest={entry.latestTest}
+                          locale={locale}
+                          t={t}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState title={t.catalog.noResultsTitle} copy={t.catalog.noResultsCopy} />
+                  )}
                 </Panel>
-              </div>
               </div>
             </div>
           ) : null}
@@ -1948,6 +2086,140 @@ function ScreenHeader({
         </p>
       ) : null}
     </div>
+  );
+}
+
+function CatalogSummaryCard({ label, value }: { label: string; value: number }) {
+  return (
+    <article className="rounded-[1.25rem] border border-[var(--border)] bg-white/70 px-4 py-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
+    </article>
+  );
+}
+
+function CollapsiblePanel({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="rounded-[1.5rem] border border-[var(--border)] bg-white/70 p-4">
+      <summary className="cursor-pointer list-none text-base font-semibold">
+        {title}
+      </summary>
+      <div className="mt-4">{children}</div>
+    </details>
+  );
+}
+
+function CatalogVarietyCard({
+  variety,
+  species,
+  seedBatches,
+  warningsByBatch,
+  latestTest,
+  locale,
+  t,
+}: {
+  variety: Variety;
+  species: Variety["species"] | Species | null;
+  seedBatches: SeedBatch[];
+  warningsByBatch: Map<string, NonNullable<SeedBatch["storageWarnings"]>>;
+  latestTest: NonNullable<SeedBatch["germinationTests"]>[number] | null;
+  locale: Locale;
+  t: AppMessages;
+}) {
+  const warningCount = seedBatches.reduce(
+    (sum, seedBatch) => sum + (warningsByBatch.get(seedBatch.id) ?? []).filter((warning) => warning.level !== "info").length,
+    0,
+  );
+
+  return (
+    <article className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--muted)] px-4 py-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="max-w-3xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-xl font-semibold">{variety.name}</h3>
+            {variety.heirloom ? (
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
+                {t.catalog.heirloom}
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.72)]">
+            {species?.commonName ?? t.common.notSet}
+            {species?.latinName ? ` · ${species.latinName}` : ""}
+            {species?.category ? ` · ${labelSpeciesCategory(species.category, t)}` : ""}
+          </p>
+          {variety.description ? (
+            <p className="mt-3 max-w-[42rem] text-sm leading-6 text-[color:rgba(24,49,40,0.74)]">
+              {variety.description}
+            </p>
+          ) : null}
+        </div>
+        <div className="grid min-w-[12rem] gap-2 sm:text-right">
+          <p className="text-sm font-medium text-[color:rgba(24,49,40,0.72)]">
+            {seedBatches.length} {t.catalog.batchesOnHand}
+          </p>
+          <p className="text-sm font-medium text-[color:rgba(24,49,40,0.72)]">
+            {warningCount} {t.catalog.needsAttention}
+          </p>
+          <p className="text-sm font-medium text-[color:rgba(24,49,40,0.72)]">
+            {t.catalog.latestCheck}{" "}
+            {latestTest ? formatDate(latestTest.testedAt, locale, t.common.notSet) : t.common.notSet}
+          </p>
+        </div>
+      </div>
+
+      {variety.tags.length || variety.synonyms?.length ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {variety.tags.map((tag) => (
+            <span key={`${variety.id}-${tag}`} className="rounded-full bg-white px-3 py-1 text-xs font-semibold">
+              {tag}
+            </span>
+          ))}
+          {(variety.synonyms ?? []).map((synonym) => (
+            <span
+              key={synonym.id}
+              className="rounded-full border border-[var(--border)] bg-transparent px-3 py-1 text-xs font-semibold"
+            >
+              {synonym.name}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="mt-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
+          {t.catalog.batchListTitle}
+        </p>
+        {seedBatches.length ? (
+          <div className="mt-3 grid gap-3">
+            {seedBatches.map((seedBatch) => (
+              <SeedBatchCard
+                key={seedBatch.id}
+                seedBatch={seedBatch}
+                varietyName={variety.name}
+                warnings={warningsByBatch.get(seedBatch.id) ?? []}
+                germinationTests={seedBatch.germinationTests ?? []}
+                adjustments={seedBatch.stockTransactions?.filter((transaction) => transaction.type !== "INITIAL_STOCK") ?? []}
+                locale={locale}
+                t={t}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 rounded-xl bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
+            {t.catalog.noBatches}
+          </p>
+        )}
+      </div>
+    </article>
   );
 }
 
