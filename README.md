@@ -14,6 +14,13 @@ Saatgut is a self-hosted seed-bank and cultivation journal web app for running a
 
 German-first end-user documentation with validated screenshots is available in [docs/benutzerhandbuch.md](docs/benutzerhandbuch.md).
 
+## 🎨 Visual Identity
+
+The repository-level visual system is documented in:
+
+- [docs/design/visual-identity-guide.md](docs/design/visual-identity-guide.md)
+- [docs/design/logo-design-description.md](docs/design/logo-design-description.md)
+
 ## ✨ What Is Shipped
 
 The current implementation includes:
