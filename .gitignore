@@ -3,6 +3,7 @@ node_modules/
 coverage/
 dist/
 data/
+backups/
 .vercel/
 
 .env

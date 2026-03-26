@@ -1,3 +1,4 @@
+import { ApiTokenScope } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireAuth } from "@/lib/server/auth-context";
@@ -8,7 +9,7 @@ import { journalEntryCreateSchema, journalQuerySchema } from "@/lib/server/schem
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAuth(request, { scope: ApiTokenScope.READ });
     const url = new URL(request.url);
     const query = journalQuerySchema.parse({
       q: url.searchParams.get("q") ?? undefined,
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAuth(request, { scope: ApiTokenScope.WRITE });
     const payload = journalEntryCreateSchema.parse(await readJson(request));
     const entry = await createJournalEntry(auth, payload);
     return NextResponse.json(serializeJournalEntry(entry), { status: 201 });

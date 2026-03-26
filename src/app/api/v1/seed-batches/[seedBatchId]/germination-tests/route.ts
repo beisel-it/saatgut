@@ -1,3 +1,4 @@
+import { ApiTokenScope } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { createGerminationTest, listGerminationTests } from "@/lib/server/domain-service";
@@ -11,7 +12,7 @@ export async function GET(
   context: { params: Promise<{ seedBatchId: string }> },
 ) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAuth(request, { scope: ApiTokenScope.READ });
     const { seedBatchId } = await context.params;
     const tests = await listGerminationTests(auth, seedBatchId);
     return NextResponse.json({ items: tests.map(serializeGerminationTest) });
@@ -25,7 +26,7 @@ export async function POST(
   context: { params: Promise<{ seedBatchId: string }> },
 ) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAuth(request, { scope: ApiTokenScope.WRITE });
     const { seedBatchId } = await context.params;
     const payload = germinationTestCreateSchema.parse(await readJson(request));
     const test = await createGerminationTest(auth, seedBatchId, payload);

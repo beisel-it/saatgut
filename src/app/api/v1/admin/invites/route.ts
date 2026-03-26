@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ApiTokenScope } from "@prisma/client";
 
 import { createUserInvite } from "@/lib/server/admin-service";
 import { requireAuth } from "@/lib/server/auth-context";
@@ -8,7 +9,7 @@ import { adminInviteCreateSchema } from "@/lib/server/schemas";
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAuth(request, { scope: ApiTokenScope.ADMIN });
     const payload = adminInviteCreateSchema.parse(await readJson(request));
     const result = await createUserInvite(auth, payload);
 

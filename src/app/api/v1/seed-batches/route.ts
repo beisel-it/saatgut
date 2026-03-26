@@ -1,3 +1,4 @@
+import { ApiTokenScope } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { createSeedBatch, listSeedBatches } from "@/lib/server/domain-service";
@@ -8,7 +9,7 @@ import { seedBatchCreateSchema } from "@/lib/server/schemas";
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAuth(request, { scope: ApiTokenScope.READ });
     const seedBatches = await listSeedBatches(auth);
     return NextResponse.json({ items: seedBatches.map(serializeSeedBatch) });
   } catch (error) {
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAuth(request, { scope: ApiTokenScope.WRITE });
     const payload = seedBatchCreateSchema.parse(await readJson(request));
     const seedBatch = await createSeedBatch(auth, payload);
     return NextResponse.json(serializeSeedBatch(seedBatch), { status: 201 });

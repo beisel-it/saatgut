@@ -78,6 +78,28 @@ enum PlantingJournalEntryType {
   SEED_SAVED
 }
 
+enum ReminderTaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  DISMISSED
+}
+
+enum ReminderTaskSource {
+  MANUAL
+  CALENDAR
+  JOURNAL
+  QUALITY
+  SYSTEM
+}
+
+enum ApiTokenScope {
+  READ
+  WRITE
+  EXPORT
+  ADMIN
+}
+
 model User {
   id           String        @id @default(cuid())
   email        String        @unique
@@ -87,6 +109,9 @@ model User {
   memberships  Membership[]
   auditLogs    AuditLog[]
   sentInvites  UserInvite[]  @relation("SentInvites")
+  createdReminderTasks ReminderTask[] @relation("CreatedReminderTasks")
+  assignedReminderTasks ReminderTask[] @relation("AssignedReminderTasks")
+  apiTokens    ApiToken[]    @relation("CreatedApiTokens")
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 }
@@ -104,6 +129,8 @@ model Workspace {
   growingProfiles GrowingProfile[]
   plantingEvents  PlantingEvent[]
   journalEntries  PlantingJournalEntry[]
+  reminderTasks   ReminderTask[]
+  apiTokens       ApiToken[]
   invites         UserInvite[]
   auditLogs       AuditLog[]
   createdAt       DateTime          @default(now())
@@ -151,6 +178,7 @@ model Variety {
   cultivationRule CultivationRule?
   plantingEvents  PlantingEvent[]
   journalEntries  PlantingJournalEntry[]
+  reminderTasks   ReminderTask[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -189,6 +217,7 @@ model SeedBatch {
   journalEntries  PlantingJournalEntry[]
   germinationTests GerminationTest[]
   stockTransactions SeedBatchTransaction[]
+  reminderTasks   ReminderTask[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -250,6 +279,7 @@ model PlantingEvent {
   growingProfile  GrowingProfile?   @relation(fields: [growingProfileId], references: [id], onDelete: SetNull)
   journalEntries  PlantingJournalEntry[]
   stockTransactions SeedBatchTransaction[]
+  reminderTasks   ReminderTask[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -335,6 +365,57 @@ model UserInvite {
   updatedAt       DateTime       @updatedAt
 
   @@index([workspaceId, email, status])
+}
+
+model ReminderTask {
+  id              String             @id @default(cuid())
+  workspaceId     String
+  createdByUserId String
+  assignedUserId  String?
+  varietyId       String?
+  seedBatchId     String?
+  plantingEventId String?
+  title           String
+  details         String?
+  dueDate         DateTime
+  status          ReminderTaskStatus @default(PENDING)
+  source          ReminderTaskSource @default(MANUAL)
+  tags            String[]           @default([])
+  completedAt     DateTime?
+  dismissedAt     DateTime?
+  workspace       Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User               @relation("CreatedReminderTasks", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  assignedUser    User?              @relation("AssignedReminderTasks", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  variety         Variety?           @relation(fields: [varietyId], references: [id], onDelete: SetNull)
+  seedBatch       SeedBatch?         @relation(fields: [seedBatchId], references: [id], onDelete: SetNull)
+  plantingEvent   PlantingEvent?     @relation(fields: [plantingEventId], references: [id], onDelete: SetNull)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([workspaceId, dueDate])
+  @@index([workspaceId, status, dueDate])
+  @@index([assignedUserId, status, dueDate])
+}
+
+model ApiToken {
+  id                 String          @id @default(cuid())
+  workspaceId        String
+  createdByUserId    String
+  name               String
+  tokenHash          String          @unique
+  tokenPrefix        String
+  scopes             ApiTokenScope[]
+  rateLimitPerMinute Int             @default(120)
+  lastUsedAt         DateTime?
+  expiresAt          DateTime?
+  revokedAt          DateTime?
+  workspace          Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser      User            @relation("CreatedApiTokens", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([workspaceId, revokedAt, createdAt])
+  @@index([createdByUserId, revokedAt])
 }
 
 model AuditLog {

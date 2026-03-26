@@ -1,3 +1,4 @@
+import { ApiTokenScope } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { listAdminUsers } from "@/lib/server/admin-service";
@@ -7,7 +8,7 @@ import { serializeInvite, serializeMembership, serializeUser } from "@/lib/serve
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAuth(request, { scope: ApiTokenScope.ADMIN });
     const result = await listAdminUsers(auth);
 
     return NextResponse.json({

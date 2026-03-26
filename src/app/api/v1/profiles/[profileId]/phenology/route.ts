@@ -1,3 +1,4 @@
+import { ApiTokenScope } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireAuth } from "@/lib/server/auth-context";
@@ -11,7 +12,7 @@ export async function PATCH(
   context: { params: Promise<{ profileId: string }> },
 ) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAuth(request, { scope: ApiTokenScope.WRITE });
     const { profileId } = await context.params;
     const payload = phenologyUpdateSchema.parse(await readJson(request));
     const profile = await updateProfilePhenology(auth, profileId, payload);

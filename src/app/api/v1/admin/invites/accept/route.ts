@@ -3,11 +3,13 @@ import { NextResponse } from "next/server";
 import { acceptUserInvite } from "@/lib/server/admin-service";
 import { applySessionCookie } from "@/lib/server/auth-context";
 import { handleApiError, readJson } from "@/lib/server/http";
+import { assertAnonymousRateLimit } from "@/lib/server/rate-limit";
 import { serializeMembership, serializeUser } from "@/lib/server/serializers";
 import { inviteAcceptSchema } from "@/lib/server/schemas";
 
 export async function POST(request: Request) {
   try {
+    assertAnonymousRateLimit(request, "invite-accept", 20);
     const payload = inviteAcceptSchema.parse(await readJson(request));
     const result = await acceptUserInvite(payload);
     const response = NextResponse.json({

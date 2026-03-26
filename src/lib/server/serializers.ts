@@ -1,7 +1,10 @@
 import {
+  ApiTokenScope,
   GerminationTest,
   MembershipRole,
   PlantingEventType,
+  ReminderTaskSource,
+  ReminderTaskStatus,
   SeedBatchTransactionType,
   SeedQuantityUnit,
   SpeciesCategory,
@@ -28,7 +31,10 @@ export function serializeUser(user: {
   updatedAt: Date;
 }) {
   return {
-    ...user,
+    id: user.id,
+    email: user.email,
+    isActive: user.isActive,
+    role: user.role,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };
@@ -305,7 +311,11 @@ export function serializeInvite(invite: {
   updatedAt: Date;
 }) {
   return {
-    ...invite,
+    id: invite.id,
+    workspaceId: invite.workspaceId,
+    email: invite.email,
+    role: invite.role,
+    status: invite.status,
     expiresAt: invite.expiresAt.toISOString(),
     acceptedAt: invite.acceptedAt?.toISOString() ?? null,
     createdAt: invite.createdAt.toISOString(),
@@ -355,5 +365,64 @@ export function serializeSeedBatchTransaction(transaction: {
     quantityAfter: serializeDecimal(transaction.quantityAfter),
     effectiveDate: transaction.effectiveDate.toISOString(),
     createdAt: transaction.createdAt.toISOString(),
+  };
+}
+
+export function serializeReminderTask(task: {
+  id: string;
+  workspaceId: string;
+  createdByUserId: string;
+  assignedUserId: string | null;
+  varietyId: string | null;
+  seedBatchId: string | null;
+  plantingEventId: string | null;
+  title: string;
+  details: string | null;
+  dueDate: Date;
+  status: ReminderTaskStatus;
+  source: ReminderTaskSource;
+  tags: string[];
+  completedAt: Date | null;
+  dismissedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    ...task,
+    dueDate: task.dueDate.toISOString(),
+    completedAt: task.completedAt?.toISOString() ?? null,
+    dismissedAt: task.dismissedAt?.toISOString() ?? null,
+    createdAt: task.createdAt.toISOString(),
+    updatedAt: task.updatedAt.toISOString(),
+  };
+}
+
+export function serializeApiToken(token: {
+  id: string;
+  workspaceId: string;
+  createdByUserId: string;
+  name: string;
+  tokenPrefix: string;
+  scopes: ApiTokenScope[];
+  rateLimitPerMinute: number;
+  lastUsedAt: Date | null;
+  expiresAt: Date | null;
+  revokedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: token.id,
+    workspaceId: token.workspaceId,
+    createdByUserId: token.createdByUserId,
+    name: token.name,
+    tokenPrefix: token.tokenPrefix,
+    scopes: token.scopes,
+    rateLimitPerMinute: token.rateLimitPerMinute,
+    lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
+    expiresAt: token.expiresAt?.toISOString() ?? null,
+    revokedAt: token.revokedAt?.toISOString() ?? null,
+    createdAt: token.createdAt.toISOString(),
+    updatedAt: token.updatedAt.toISOString(),
   };
 }

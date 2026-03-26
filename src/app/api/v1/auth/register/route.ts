@@ -3,11 +3,13 @@ import { NextResponse } from "next/server";
 import { registerUser } from "@/lib/server/auth-service";
 import { applySessionCookie } from "@/lib/server/auth-context";
 import { handleApiError, readJson } from "@/lib/server/http";
+import { assertAnonymousRateLimit } from "@/lib/server/rate-limit";
 import { serializeMembership, serializeUser } from "@/lib/server/serializers";
 import { registerSchema } from "@/lib/server/schemas";
 
 export async function POST(request: Request) {
   try {
+    assertAnonymousRateLimit(request, "register", 20);
     const payload = registerSchema.parse(await readJson(request));
     const result = await registerUser(payload);
     const response = NextResponse.json(

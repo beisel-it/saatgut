@@ -1,7 +1,10 @@
 import {
+  ApiTokenScope,
   MembershipRole,
   PlantingEventType,
   PlantingJournalEntryType,
+  ReminderTaskSource,
+  ReminderTaskStatus,
   StorageLightExposure,
   StorageMoistureLevel,
   SeedQuantityUnit,
@@ -169,4 +172,41 @@ export const phenologyUpdateSchema = z.object({
   phenologyStage: z.string().trim().min(1).max(40).nullable(),
   phenologyObservedAt: z.string().datetime().optional().nullable(),
   phenologyNotes: z.string().trim().max(1000).optional().nullable(),
+});
+
+export const reminderTaskCreateSchema = z.object({
+  assignedUserId: z.string().cuid().optional().nullable(),
+  varietyId: z.string().cuid().optional().nullable(),
+  seedBatchId: z.string().cuid().optional().nullable(),
+  plantingEventId: z.string().cuid().optional().nullable(),
+  title: z.string().trim().min(1).max(160),
+  details: z.string().trim().max(4000).optional().nullable(),
+  dueDate: z.string().datetime(),
+  source: z.nativeEnum(ReminderTaskSource).default(ReminderTaskSource.MANUAL),
+  tags: z.array(z.string().trim().min(1).max(48)).max(12).default([]),
+});
+
+export const reminderTaskQuerySchema = z.object({
+  status: z.nativeEnum(ReminderTaskStatus).optional(),
+  assignedUserId: z.string().cuid().optional(),
+  dueFrom: z.string().datetime().optional(),
+  dueTo: z.string().datetime().optional(),
+  tag: z.string().trim().min(1).optional(),
+});
+
+export const reminderTaskStatusUpdateSchema = z.object({
+  status: z.nativeEnum(ReminderTaskStatus),
+});
+
+export const timelineQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+});
+
+export const apiTokenCreateSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  scopes: z.array(z.nativeEnum(ApiTokenScope)).min(1).max(4),
+  expiresInDays: z.number().int().min(1).max(365).optional().nullable(),
+  rateLimitPerMinute: z.number().int().positive().max(5000).optional().nullable(),
 });

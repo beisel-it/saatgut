@@ -43,6 +43,25 @@ npm run test
 npm run build
 ```
 
+## Operations Surface
+
+The V1 operations layer now includes:
+
+- reminder task APIs under `/api/v1/tasks`
+- unified timeline reads under `/api/v1/timeline`
+- workspace JSON export via `/api/v1/exports/workspace`
+- backup metadata via `/api/v1/backups/summary`
+- admin API token management under `/api/v1/admin/api-tokens`
+- generated OpenAPI output at `/api/v1/openapi.json`
+
+For database backups, run:
+
+```bash
+npm run backup:db
+```
+
+This writes timestamped PostgreSQL dumps to `backups/`.
+
 ## Current MVP Surface
 
 The web app now includes:
@@ -55,5 +74,6 @@ The web app now includes:
 - cultivation rule entry for frost-relative planning
 - 14-day calendar list fed by the backend calendar service
 - planting event capture with optional seed stock deduction
+- journal entries, reminder task APIs, timeline reads, exports, and tokenized API access
 
 The remaining work is deeper refinement, not initial UI scaffolding.

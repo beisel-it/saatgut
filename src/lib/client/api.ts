@@ -1,5 +1,6 @@
 import type {
   ApiErrorPayload,
+  ApiToken,
   CalendarItem,
   CultivationRule,
   DashboardData,
@@ -8,10 +9,12 @@ import type {
   JournalEntry,
   Membership,
   PlantingEvent,
+  ReminderTask,
   SeedBatch,
   SeedBatchTransaction,
   SessionSnapshot,
   Species,
+  TimelineItem,
   User,
   Variety,
 } from "@/lib/client/types";
@@ -295,5 +298,82 @@ export function updateProfilePhenology(
   return request<GrowingProfile>(`/api/v1/profiles/${profileId}/phenology`, {
     method: "PATCH",
     body: JSON.stringify(input),
+  });
+}
+
+export function fetchReminderTasks(params?: {
+  status?: ReminderTask["status"];
+  assignedUserId?: string;
+  dueFrom?: string;
+  dueTo?: string;
+  tag?: string;
+}) {
+  const search = new URLSearchParams();
+
+  if (params?.status) search.set("status", params.status);
+  if (params?.assignedUserId) search.set("assignedUserId", params.assignedUserId);
+  if (params?.dueFrom) search.set("dueFrom", params.dueFrom);
+  if (params?.dueTo) search.set("dueTo", params.dueTo);
+  if (params?.tag) search.set("tag", params.tag);
+
+  const query = search.toString();
+  return getCollection<ReminderTask>(`/api/v1/tasks${query ? `?${query}` : ""}`);
+}
+
+export function createReminderTask(input: {
+  assignedUserId?: string | null;
+  varietyId?: string | null;
+  seedBatchId?: string | null;
+  plantingEventId?: string | null;
+  title: string;
+  details?: string | null;
+  dueDate: string;
+  source?: ReminderTask["source"];
+  tags: string[];
+}) {
+  return request<ReminderTask>("/api/v1/tasks", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateReminderTask(taskId: string, status: ReminderTask["status"]) {
+  return request<ReminderTask>(`/api/v1/tasks/${taskId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function fetchTimeline(limit = 50) {
+  return getCollection<TimelineItem>(`/api/v1/timeline?limit=${limit}`);
+}
+
+export function fetchWorkspaceExport() {
+  return request<unknown>("/api/v1/exports/workspace", { method: "GET" });
+}
+
+export function fetchBackupSummary() {
+  return request<unknown>("/api/v1/backups/summary", { method: "GET" });
+}
+
+export function fetchApiTokens() {
+  return getCollection<ApiToken>("/api/v1/admin/api-tokens");
+}
+
+export function createApiToken(input: {
+  name: string;
+  scopes: ApiToken["scopes"];
+  expiresInDays?: number | null;
+  rateLimitPerMinute?: number | null;
+}) {
+  return request<{ token: string; record: ApiToken }>("/api/v1/admin/api-tokens", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function revokeApiToken(tokenId: string) {
+  return request<ApiToken>(`/api/v1/admin/api-tokens/${tokenId}/revoke`, {
+    method: "POST",
   });
 }

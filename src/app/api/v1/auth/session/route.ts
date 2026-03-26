@@ -1,3 +1,4 @@
+import { ApiTokenScope } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { getSessionSnapshot } from "@/lib/server/auth-service";
@@ -7,7 +8,7 @@ import { serializeMembership, serializeUser } from "@/lib/server/serializers";
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAuth(request, { scope: ApiTokenScope.READ });
     const result = await getSessionSnapshot(auth);
 
     return NextResponse.json({

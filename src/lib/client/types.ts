@@ -253,3 +253,55 @@ export type SeedBatchWarning = {
   title: string;
   detail: string;
 };
+
+export type ReminderTask = {
+  id: string;
+  workspaceId: string;
+  createdByUserId: string;
+  assignedUserId: string | null;
+  varietyId: string | null;
+  seedBatchId: string | null;
+  plantingEventId: string | null;
+  title: string;
+  details: string | null;
+  dueDate: string;
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "DISMISSED";
+  source: "MANUAL" | "CALENDAR" | "JOURNAL" | "QUALITY" | "SYSTEM";
+  tags: string[];
+  completedAt: string | null;
+  dismissedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TimelineItem =
+  | {
+      kind: "task";
+      date: string;
+      task: ReminderTask;
+    }
+  | {
+      kind: "journal";
+      date: string;
+      entry: JournalEntry;
+    }
+  | {
+      kind: "planting";
+      date: string;
+      event: PlantingEvent;
+    };
+
+export type ApiToken = {
+  id: string;
+  workspaceId: string;
+  createdByUserId: string;
+  name: string;
+  tokenPrefix: string;
+  scopes: Array<"READ" | "WRITE" | "EXPORT" | "ADMIN">;
+  rateLimitPerMinute: number;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};

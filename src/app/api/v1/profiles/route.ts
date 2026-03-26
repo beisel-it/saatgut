@@ -1,3 +1,4 @@
+import { ApiTokenScope } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { createGrowingProfile, listGrowingProfiles } from "@/lib/server/domain-service";
@@ -8,7 +9,7 @@ import { growingProfileCreateSchema } from "@/lib/server/schemas";
 
 export async function GET(request: Request) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAuth(request, { scope: ApiTokenScope.READ });
     const profiles = await listGrowingProfiles(auth);
     return NextResponse.json({ items: profiles.map(serializeGrowingProfile) });
   } catch (error) {
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAuth(request, { scope: ApiTokenScope.WRITE });
     const payload = growingProfileCreateSchema.parse(await readJson(request));
     const profile = await createGrowingProfile(auth, payload);
     return NextResponse.json(serializeGrowingProfile(profile), { status: 201 });

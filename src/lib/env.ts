@@ -7,6 +7,8 @@ const envSchema = z.object({
     .string()
     .min(1)
     .default("postgresql://postgres:postgres@127.0.0.1:5432/saatgut?schema=public"),
+  API_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(120),
+  API_TOKEN_DEFAULT_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(60),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 
@@ -14,5 +16,7 @@ export const env = envSchema.parse({
   APP_URL: process.env.APP_URL,
   AUTH_SECRET: process.env.AUTH_SECRET,
   DATABASE_URL: process.env.DATABASE_URL,
+  API_RATE_LIMIT_PER_MINUTE: process.env.API_RATE_LIMIT_PER_MINUTE,
+  API_TOKEN_DEFAULT_RATE_LIMIT_PER_MINUTE: process.env.API_TOKEN_DEFAULT_RATE_LIMIT_PER_MINUTE,
   NODE_ENV: process.env.NODE_ENV,
 });

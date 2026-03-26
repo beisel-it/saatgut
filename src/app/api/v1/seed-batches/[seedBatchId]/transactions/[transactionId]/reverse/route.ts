@@ -1,3 +1,4 @@
+import { ApiTokenScope } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireAuth } from "@/lib/server/auth-context";
@@ -11,7 +12,7 @@ export async function POST(
   context: { params: Promise<{ seedBatchId: string; transactionId: string }> },
 ) {
   try {
-    const auth = await requireAuth(request);
+    const auth = await requireAuth(request, { scope: ApiTokenScope.WRITE });
     const { seedBatchId, transactionId } = await context.params;
     const payload = seedBatchReversalCreateSchema.parse(await readJson(request));
     const result = await reverseSeedBatchTransaction(auth, seedBatchId, transactionId, payload);
