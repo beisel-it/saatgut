@@ -7,6 +7,7 @@ import { useI18n } from "@/components/i18n-provider";
 import {
   adjustSeedBatchStock,
   ApiClientError,
+  changeUserPassword,
   createGrowingProfile,
   createGerminationTest,
   createPlantingEvent,
@@ -20,11 +21,15 @@ import {
   deleteSpecies,
   deleteVariety,
   fetchDashboardData,
+  fetchWorkspaceMembers,
   getSession,
+  inviteWorkspaceCollaborator,
   loginUser,
   logoutUser,
+  removeWorkspaceMember,
   registerUser,
   reverseSeedBatchTransaction,
+  updateWorkspaceMemberRole,
   updateCultivationRule,
   updateGrowingProfile,
   updatePlantingEvent,
@@ -45,7 +50,9 @@ import type {
   SeedBatchWarning,
   SessionSnapshot,
   Species,
+  UserInvite,
   Variety,
+  WorkspaceMember,
 } from "@/lib/client/types";
 
 type AuthMode = "login" | "register";
@@ -80,6 +87,8 @@ type PacketIntakeFormValues = {
   storageLocation: string;
   notes: string;
 };
+
+type EditableMembershipRole = Exclude<SessionSnapshot["membership"]["role"], "OWNER">;
 
 type CatalogDeleteTarget = {
   type: "species" | "variety" | "seedBatch";
@@ -303,6 +312,23 @@ export function SaatgutApp() {
   const [authPending, startAuthTransition] = useTransition();
   const [refreshPending, startRefreshTransition] = useTransition();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [workspaceState, setWorkspaceState] = useState<FormState>(initialFormState);
+  const [inviteState, setInviteState] = useState<FormState>(initialFormState);
+  const [memberState, setMemberState] = useState<FormState>(initialFormState);
+  const [passwordState, setPasswordState] = useState<FormState>(initialFormState);
+  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
+  const [workspaceInvites, setWorkspaceInvites] = useState<UserInvite[]>([]);
+  const [memberActionId, setMemberActionId] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, SessionSnapshot["membership"]["role"]>>({});
+  const [latestInviteToken, setLatestInviteToken] = useState<{
+    email: string;
+    role: EditableMembershipRole;
+    expiresAt: string;
+    token: string;
+  } | null>(null);
 
   const [registerForm, setRegisterForm] = useState({
     email: "",
@@ -312,6 +338,16 @@ export function SaatgutApp() {
   const [loginForm, setLoginForm] = useState({
     email: "",
     password: "",
+  });
+  const [inviteForm, setInviteForm] = useState({
+    email: "",
+    role: "MEMBER" as EditableMembershipRole,
+    expiresInDays: "7",
+  });
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
   const [speciesForm, setSpeciesForm] = useState({
     commonName: "",
@@ -532,6 +568,36 @@ export function SaatgutApp() {
       ).length,
     [storageWarningsByBatch],
   );
+  const canManageWorkspace = session
+    ? session.user.role === "ADMIN" || session.membership.role === "OWNER"
+    : false;
+  const pendingWorkspaceInvites = useMemo(
+    () => workspaceInvites.filter((invite) => invite.status === "PENDING"),
+    [workspaceInvites],
+  );
+
+  async function loadWorkspaceCollaboration() {
+    if (!canManageWorkspace) return;
+
+    setWorkspaceLoading(true);
+    setWorkspaceState(initialFormState);
+
+    try {
+      const result = await fetchWorkspaceMembers();
+      setWorkspaceMembers(result.items);
+      setWorkspaceInvites(result.invites);
+      setMemberRoleDrafts(
+        result.items.reduce<Record<string, SessionSnapshot["membership"]["role"]>>((drafts, member) => {
+          drafts[member.user.id] = member.role;
+          return drafts;
+        }, {}),
+      );
+    } catch (error) {
+      setWorkspaceState(toFormState(error, t));
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  }
 
   const catalogEntries = useMemo(() => {
     const normalizedQuery = deferredCatalogQuery.trim().toLowerCase();
@@ -1350,6 +1416,144 @@ export function SaatgutApp() {
     setPacketIntakeForm(createInitialPacketIntakeForm());
   }
 
+  function openWorkspaceManager() {
+    setWorkspaceManagerOpen(true);
+    setMobileNavOpen(false);
+    setWorkspaceState(initialFormState);
+    setInviteState(initialFormState);
+    setMemberState(initialFormState);
+    setInviteCopied(false);
+    if (canManageWorkspace) {
+      void loadWorkspaceCollaboration();
+    }
+  }
+
+  function closeWorkspaceManager() {
+    setWorkspaceManagerOpen(false);
+    setInviteCopied(false);
+  }
+
+  async function submitWorkspaceInvite(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setInviteState(initialFormState);
+    setInviteCopied(false);
+
+    try {
+      const result = await inviteWorkspaceCollaborator({
+        email: inviteForm.email,
+        role: inviteForm.role,
+        expiresInDays: Number(inviteForm.expiresInDays),
+      });
+      setInviteForm({
+        email: "",
+        role: "MEMBER",
+        expiresInDays: "7",
+      });
+      setLatestInviteToken({
+        email: result.invite.email,
+        role: result.invite.role as EditableMembershipRole,
+        expiresAt: result.invite.expiresAt,
+        token: result.token,
+      });
+      setInviteState({
+        error: null,
+        success: t.statuses.workspaceInviteCreated,
+        fieldErrors: {},
+      });
+      await loadWorkspaceCollaboration();
+    } catch (error) {
+      setInviteState(toFormState(error, t));
+    }
+  }
+
+  async function copyLatestInviteToken() {
+    if (!latestInviteToken) return;
+
+    try {
+      await navigator.clipboard.writeText(latestInviteToken.token);
+      setInviteCopied(true);
+    } catch {
+      setInviteCopied(false);
+    }
+  }
+
+  async function submitPasswordChange(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPasswordState(initialFormState);
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordState({
+        error: t.workspace.passwordMismatch,
+        success: null,
+        fieldErrors: {},
+      });
+      return;
+    }
+
+    try {
+      const result = await changeUserPassword({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      setSession((current) => (current ? { ...current, user: result.user } : current));
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setPasswordState({
+        error: null,
+        success: t.statuses.passwordChanged,
+        fieldErrors: {},
+      });
+    } catch (error) {
+      setPasswordState(toFormState(error, t));
+    }
+  }
+
+  async function saveWorkspaceMemberRole(member: WorkspaceMember) {
+    const nextRole = memberRoleDrafts[member.user.id];
+    if (!nextRole || nextRole === member.role || nextRole === "OWNER") return;
+
+    setMemberState(initialFormState);
+    setMemberActionId(member.user.id);
+
+    try {
+      await updateWorkspaceMemberRole(member.user.id, { role: nextRole });
+      setMemberState({
+        error: null,
+        success: t.statuses.workspaceMemberUpdated,
+        fieldErrors: {},
+      });
+      await loadWorkspaceCollaboration();
+    } catch (error) {
+      setMemberState(toFormState(error, t));
+    } finally {
+      setMemberActionId(null);
+    }
+  }
+
+  async function handleRemoveWorkspaceMember(member: WorkspaceMember) {
+    if (!window.confirm(t.workspace.removeMemberConfirm)) return;
+
+    setMemberState(initialFormState);
+    setMemberActionId(member.user.id);
+
+    try {
+      await removeWorkspaceMember(member.user.id);
+      setMemberState({
+        error: null,
+        success: t.statuses.workspaceMemberRemoved,
+        fieldErrors: {},
+      });
+      await loadWorkspaceCollaboration();
+    } catch (error) {
+      setMemberState(toFormState(error, t));
+    } finally {
+      setMemberActionId(null);
+    }
+  }
+
   if (sessionLoading) {
     return (
       <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(127,155,71,0.18),transparent_30%),linear-gradient(180deg,#e8e1cf_0%,#f4efe3_100%)] px-6 py-10">
@@ -1582,6 +1786,14 @@ export function SaatgutApp() {
 
           <button
             type="button"
+            onClick={openWorkspaceManager}
+            className="mt-4 w-full rounded-lg border border-white/14 bg-white/6 px-4 py-3 text-sm font-semibold text-white/88"
+          >
+            {t.workspace.manageButton}
+          </button>
+
+          <button
+            type="button"
             onClick={handleLogout}
             className="mt-8 w-full rounded-lg border border-white/14 px-4 py-3 text-sm font-semibold text-white/88"
             disabled={authPending}
@@ -1649,6 +1861,14 @@ export function SaatgutApp() {
                         : t.dashboard.createActiveProfile}
                     </p>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={openWorkspaceManager}
+                    className="mt-3 w-full rounded-md border border-white/14 bg-white/6 px-4 py-2.5 text-sm font-semibold text-white/88"
+                  >
+                    {t.workspace.manageButton}
+                  </button>
 
                   <button
                     type="button"
@@ -3590,6 +3810,313 @@ export function SaatgutApp() {
               </div>
             </div>
           ) : null}
+
+          <ResponsiveModal
+            open={workspaceManagerOpen}
+            title={t.workspace.manageTitle}
+            subtitle={t.workspace.manageSubtitle}
+            closeLabel={t.common.close}
+            onClose={closeWorkspaceManager}
+          >
+            <div className="grid gap-4">
+              <Panel
+                title={t.workspace.accountTitle}
+                subtitle={t.workspace.accountSubtitle}
+                className="bg-white/85 shadow-none"
+              >
+                <div className="grid gap-3 md:grid-cols-3">
+                  <article className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
+                      {t.workspace.emailLabel}
+                    </p>
+                    <p className="mt-2 break-all text-sm font-semibold text-[var(--foreground)]">
+                      {session.user.email}
+                    </p>
+                  </article>
+                  <article className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
+                      {t.workspace.workspaceLabel}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">
+                      {session.membership.workspace.name}
+                    </p>
+                  </article>
+                  <article className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
+                      {t.workspace.membershipLabel}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">
+                      {labelMembershipRole(session.membership.role, t)} · {t.workspace.userRoleLabel}: {session.user.role}
+                    </p>
+                  </article>
+                </div>
+
+                <div className="mt-5 rounded-lg border border-[var(--border)] bg-white/80 p-4 md:p-5">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold tracking-tight">{t.workspace.passwordTitle}</h3>
+                    <p className="mt-2 max-w-[44ch] text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                      {t.workspace.passwordSubtitle}
+                    </p>
+                  </div>
+                  <DataForm state={passwordState} onSubmit={submitPasswordChange} submitLabel={t.workspace.changePassword}>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label={t.workspace.currentPassword} name="currentPassword" fieldErrors={passwordState.fieldErrors} optionalLabel={t.common.optional}>
+                        <input
+                          className="field-input"
+                          type="password"
+                          value={passwordForm.currentPassword}
+                          onChange={(event) =>
+                            setPasswordForm((current) => ({ ...current, currentPassword: event.target.value }))
+                          }
+                        />
+                      </Field>
+                      <Field label={t.workspace.newPassword} name="newPassword" fieldErrors={passwordState.fieldErrors} optionalLabel={t.common.optional}>
+                        <input
+                          className="field-input"
+                          type="password"
+                          value={passwordForm.newPassword}
+                          onChange={(event) =>
+                            setPasswordForm((current) => ({ ...current, newPassword: event.target.value }))
+                          }
+                        />
+                      </Field>
+                    </div>
+                    <Field label={t.workspace.confirmPassword} name="confirmPassword" fieldErrors={passwordState.fieldErrors} optionalLabel={t.common.optional}>
+                      <input
+                        className="field-input"
+                        type="password"
+                        value={passwordForm.confirmPassword}
+                        onChange={(event) =>
+                          setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.62)]">{t.workspace.passwordHint}</p>
+                  </DataForm>
+                </div>
+              </Panel>
+
+              {canManageWorkspace ? (
+                <>
+                  <Panel
+                    title={t.workspace.inviteTitle}
+                    subtitle={t.workspace.inviteSubtitle}
+                    className="bg-white/85 shadow-none"
+                  >
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,0.88fr)_minmax(18rem,0.72fr)]">
+                      <div className="rounded-lg border border-[var(--border)] bg-white/80 p-4 md:p-5">
+                        <DataForm state={inviteState} onSubmit={submitWorkspaceInvite} submitLabel={t.workspace.inviteButton}>
+                          <Field label={t.workspace.inviteEmailLabel} name="email" fieldErrors={inviteState.fieldErrors} optionalLabel={t.common.optional}>
+                            <input
+                              className="field-input"
+                              type="email"
+                              value={inviteForm.email}
+                              onChange={(event) =>
+                                setInviteForm((current) => ({ ...current, email: event.target.value }))
+                              }
+                            />
+                          </Field>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <Field label={t.workspace.inviteRoleLabel} name="role" fieldErrors={inviteState.fieldErrors} optionalLabel={t.common.optional}>
+                              <select
+                                className="field-input"
+                                value={inviteForm.role}
+                                onChange={(event) =>
+                                  setInviteForm((current) => ({
+                                    ...current,
+                                    role: event.target.value as EditableMembershipRole,
+                                  }))
+                                }
+                              >
+                                <option value="MEMBER">{labelMembershipRole("MEMBER", t)}</option>
+                                <option value="VIEWER">{labelMembershipRole("VIEWER", t)}</option>
+                              </select>
+                            </Field>
+                            <Field label={t.workspace.inviteExpiryLabel} name="expiresInDays" fieldErrors={inviteState.fieldErrors} optionalLabel={t.common.optional}>
+                              <input
+                                className="field-input"
+                                type="number"
+                                min="1"
+                                max="30"
+                                value={inviteForm.expiresInDays}
+                                onChange={(event) =>
+                                  setInviteForm((current) => ({ ...current, expiresInDays: event.target.value }))
+                                }
+                              />
+                            </Field>
+                          </div>
+                        </DataForm>
+                      </div>
+
+                      <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4 md:p-5">
+                        <h3 className="text-lg font-semibold tracking-tight">{t.workspace.latestInviteTitle}</h3>
+                        <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                          {t.workspace.latestInviteSubtitle}
+                        </p>
+                        {latestInviteToken ? (
+                          <div className="mt-4 grid gap-3">
+                            <div className="rounded-lg border border-[var(--border)] bg-white px-4 py-3">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
+                                {t.workspace.emailLabel}
+                              </p>
+                              <p className="mt-2 break-all text-sm font-semibold">{latestInviteToken.email}</p>
+                              <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">
+                                {labelMembershipRole(latestInviteToken.role, t)} · {t.workspace.expiresAt}{" "}
+                                {formatDate(latestInviteToken.expiresAt, locale, t.common.notSet)}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border border-[var(--border)] bg-white px-4 py-3">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
+                                {t.workspace.inviteCodeLabel}
+                              </p>
+                              <p className="mt-2 break-all font-mono text-sm text-[var(--foreground)]">
+                                {latestInviteToken.token}
+                              </p>
+                              <div className="mt-3 flex flex-wrap items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={copyLatestInviteToken}
+                                  className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-sm font-semibold"
+                                >
+                                  {inviteCopied ? t.common.copied : t.common.copy}
+                                </button>
+                                <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.62)]">
+                                  {t.workspace.inviteCodeHint}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="mt-4 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                            {t.workspace.noPendingInvites}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </Panel>
+
+                  <Panel
+                    title={t.workspace.membersTitle}
+                    subtitle={t.workspace.membersSubtitle}
+                    className="bg-white/85 shadow-none"
+                  >
+                    {workspaceState.error ? <Alert tone="danger">{workspaceState.error}</Alert> : null}
+                    {memberState.error ? <Alert tone="danger">{memberState.error}</Alert> : null}
+                    {memberState.success ? <Alert tone="success">{memberState.success}</Alert> : null}
+
+                    {workspaceLoading ? (
+                      <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">{t.common.refreshing}</p>
+                    ) : (
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)]">
+                        <div className="grid gap-3">
+                          {workspaceMembers.map((member) => {
+                            const canEditMember =
+                              member.user.id !== session.user.id && member.role !== "OWNER";
+                            const selectedRole = memberRoleDrafts[member.user.id] ?? member.role;
+
+                            return (
+                              <article
+                                key={member.user.id}
+                                className="rounded-lg border border-[var(--border)] bg-white/80 px-4 py-4"
+                              >
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <h3 className="break-all text-base font-semibold">{member.user.email}</h3>
+                                      {member.user.id === session.user.id ? (
+                                        <span className="rounded-md border border-[var(--border)] bg-[var(--muted)] px-2.5 py-1 text-xs font-semibold">
+                                          {t.workspace.selfBadge}
+                                        </span>
+                                      ) : null}
+                                      {member.role === "OWNER" ? (
+                                        <span className="rounded-md border border-[var(--border)] bg-[var(--muted)] px-2.5 py-1 text-xs font-semibold">
+                                          {t.workspace.ownerBadge}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                                      {labelMembershipRole(member.role, t)} · {t.workspace.joinedAt}{" "}
+                                      {formatDate(member.createdAt, locale, t.common.notSet)}
+                                    </p>
+                                  </div>
+
+                                  {canEditMember ? (
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <select
+                                        className="field-input min-w-[10rem]"
+                                        value={selectedRole}
+                                        disabled={memberActionId === member.user.id}
+                                        onChange={(event) =>
+                                          setMemberRoleDrafts((current) => ({
+                                            ...current,
+                                            [member.user.id]: event.target.value as SessionSnapshot["membership"]["role"],
+                                          }))
+                                        }
+                                      >
+                                        <option value="MEMBER">{labelMembershipRole("MEMBER", t)}</option>
+                                        <option value="VIEWER">{labelMembershipRole("VIEWER", t)}</option>
+                                      </select>
+                                      <button
+                                        type="button"
+                                        onClick={() => saveWorkspaceMemberRole(member)}
+                                        disabled={memberActionId === member.user.id || selectedRole === member.role}
+                                        className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                                      >
+                                        {t.workspace.roleSave}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveWorkspaceMember(member)}
+                                        disabled={memberActionId === member.user.id}
+                                        className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                      >
+                                        {t.workspace.removeMember}
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </article>
+                            );
+                          })}
+                        </div>
+
+                        <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4 md:p-5">
+                          <div>
+                            <h3 className="text-lg font-semibold tracking-tight">{t.workspace.pendingInvitesTitle}</h3>
+                            <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                              {t.workspace.pendingInvitesSubtitle}
+                            </p>
+                          </div>
+                          {pendingWorkspaceInvites.length ? (
+                            <div className="mt-4 grid gap-3">
+                              {pendingWorkspaceInvites.map((invite) => (
+                                <article key={invite.id} className="rounded-lg border border-[var(--border)] bg-white px-4 py-3">
+                                  <h4 className="break-all text-sm font-semibold">{invite.email}</h4>
+                                  <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                                    {labelMembershipRole(invite.role, t)}
+                                  </p>
+                                  <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                                    {t.workspace.expiresAt} {formatDate(invite.expiresAt, locale, t.common.notSet)}
+                                  </p>
+                                  <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                                    {t.workspace.statusLabel} {invite.status}
+                                  </p>
+                                </article>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mt-4 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                              {t.workspace.noPendingInvites}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </Panel>
+                </>
+              ) : null}
+            </div>
+          </ResponsiveModal>
         </section>
       </div>
     </main>

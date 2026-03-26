@@ -103,6 +103,16 @@ export function logoutUser() {
   return request<{ ok: true }>("/api/v1/auth/session", { method: "DELETE" });
 }
 
+export function changeUserPassword(input: {
+  currentPassword: string;
+  newPassword: string;
+}) {
+  return request<{ user: User }>("/api/v1/auth/password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function fetchDashboardData(days = 14): Promise<DashboardData> {
   const calendarPromise = getCollection<CalendarItem>(`/api/v1/calendar?days=${days}`).catch(
     (error) => {
