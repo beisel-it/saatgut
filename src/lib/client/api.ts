@@ -8,6 +8,7 @@ import type {
   GerminationTest,
   JournalEntry,
   Membership,
+  McpEndpointMetadata,
   PasskeyCredential,
   PasskeyListResponse,
   PlantingEvent,
@@ -584,6 +585,10 @@ export function fetchWorkspaceExport() {
 
 export function fetchBackupSummary() {
   return request<unknown>("/api/v1/backups/summary", { method: "GET" });
+}
+
+export function fetchMcpMetadata() {
+  return request<McpEndpointMetadata>("/api/v1/mcp", { method: "GET" });
 }
 
 export function fetchApiTokens() {

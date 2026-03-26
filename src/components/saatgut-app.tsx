@@ -25,6 +25,7 @@ import {
   completePasskeyEnrollment,
   completePasskeyLogin,
   completePasskeySignup,
+  createApiToken,
   createGrowingProfile,
   createGerminationTest,
   createPlantingEvent,
@@ -37,7 +38,9 @@ import {
   deletePlantingEvent,
   deleteSpecies,
   deleteVariety,
+  fetchApiTokens,
   fetchDashboardData,
+  fetchMcpMetadata,
   fetchWorkspaceMembers,
   getSession,
   inviteWorkspaceCollaborator,
@@ -47,6 +50,7 @@ import {
   removePasskey,
   removeWorkspaceMember,
   registerUser,
+  revokeApiToken,
   reverseSeedBatchTransaction,
   updateWorkspaceMemberRole,
   updateCultivationRule,
@@ -60,9 +64,11 @@ import {
 } from "@/lib/client/api";
 import { getIntlLocale, type AppMessages, type Locale } from "@/lib/i18n";
 import type {
+  ApiToken,
   CalendarItem,
   DashboardData,
   GrowingProfile,
+  McpEndpointMetadata,
   PasskeyCredential,
   PlantingEvent,
   SeedBatch,
@@ -351,12 +357,19 @@ export function SaatgutApp() {
   const [memberState, setMemberState] = useState<FormState>(initialFormState);
   const [passwordState, setPasswordState] = useState<FormState>(initialFormState);
   const [passkeyManagementState, setPasskeyManagementState] = useState<FormState>(initialFormState);
+  const [powerToolsState, setPowerToolsState] = useState<FormState>(initialFormState);
+  const [apiTokenState, setApiTokenState] = useState<FormState>(initialFormState);
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
   const [workspaceInvites, setWorkspaceInvites] = useState<UserInvite[]>([]);
   const [passkeys, setPasskeys] = useState<PasskeyCredential[]>([]);
   const [passkeysLoading, setPasskeysLoading] = useState(false);
+  const [apiTokens, setApiTokens] = useState<ApiToken[]>([]);
+  const [apiTokensLoading, setApiTokensLoading] = useState(false);
+  const [mcpMetadata, setMcpMetadata] = useState<McpEndpointMetadata | null>(null);
+  const [mcpLoading, setMcpLoading] = useState(false);
   const [memberActionId, setMemberActionId] = useState<string | null>(null);
   const [passkeyActionId, setPasskeyActionId] = useState<string | null>(null);
+  const [apiTokenActionId, setApiTokenActionId] = useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
   const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, SessionSnapshot["membership"]["role"]>>({});
   const [latestInviteToken, setLatestInviteToken] = useState<{
@@ -386,6 +399,16 @@ export function SaatgutApp() {
     newPassword: "",
     confirmPassword: "",
   });
+  const [apiTokenForm, setApiTokenForm] = useState({
+    name: "",
+    expiresInDays: "30",
+    rateLimitPerMinute: "60",
+    read: true,
+    write: false,
+    export: false,
+    admin: false,
+  });
+  const [latestApiTokenSecret, setLatestApiTokenSecret] = useState<string | null>(null);
   const [speciesForm, setSpeciesForm] = useState({
     commonName: "",
     latinName: "",
@@ -685,6 +708,32 @@ export function SaatgutApp() {
       setPasskeyManagementState(toFormState(error, t));
     } finally {
       setPasskeysLoading(false);
+    }
+  }
+
+  async function loadPowerTools(resetState = false) {
+    if (!session) return;
+
+    setMcpLoading(true);
+    setApiTokensLoading(canManageWorkspace);
+    if (resetState) {
+      setPowerToolsState(initialFormState);
+      setApiTokenState(initialFormState);
+      setLatestApiTokenSecret(null);
+    }
+
+    try {
+      const [mcpResult, tokenResult] = await Promise.all([
+        fetchMcpMetadata(),
+        canManageWorkspace ? fetchApiTokens() : Promise.resolve([] as ApiToken[]),
+      ]);
+      setMcpMetadata(mcpResult);
+      setApiTokens(tokenResult);
+    } catch (error) {
+      setPowerToolsState(toFormState(error, t));
+    } finally {
+      setMcpLoading(false);
+      setApiTokensLoading(false);
     }
   }
 
@@ -1581,8 +1630,11 @@ export function SaatgutApp() {
     setMemberState(initialFormState);
     setPasskeyEnrollState(initialFormState);
     setPasskeyManagementState(initialFormState);
+    setPowerToolsState(initialFormState);
+    setApiTokenState(initialFormState);
     setInviteCopied(false);
     void loadPasskeyManagement(true);
+    void loadPowerTools(true);
     if (canManageWorkspace) {
       void loadWorkspaceCollaboration();
     }
@@ -1730,6 +1782,78 @@ export function SaatgutApp() {
       setPasskeyManagementState(toFormState(error, t));
     } finally {
       setPasskeyActionId(null);
+    }
+  }
+
+  async function submitApiToken(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setApiTokenState(initialFormState);
+
+    const scopes = [
+      apiTokenForm.read ? "READ" : null,
+      apiTokenForm.write ? "WRITE" : null,
+      apiTokenForm.export ? "EXPORT" : null,
+      apiTokenForm.admin ? "ADMIN" : null,
+    ].filter(Boolean) as ApiToken["scopes"];
+
+    if (!scopes.length) {
+      setApiTokenState({
+        error: t.powerTools.tokenScopeRequired,
+        success: null,
+        fieldErrors: {},
+      });
+      return;
+    }
+
+    try {
+      const result = await createApiToken({
+        name: apiTokenForm.name.trim(),
+        scopes,
+        expiresInDays: apiTokenForm.expiresInDays ? Number(apiTokenForm.expiresInDays) : null,
+        rateLimitPerMinute: apiTokenForm.rateLimitPerMinute ? Number(apiTokenForm.rateLimitPerMinute) : null,
+      });
+      setLatestApiTokenSecret(result.token);
+      setApiTokenForm({
+        name: "",
+        expiresInDays: "30",
+        rateLimitPerMinute: "60",
+        read: true,
+        write: false,
+        export: false,
+        admin: false,
+      });
+      setApiTokenState({
+        error: null,
+        success: t.powerTools.tokenCreated,
+        fieldErrors: {},
+      });
+      await loadPowerTools();
+    } catch (error) {
+      setApiTokenState(toFormState(error, t));
+    }
+  }
+
+  async function handleRevokeApiToken(token: ApiToken) {
+    const confirmed = window.confirm(
+      t.powerTools.revokeTokenConfirm.replace("{token}", `${token.name} (${token.tokenPrefix})`),
+    );
+    if (!confirmed) return;
+
+    setApiTokenState(initialFormState);
+    setApiTokenActionId(token.id);
+
+    try {
+      await revokeApiToken(token.id);
+      setApiTokenState({
+        error: null,
+        success: t.powerTools.tokenRevoked,
+        fieldErrors: {},
+      });
+      await loadPowerTools();
+    } catch (error) {
+      setApiTokenState(toFormState(error, t));
+    } finally {
+      setApiTokenActionId(null);
     }
   }
 
@@ -4272,6 +4396,209 @@ export function SaatgutApp() {
                     </Field>
                     <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.62)]">{t.workspace.passwordHint}</p>
                   </DataForm>
+                </div>
+
+                <div className="mt-5">
+                  <CollapsiblePanel title={t.powerTools.title} actionLabel={t.powerTools.actionLabel}>
+                    {powerToolsState.error ? <Alert tone="danger">{powerToolsState.error}</Alert> : null}
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                      <div className="grid gap-4">
+                        <section className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                            {t.powerTools.docsEyebrow}
+                          </p>
+                          <h3 className="mt-2 text-lg font-semibold tracking-tight">{t.powerTools.docsTitle}</h3>
+                          <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                            {t.powerTools.docsCopy}
+                          </p>
+                          <div className="mt-4 flex flex-wrap gap-3">
+                            <Link
+                              href="/api-reference"
+                              className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
+                            >
+                              {t.docs.apiReferenceLink}
+                            </Link>
+                            <a
+                              href="/api/v1/openapi.json"
+                              className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
+                            >
+                              {t.docs.rawOpenApi}
+                            </a>
+                          </div>
+                        </section>
+
+                        <section className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                            {t.powerTools.mcpEyebrow}
+                          </p>
+                          <h3 className="mt-2 text-lg font-semibold tracking-tight">{t.powerTools.mcpTitle}</h3>
+                          <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                            {t.powerTools.mcpCopy}
+                          </p>
+                          {mcpLoading ? (
+                            <p className="mt-4 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">{t.powerTools.loading}</p>
+                          ) : mcpMetadata ? (
+                            <div className="mt-4 grid gap-3 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                              <p><span className="font-semibold text-[var(--foreground)]">{t.powerTools.endpointLabel}:</span> {mcpMetadata.endpoint}</p>
+                              <p><span className="font-semibold text-[var(--foreground)]">{t.powerTools.transportLabel}:</span> {mcpMetadata.transport}</p>
+                              <p><span className="font-semibold text-[var(--foreground)]">{t.powerTools.protocolLabel}:</span> {mcpMetadata.protocolVersion}</p>
+                              <p><span className="font-semibold text-[var(--foreground)]">{t.powerTools.authLabel}:</span> {mcpMetadata.auth}</p>
+                              <div>
+                                <p className="font-semibold text-[var(--foreground)]">{t.powerTools.allowedOriginsLabel}</p>
+                                <p className="mt-1 break-words">
+                                  {mcpMetadata.allowedOrigins.length ? mcpMetadata.allowedOrigins.join(", ") : t.powerTools.originsFallback}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="font-semibold text-[var(--foreground)]">{t.powerTools.notesLabel}</p>
+                                <div className="mt-1 grid gap-1">
+                                  {mcpMetadata.notes.map((note) => (
+                                    <p key={note}>{note}</p>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
+                        </section>
+
+                        <section className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                            {t.powerTools.setupEyebrow}
+                          </p>
+                          <h3 className="mt-2 text-lg font-semibold tracking-tight">{t.powerTools.setupTitle}</h3>
+                          <div className="mt-3 grid gap-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                            <p>{t.powerTools.setupStepOne}</p>
+                            <p>{t.powerTools.setupStepTwo}</p>
+                            <p>{t.powerTools.setupStepThree}</p>
+                          </div>
+                        </section>
+                      </div>
+
+                      {canManageWorkspace ? (
+                        <section className="rounded-lg border border-[var(--border)] bg-white/80 p-4">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                              {t.powerTools.tokensEyebrow}
+                            </p>
+                            <h3 className="mt-2 text-lg font-semibold tracking-tight">{t.powerTools.tokensTitle}</h3>
+                            <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                              {t.powerTools.tokensCopy}
+                            </p>
+                          </div>
+
+                          <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4">
+                            <DataForm state={apiTokenState} onSubmit={submitApiToken} submitLabel={t.powerTools.createToken}>
+                              <div className="grid gap-4 md:grid-cols-2">
+                                <Field label={t.powerTools.tokenNameLabel} name="name" fieldErrors={apiTokenState.fieldErrors} optionalLabel={t.common.optional}>
+                                  <input
+                                    className="field-input"
+                                    value={apiTokenForm.name}
+                                    onChange={(event) => setApiTokenForm((current) => ({ ...current, name: event.target.value }))}
+                                  />
+                                </Field>
+                                <Field label={t.powerTools.expiresLabel} name="expiresInDays" fieldErrors={apiTokenState.fieldErrors} optionalLabel={t.common.optional} optional>
+                                  <input
+                                    className="field-input"
+                                    inputMode="numeric"
+                                    value={apiTokenForm.expiresInDays}
+                                    onChange={(event) => setApiTokenForm((current) => ({ ...current, expiresInDays: event.target.value }))}
+                                  />
+                                </Field>
+                                <Field label={t.powerTools.rateLimitLabel} name="rateLimitPerMinute" fieldErrors={apiTokenState.fieldErrors} optionalLabel={t.common.optional} optional>
+                                  <input
+                                    className="field-input"
+                                    inputMode="numeric"
+                                    value={apiTokenForm.rateLimitPerMinute}
+                                    onChange={(event) => setApiTokenForm((current) => ({ ...current, rateLimitPerMinute: event.target.value }))}
+                                  />
+                                </Field>
+                              </div>
+                              <fieldset className="grid gap-3">
+                                <legend className="text-sm font-medium text-[var(--foreground)]">{t.powerTools.scopesLabel}</legend>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <label className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-white px-4 py-3 text-sm">
+                                    <input type="checkbox" checked={apiTokenForm.read} onChange={(event) => setApiTokenForm((current) => ({ ...current, read: event.target.checked }))} />
+                                    <span>{t.powerTools.scopeRead}</span>
+                                  </label>
+                                  <label className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-white px-4 py-3 text-sm">
+                                    <input type="checkbox" checked={apiTokenForm.write} onChange={(event) => setApiTokenForm((current) => ({ ...current, write: event.target.checked }))} />
+                                    <span>{t.powerTools.scopeWrite}</span>
+                                  </label>
+                                  <label className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-white px-4 py-3 text-sm">
+                                    <input type="checkbox" checked={apiTokenForm.export} onChange={(event) => setApiTokenForm((current) => ({ ...current, export: event.target.checked }))} />
+                                    <span>{t.powerTools.scopeExport}</span>
+                                  </label>
+                                  <label className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-white px-4 py-3 text-sm">
+                                    <input type="checkbox" checked={apiTokenForm.admin} onChange={(event) => setApiTokenForm((current) => ({ ...current, admin: event.target.checked }))} />
+                                    <span>{t.powerTools.scopeAdmin}</span>
+                                  </label>
+                                </div>
+                              </fieldset>
+                            </DataForm>
+
+                            {latestApiTokenSecret ? (
+                              <div className="mt-4 rounded-lg border border-emerald-300/40 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                                <p className="font-semibold">{t.powerTools.latestTokenTitle}</p>
+                                <p className="mt-2 break-all font-mono text-[13px]">{latestApiTokenSecret}</p>
+                                <p className="mt-2 leading-6">{t.powerTools.latestTokenHint}</p>
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div className="mt-5">
+                            <h4 className="text-base font-semibold tracking-tight">{t.powerTools.tokenListTitle}</h4>
+                            <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                              {t.powerTools.tokenListCopy}
+                            </p>
+                            {apiTokensLoading ? (
+                              <p className="mt-4 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">{t.powerTools.loading}</p>
+                            ) : apiTokens.length ? (
+                              <div className="mt-4 grid gap-3">
+                                {apiTokens.map((token) => (
+                                  <article key={token.id} className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-4">
+                                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-[var(--foreground)]">{token.name}</p>
+                                        <p className="mt-1 break-all text-sm text-[color:rgba(24,49,40,0.68)]">{token.tokenPrefix}</p>
+                                        <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                                          {token.scopes.join(", ")} · {t.powerTools.rateLimitLabel}: {token.rateLimitPerMinute}
+                                        </p>
+                                        <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                                          {t.workspace.createdAt}: {formatDate(token.createdAt, locale, t.common.notSet)} · {t.workspace.lastUsed}: {formatDate(token.lastUsedAt, locale, t.common.notSet)}
+                                        </p>
+                                        <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                                          {t.workspace.expiresAt}: {formatDate(token.expiresAt, locale, t.common.notSet)}
+                                        </p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          void handleRevokeApiToken(token);
+                                        }}
+                                        className="w-full rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--foreground)] md:w-fit"
+                                        disabled={Boolean(token.revokedAt) || apiTokenActionId === token.id}
+                                      >
+                                        {apiTokenActionId === token.id ? t.powerTools.revokingToken : token.revokedAt ? t.powerTools.tokenRevokedLabel : t.powerTools.revokeToken}
+                                      </button>
+                                    </div>
+                                  </article>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="mt-4 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">{t.powerTools.noTokens}</p>
+                            )}
+                          </div>
+                        </section>
+                      ) : (
+                        <section className="rounded-lg border border-[var(--border)] bg-white/80 p-4">
+                          <h3 className="text-lg font-semibold tracking-tight">{t.powerTools.accessTitle}</h3>
+                          <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                            {t.powerTools.accessCopy}
+                          </p>
+                        </section>
+                      )}
+                    </div>
+                  </CollapsiblePanel>
                 </div>
               </Panel>
 

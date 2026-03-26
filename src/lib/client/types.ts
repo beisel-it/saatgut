@@ -330,3 +330,14 @@ export type ApiToken = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type McpEndpointMetadata = {
+  name: string;
+  version: string;
+  protocolVersion: string;
+  transport: string;
+  endpoint: string;
+  auth: string;
+  allowedOrigins: string[];
+  notes: string[];
+};
