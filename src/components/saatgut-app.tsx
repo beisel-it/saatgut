@@ -3995,22 +3995,24 @@ export function SaatgutApp() {
                     </div>
                     <div className="grid gap-4 xl:grid-cols-2">
                       <Field label={t.forms.plannedDate} name="plannedDate" fieldErrors={plantingEditState.fieldErrors} optional optionalLabel={t.common.optional}>
-                        <input
-                          className="field-input"
-                          type="date"
-                          value={plantingEditForm.plannedDate}
-                          onChange={(event) =>
-                            setPlantingEditForm((current) => ({ ...current, plannedDate: event.target.value }))
+                      <input
+                        className="field-input"
+                        type="date"
+                        lang={getIntlLocale(locale)}
+                        value={plantingEditForm.plannedDate}
+                        onChange={(event) =>
+                          setPlantingEditForm((current) => ({ ...current, plannedDate: event.target.value }))
                           }
                         />
                       </Field>
                       <Field label={t.forms.actualDate} name="actualDate" fieldErrors={plantingEditState.fieldErrors} optional optionalLabel={t.common.optional}>
-                        <input
-                          className="field-input"
-                          type="date"
-                          value={plantingEditForm.actualDate}
-                          onChange={(event) =>
-                            setPlantingEditForm((current) => ({ ...current, actualDate: event.target.value }))
+                      <input
+                        className="field-input"
+                        type="date"
+                        lang={getIntlLocale(locale)}
+                        value={plantingEditForm.actualDate}
+                        onChange={(event) =>
+                          setPlantingEditForm((current) => ({ ...current, actualDate: event.target.value }))
                           }
                         />
                       </Field>
@@ -4052,6 +4054,7 @@ export function SaatgutApp() {
                       <input
                         className="field-input"
                         type="date"
+                        lang={getIntlLocale(locale)}
                         value={profileForm.lastFrostDate}
                         onChange={(event) =>
                           setProfileForm((current) => ({ ...current, lastFrostDate: event.target.value }))
@@ -4062,6 +4065,7 @@ export function SaatgutApp() {
                       <input
                         className="field-input"
                         type="date"
+                        lang={getIntlLocale(locale)}
                         value={profileForm.firstFrostDate}
                         onChange={(event) =>
                           setProfileForm((current) => ({ ...current, firstFrostDate: event.target.value }))
@@ -4111,10 +4115,10 @@ export function SaatgutApp() {
                             </Field>
                             <div className="grid gap-4 xl:grid-cols-2">
                               <Field label={t.forms.lastFrostDate} name="lastFrostDate" fieldErrors={profileEditState.fieldErrors} optionalLabel={t.common.optional}>
-                                <input className="field-input" type="date" value={profileEditForm.lastFrostDate} onChange={(event) => setProfileEditForm((current) => ({ ...current, lastFrostDate: event.target.value }))} />
+                                <input className="field-input" type="date" lang={getIntlLocale(locale)} value={profileEditForm.lastFrostDate} onChange={(event) => setProfileEditForm((current) => ({ ...current, lastFrostDate: event.target.value }))} />
                               </Field>
                               <Field label={t.forms.firstFrostDate} name="firstFrostDate" fieldErrors={profileEditState.fieldErrors} optionalLabel={t.common.optional}>
-                                <input className="field-input" type="date" value={profileEditForm.firstFrostDate} onChange={(event) => setProfileEditForm((current) => ({ ...current, firstFrostDate: event.target.value }))} />
+                                <input className="field-input" type="date" lang={getIntlLocale(locale)} value={profileEditForm.firstFrostDate} onChange={(event) => setProfileEditForm((current) => ({ ...current, firstFrostDate: event.target.value }))} />
                               </Field>
                             </div>
                             <label className="flex items-center gap-3 text-sm font-medium">
@@ -4456,6 +4460,7 @@ export function SaatgutApp() {
                       <input
                         className="field-input"
                         type="date"
+                        lang={getIntlLocale(locale)}
                         value={plantingForm.plannedDate}
                         onChange={(event) =>
                           setPlantingForm((current) => ({
@@ -4469,6 +4474,7 @@ export function SaatgutApp() {
                       <input
                         className="field-input"
                         type="date"
+                        lang={getIntlLocale(locale)}
                         value={plantingForm.actualDate}
                         onChange={(event) =>
                           setPlantingForm((current) => ({
