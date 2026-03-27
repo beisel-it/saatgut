@@ -5746,6 +5746,39 @@ function CollapsiblePanel({
   );
 }
 
+function DetailPanel({
+  title,
+  subtitle,
+  actionLabel,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  actionLabel: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="rounded-lg border border-[var(--border)] bg-white/72 p-4 open:bg-white" open={defaultOpen ? true : undefined}>
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-[var(--foreground)]">{title}</p>
+          {subtitle ? (
+            <p className="mt-1 max-w-[56ch] text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+              {subtitle}
+            </p>
+          ) : null}
+        </div>
+        <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-[color:rgba(24,49,40,0.46)]">
+          {actionLabel}
+        </span>
+      </summary>
+      <div className="mt-4 border-t border-[var(--border)] pt-4">{children}</div>
+    </details>
+  );
+}
+
 function CatalogVarietyCard({
   variety,
   species,
@@ -5927,232 +5960,298 @@ function CatalogVarietyCard({
       </summary>
 
       <div className="mt-5 border-t border-[var(--border)] pt-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="max-w-[42rem]">
-            {variety.description ? (
-              <p className="text-sm leading-6 text-[color:rgba(24,49,40,0.74)]">
-                {variety.description}
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)]">
+          <div className="grid gap-4">
+            <section className="rounded-lg border border-[var(--border)] bg-white/72 px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                {t.forms.species}
               </p>
-            ) : null}
+              <h4 className="mt-2 text-lg font-semibold">{species?.commonName ?? t.common.notSet}</h4>
+              <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                {species?.latinName ?? t.common.notSet}
+                {species?.category ? ` · ${labelSpeciesCategory(species.category, t)}` : ""}
+              </p>
+            </section>
+
+            <section className="rounded-lg border border-[var(--border)] bg-white/72 px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                {t.forms.variety}
+              </p>
+              {variety.description ? (
+                <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.74)]">{variety.description}</p>
+              ) : (
+                <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.6)]">{t.common.notSet}</p>
+              )}
+              {variety.tags.length || variety.synonyms?.length ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {variety.tags.map((tag) => (
+                    <span key={`${variety.id}-${tag}`} className="max-w-full rounded-md bg-[var(--muted)] px-3 py-1 text-xs font-semibold break-words">
+                      {tag}
+                    </span>
+                  ))}
+                  {(variety.synonyms ?? []).map((synonym) => (
+                    <span
+                      key={synonym.id}
+                      className="max-w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-1 text-xs font-semibold break-words"
+                    >
+                      {synonym.name}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </section>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => onStartVarietyEdit(variety)}
-              className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold"
-            >
-              {t.common.edit}
-            </button>
-            <button
-              type="button"
-              onClick={() => onDeleteVariety(variety)}
-              className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700"
-            >
-              {t.common.delete}
-            </button>
-          </div>
+
+          <section className="rounded-lg border border-[var(--border)] bg-white/72 px-4 py-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+              {t.forms.seedBatch}
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-3 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
+                  {t.stats.seedBatches}
+                </p>
+                <p className="mt-1 text-xl font-semibold">{seedBatches.length}</p>
+              </div>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-3 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
+                  {t.catalog.needsAttention}
+                </p>
+                <p className="mt-1 text-xl font-semibold">{warningCount}</p>
+              </div>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-3 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
+                  {t.catalog.latestCheck}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-[color:rgba(24,49,40,0.8)]">
+                  {latestTest ? formatDate(latestTest.testedAt, locale, t.common.notSet) : t.common.notSet}
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+              {seedBatches.length
+                ? t.catalog.listHint
+                : t.catalog.noBatches}
+            </p>
+          </section>
         </div>
 
-        {varietyEditId === variety.id ? (
-          <div className="mt-4 rounded-lg border border-[var(--border)] bg-white p-4">
-            <DataForm state={varietyEditState} onSubmit={onSubmitVarietyEdit} submitLabel={t.common.saveChanges}>
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field label={t.forms.species} name="speciesId" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional}>
-                  <select
-                    className="field-input"
-                    value={varietyEditForm.speciesId}
-                    onChange={(event) => setVarietyEditForm((current) => ({ ...current, speciesId: event.target.value }))}
-                  >
-                    <option value="">{t.common.selectSpecies}</option>
-                    {speciesOptions.map((entry) => (
-                      <option key={entry.id} value={entry.id}>{entry.commonName}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={t.forms.varietyName} name="name" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional}>
-                  <input
-                    className="field-input"
-                    value={varietyEditForm.name}
-                    onChange={(event) => setVarietyEditForm((current) => ({ ...current, name: event.target.value }))}
-                  />
-                </Field>
-              </div>
-              <Field label={t.forms.description} name="description" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional} optional>
-                <textarea
-                  className="field-input min-h-24"
-                  value={varietyEditForm.description}
-                  onChange={(event) => setVarietyEditForm((current) => ({ ...current, description: event.target.value }))}
-                />
-              </Field>
-              <GuidanceFields
-                values={varietyEditForm}
-                setValues={setVarietyEditForm}
-                fieldErrors={varietyEditState.fieldErrors}
-                t={t}
-              />
-              <CompanionSelector
-                label={t.forms.companionVarieties}
-                hint={t.catalog.inlineCompanionHint}
-                selectedIds={varietyEditForm.companionIds}
-                options={companionOptions.filter((option) => option.id !== variety.id)}
-                onChange={(companionIds) =>
-                  setVarietyEditForm((current) => ({ ...current, companionIds }))
-                }
-                t={t}
-              />
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field label={t.forms.tags} name="tags" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional} optional>
-                  <input
-                    className="field-input"
-                    value={varietyEditForm.tags}
-                    onChange={(event) => setVarietyEditForm((current) => ({ ...current, tags: event.target.value }))}
-                  />
-                </Field>
-                <Field label={t.forms.synonyms} name="synonyms" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional} optional>
-                  <input
-                    className="field-input"
-                    value={varietyEditForm.synonyms}
-                    onChange={(event) => setVarietyEditForm((current) => ({ ...current, synonyms: event.target.value }))}
-                  />
-                </Field>
-              </div>
-              <Field label={t.forms.notes} name="notes" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional} optional>
-                <textarea
-                  className="field-input min-h-24"
-                  value={varietyEditForm.notes}
-                  onChange={(event) => setVarietyEditForm((current) => ({ ...current, notes: event.target.value }))}
-                />
-              </Field>
-              <label className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-medium text-[var(--foreground)]">
-                <input
-                  type="checkbox"
-                  checked={varietyEditForm.heirloom}
-                  onChange={(event) => setVarietyEditForm((current) => ({ ...current, heirloom: event.target.checked }))}
-                />
-                <span>{t.catalog.heirloom}</span>
-              </label>
+        <div className="mt-4 grid gap-4 xl:grid-cols-2">
+          <CropGuidancePanel guidance={guidance} t={t} />
+          <CompanionVarietiesPanel variety={variety} t={t} />
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          <DetailPanel
+            title={t.catalog.toolsTitle}
+            subtitle={t.catalog.toolsSubtitle}
+            actionLabel={t.catalog.toolsOpen}
+            defaultOpen={varietyEditId === variety.id}
+          >
+            <div className="mb-4 flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={onCancelVarietyEdit}
-                className="w-full rounded-lg border border-[var(--border)] bg-white px-5 py-3 text-sm font-semibold text-[var(--foreground)] sm:w-fit"
+                onClick={() => onStartVarietyEdit(variety)}
+                className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold"
               >
-                {t.common.cancel}
+                {t.common.edit}
               </button>
-            </DataForm>
-          </div>
-        ) : null}
-
-        {variety.tags.length || variety.synonyms?.length ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {variety.tags.map((tag) => (
-              <span key={`${variety.id}-${tag}`} className="max-w-full rounded-md bg-[var(--muted)] px-3 py-1 text-xs font-semibold break-words">
-                {tag}
-              </span>
-            ))}
-            {(variety.synonyms ?? []).map((synonym) => (
-              <span
-                key={synonym.id}
-                className="max-w-full rounded-md border border-[var(--border)] bg-transparent px-3 py-1 text-xs font-semibold break-words"
+              <button
+                type="button"
+                onClick={() => onDeleteVariety(variety)}
+                className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700"
               >
-                {synonym.name}
-              </span>
-            ))}
-          </div>
-        ) : null}
-
-        <CropGuidancePanel className="mt-4" guidance={guidance} t={t} />
-        <CompanionVarietiesPanel className="mt-4" variety={variety} t={t} />
-
-        <section className="mt-4 rounded-lg border border-[var(--border)] bg-white/72 px-4 py-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
-                {t.catalog.varietyImageTitle}
-              </p>
-              <p className="mt-1 max-w-[42rem] text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
-                {t.catalog.varietyImageSubtitle}
-              </p>
+                {t.common.delete}
+              </button>
             </div>
-            {variety.representativeImage ? (
-              <button
-                type="button"
-                onClick={removeRepresentativeImage}
-                disabled={imagePending}
-                className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {t.catalog.removeImage}
-              </button>
-            ) : null}
-          </div>
-          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-3">
-              {variety.representativeImage ? (
-                <>
-                  <div className="overflow-hidden rounded-md border border-[var(--border)] bg-white">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={variety.representativeImage.contentUrl}
-                      alt={variety.representativeImage.altText || variety.name}
-                      className="h-56 w-full object-cover"
-                    />
+
+            {varietyEditId === variety.id ? (
+              <div className="rounded-lg border border-[var(--border)] bg-white p-4">
+                <DataForm state={varietyEditState} onSubmit={onSubmitVarietyEdit} submitLabel={t.common.saveChanges}>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label={t.forms.species} name="speciesId" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional}>
+                      <select
+                        className="field-input"
+                        value={varietyEditForm.speciesId}
+                        onChange={(event) => setVarietyEditForm((current) => ({ ...current, speciesId: event.target.value }))}
+                      >
+                        <option value="">{t.common.selectSpecies}</option>
+                        {speciesOptions.map((entry) => (
+                          <option key={entry.id} value={entry.id}>{entry.commonName}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label={t.forms.varietyName} name="name" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional}>
+                      <input
+                        className="field-input"
+                        value={varietyEditForm.name}
+                        onChange={(event) => setVarietyEditForm((current) => ({ ...current, name: event.target.value }))}
+                      />
+                    </Field>
                   </div>
-                  <p className="mt-3 text-sm font-medium text-[var(--foreground)]">
-                    {variety.representativeImage.altText || variety.name}
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
-                    {variety.representativeImage.caption || t.catalog.noImageCaption}
-                  </p>
-                </>
-              ) : (
-                <div className="flex h-56 items-center justify-center rounded-md border border-dashed border-[var(--border)] bg-white px-4 text-center text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
-                  {t.catalog.noVarietyImage}
-                </div>
-              )}
-            </div>
-            <form className="grid gap-4" onSubmit={submitRepresentativeImage}>
-              {imageState.error ? <Alert tone="danger">{imageState.error}</Alert> : null}
-              {imageState.success ? <Alert tone="success">{imageState.success}</Alert> : null}
-              <Field label={t.forms.imageFile} name="file" fieldErrors={imageState.fieldErrors} optionalLabel={t.common.optional}>
-                <input
-                  className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[var(--foreground)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(event) =>
-                    setImageForm((current) => ({ ...current, file: event.target.files?.[0] ?? null }))
-                  }
-                />
-              </Field>
-              <Field label={t.forms.altText} name="altText" fieldErrors={imageState.fieldErrors} optional optionalLabel={t.common.optional}>
-                <input
-                  className="field-input"
-                  value={imageForm.altText}
-                  onChange={(event) => setImageForm((current) => ({ ...current, altText: event.target.value }))}
-                  placeholder={t.forms.altTextPlaceholder}
-                />
-              </Field>
-              <Field label={t.forms.caption} name="caption" fieldErrors={imageState.fieldErrors} optional optionalLabel={t.common.optional}>
-                <textarea
-                  className="field-input min-h-24"
-                  value={imageForm.caption}
-                  onChange={(event) => setImageForm((current) => ({ ...current, caption: event.target.value }))}
-                  placeholder={t.forms.captionPlaceholder}
-                />
-              </Field>
-              <button className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit" disabled={imagePending}>
-                {imagePending
-                  ? t.catalog.savingImage
-                  : variety.representativeImage
-                    ? t.catalog.replaceImage
-                    : t.catalog.uploadImage}
-              </button>
-            </form>
-          </div>
-        </section>
+                  <Field label={t.forms.description} name="description" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional} optional>
+                    <textarea
+                      className="field-input min-h-24"
+                      value={varietyEditForm.description}
+                      onChange={(event) => setVarietyEditForm((current) => ({ ...current, description: event.target.value }))}
+                    />
+                  </Field>
+                  <GuidanceFields
+                    values={varietyEditForm}
+                    setValues={setVarietyEditForm}
+                    fieldErrors={varietyEditState.fieldErrors}
+                    t={t}
+                  />
+                  <CompanionSelector
+                    label={t.forms.companionVarieties}
+                    hint={t.catalog.inlineCompanionHint}
+                    selectedIds={varietyEditForm.companionIds}
+                    options={companionOptions.filter((option) => option.id !== variety.id)}
+                    onChange={(companionIds) =>
+                      setVarietyEditForm((current) => ({ ...current, companionIds }))
+                    }
+                    t={t}
+                  />
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label={t.forms.tags} name="tags" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional} optional>
+                      <input
+                        className="field-input"
+                        value={varietyEditForm.tags}
+                        onChange={(event) => setVarietyEditForm((current) => ({ ...current, tags: event.target.value }))}
+                      />
+                    </Field>
+                    <Field label={t.forms.synonyms} name="synonyms" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional} optional>
+                      <input
+                        className="field-input"
+                        value={varietyEditForm.synonyms}
+                        onChange={(event) => setVarietyEditForm((current) => ({ ...current, synonyms: event.target.value }))}
+                      />
+                    </Field>
+                  </div>
+                  <Field label={t.forms.notes} name="notes" fieldErrors={varietyEditState.fieldErrors} optionalLabel={t.common.optional} optional>
+                    <textarea
+                      className="field-input min-h-24"
+                      value={varietyEditForm.notes}
+                      onChange={(event) => setVarietyEditForm((current) => ({ ...current, notes: event.target.value }))}
+                    />
+                  </Field>
+                  <label className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-medium text-[var(--foreground)]">
+                    <input
+                      type="checkbox"
+                      checked={varietyEditForm.heirloom}
+                      onChange={(event) => setVarietyEditForm((current) => ({ ...current, heirloom: event.target.checked }))}
+                    />
+                    <span>{t.catalog.heirloom}</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={onCancelVarietyEdit}
+                    className="w-full rounded-lg border border-[var(--border)] bg-white px-5 py-3 text-sm font-semibold text-[var(--foreground)] sm:w-fit"
+                  >
+                    {t.common.cancel}
+                  </button>
+                </DataForm>
+              </div>
+            ) : null}
+          </DetailPanel>
 
-        <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
-            {t.catalog.batchListTitle}
-          </p>
+          <DetailPanel
+            title={t.catalog.varietyImageTitle}
+            subtitle={t.catalog.varietyImageSubtitle}
+            actionLabel={t.catalog.toolsOpen}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              {variety.representativeImage ? (
+                <button
+                  type="button"
+                  onClick={removeRepresentativeImage}
+                  disabled={imagePending}
+                  className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {t.catalog.removeImage}
+                </button>
+              ) : null}
+            </div>
+            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-3">
+                {variety.representativeImage ? (
+                  <>
+                    <div className="overflow-hidden rounded-md border border-[var(--border)] bg-white">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={variety.representativeImage.contentUrl}
+                        alt={variety.representativeImage.altText || variety.name}
+                        className="h-56 w-full object-cover"
+                      />
+                    </div>
+                    <p className="mt-3 text-sm font-medium text-[var(--foreground)]">
+                      {variety.representativeImage.altText || variety.name}
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                      {variety.representativeImage.caption || t.catalog.noImageCaption}
+                    </p>
+                  </>
+                ) : (
+                  <div className="flex h-56 items-center justify-center rounded-md border border-dashed border-[var(--border)] bg-white px-4 text-center text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                    {t.catalog.noVarietyImage}
+                  </div>
+                )}
+              </div>
+              <form className="grid gap-4" onSubmit={submitRepresentativeImage}>
+                {imageState.error ? <Alert tone="danger">{imageState.error}</Alert> : null}
+                {imageState.success ? <Alert tone="success">{imageState.success}</Alert> : null}
+                <Field label={t.forms.imageFile} name="file" fieldErrors={imageState.fieldErrors} optionalLabel={t.common.optional}>
+                  <input
+                    className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[var(--foreground)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(event) =>
+                      setImageForm((current) => ({ ...current, file: event.target.files?.[0] ?? null }))
+                    }
+                  />
+                </Field>
+                <Field label={t.forms.altText} name="altText" fieldErrors={imageState.fieldErrors} optional optionalLabel={t.common.optional}>
+                  <input
+                    className="field-input"
+                    value={imageForm.altText}
+                    onChange={(event) => setImageForm((current) => ({ ...current, altText: event.target.value }))}
+                    placeholder={t.forms.altTextPlaceholder}
+                  />
+                </Field>
+                <Field label={t.forms.caption} name="caption" fieldErrors={imageState.fieldErrors} optional optionalLabel={t.common.optional}>
+                  <textarea
+                    className="field-input min-h-24"
+                    value={imageForm.caption}
+                    onChange={(event) => setImageForm((current) => ({ ...current, caption: event.target.value }))}
+                    placeholder={t.forms.captionPlaceholder}
+                  />
+                </Field>
+                <button className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit" disabled={imagePending}>
+                  {imagePending
+                    ? t.catalog.savingImage
+                    : variety.representativeImage
+                      ? t.catalog.replaceImage
+                      : t.catalog.uploadImage}
+                </button>
+              </form>
+            </div>
+          </DetailPanel>
+        </div>
+
+        <section className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
+                {t.catalog.batchListTitle}
+              </p>
+              <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                {t.catalog.listHint}
+              </p>
+            </div>
+            <span className="rounded-md border border-[var(--border)] bg-white px-3 py-1 text-xs font-semibold text-[color:rgba(24,49,40,0.7)]">
+              {seedBatches.length} {t.stats.seedBatches.toLowerCase()}
+            </span>
+          </div>
           {seedBatches.length ? (
             <div className="mt-3 grid gap-3">
               {seedBatches.map((seedBatch) => (
@@ -6172,11 +6271,11 @@ function CatalogVarietyCard({
               ))}
             </div>
           ) : (
-            <p className="mt-3 rounded-md bg-[var(--muted)] px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
+            <p className="mt-3 rounded-md bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
               {t.catalog.noBatches}
             </p>
           )}
-        </div>
+        </section>
       </div>
     </details>
   );
@@ -6407,18 +6506,21 @@ function SeedBatchCard({
   }
 
   return (
-    <article className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <article className="rounded-lg border border-[var(--border)] bg-white/78 px-4 py-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold">{varietyName}</h3>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+            {t.forms.seedBatch}
+          </p>
+          <h3 className="mt-1 text-base font-semibold">
+            {seedBatch.source ?? varietyName}
+            {seedBatch.harvestYear ? ` · ${t.seedBatch.harvestPrefix} ${seedBatch.harvestYear}` : ""}
+          </h3>
           <p className="mt-1 text-sm text-[color:rgba(24,49,40,0.72)]">
             {seedBatch.quantity} {labelSeedUnit(seedBatch.unit, t).toLowerCase()} · {seedBatch.storageLocation || t.seedBatch.noStorageLocation}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md bg-white px-3 py-1 text-xs font-semibold">
-            {seedBatch.harvestYear ? `${t.seedBatch.harvestPrefix} ${seedBatch.harvestYear}` : t.seedBatch.yearUnknown}
-          </span>
           <button type="button" onClick={onEdit} className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold">
             {t.common.edit}
           </button>
@@ -6432,140 +6534,164 @@ function SeedBatchCard({
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {warnings.map((warning) => (
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-3 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
+            {t.forms.quantity}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-[color:rgba(24,49,40,0.8)]">
+            {formatSeedQuantity(seedBatch.quantity, seedBatch.unit, locale, t, t.common.notSet)}
+          </p>
+        </div>
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-3 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
+            {t.seedBatch.germinationTestsTitle}
+          </p>
+          <p className="mt-1 text-xl font-semibold">{germinationTests.length}</p>
+        </div>
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-3 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
+            {t.seedBatch.correctionHistoryTitle}
+          </p>
+          <p className="mt-1 text-xl font-semibold">{adjustments.length}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {warnings.slice(0, 3).map((warning) => (
           <WarningPill key={`${seedBatch.id}-${warning.title}`} level={warning.level}>
             {getWarningTitle(warning.code, warning.title, t)}
           </WarningPill>
         ))}
       </div>
 
-      <div className="mt-4 rounded-lg border border-[var(--border)] bg-white/72 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
-              {t.seedBatch.photosTitle}
-            </p>
-            <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
-              {t.seedBatch.photosSubtitle}
-            </p>
+      <div className="mt-4 grid gap-3">
+        <DetailPanel
+          title={t.seedBatch.photosTitle}
+          subtitle={t.seedBatch.photosSubtitle}
+          actionLabel={t.catalog.toolsOpen}
+        >
+          <div className="grid gap-4 lg:grid-cols-2">
+            <MediaSlot
+              asset={packetPhoto}
+              title={t.seedBatch.packetPhotoTitle}
+              emptyCopy={t.seedBatch.noPacketPhoto}
+              removeLabel={t.catalog.removeImage}
+              onRemove={packetPhoto ? () => removePhoto(packetPhoto) : undefined}
+              t={t}
+            />
+            <MediaSlot
+              asset={referencePhoto}
+              title={t.seedBatch.referencePhotoTitle}
+              emptyCopy={t.seedBatch.noReferencePhoto}
+              removeLabel={t.catalog.removeImage}
+              onRemove={referencePhoto ? () => removePhoto(referencePhoto) : undefined}
+              t={t}
+            />
           </div>
-        </div>
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <MediaSlot
-            asset={packetPhoto}
-            title={t.seedBatch.packetPhotoTitle}
-            emptyCopy={t.seedBatch.noPacketPhoto}
-            removeLabel={t.catalog.removeImage}
-            onRemove={packetPhoto ? () => removePhoto(packetPhoto) : undefined}
-            t={t}
-          />
-          <MediaSlot
-            asset={referencePhoto}
-            title={t.seedBatch.referencePhotoTitle}
-            emptyCopy={t.seedBatch.noReferencePhoto}
-            removeLabel={t.catalog.removeImage}
-            onRemove={referencePhoto ? () => removePhoto(referencePhoto) : undefined}
-            t={t}
-          />
-        </div>
-        <form className="mt-4 grid gap-4" onSubmit={submitBatchPhoto}>
-          {photoState.error ? <Alert tone="danger">{photoState.error}</Alert> : null}
-          {photoState.success ? <Alert tone="success">{photoState.success}</Alert> : null}
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label={t.forms.photoKind} name="kind" fieldErrors={photoState.fieldErrors} optionalLabel={t.common.optional}>
-              <select
-                className="field-input"
-                value={photoForm.kind}
-                onChange={(event) =>
-                  setPhotoForm((current) => ({ ...current, kind: event.target.value as MediaAsset["kind"] }))
-                }
-              >
-                <option value="SEED_BATCH_PACKET">{t.seedBatch.packetPhotoTitle}</option>
-                <option value="SEED_BATCH_REFERENCE">{t.seedBatch.referencePhotoTitle}</option>
-              </select>
-            </Field>
-            <Field label={t.forms.imageFile} name="file" fieldErrors={photoState.fieldErrors} optionalLabel={t.common.optional}>
+          <form className="mt-4 grid gap-4" onSubmit={submitBatchPhoto}>
+            {photoState.error ? <Alert tone="danger">{photoState.error}</Alert> : null}
+            {photoState.success ? <Alert tone="success">{photoState.success}</Alert> : null}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label={t.forms.photoKind} name="kind" fieldErrors={photoState.fieldErrors} optionalLabel={t.common.optional}>
+                <select
+                  className="field-input"
+                  value={photoForm.kind}
+                  onChange={(event) =>
+                    setPhotoForm((current) => ({ ...current, kind: event.target.value as MediaAsset["kind"] }))
+                  }
+                >
+                  <option value="SEED_BATCH_PACKET">{t.seedBatch.packetPhotoTitle}</option>
+                  <option value="SEED_BATCH_REFERENCE">{t.seedBatch.referencePhotoTitle}</option>
+                </select>
+              </Field>
+              <Field label={t.forms.imageFile} name="file" fieldErrors={photoState.fieldErrors} optionalLabel={t.common.optional}>
+                <input
+                  className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[var(--foreground)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) =>
+                    setPhotoForm((current) => ({ ...current, file: event.target.files?.[0] ?? null }))
+                  }
+                />
+              </Field>
+            </div>
+            <Field label={t.forms.altText} name="altText" fieldErrors={photoState.fieldErrors} optional optionalLabel={t.common.optional}>
               <input
-                className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-[var(--foreground)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(event) =>
-                  setPhotoForm((current) => ({ ...current, file: event.target.files?.[0] ?? null }))
-                }
+                className="field-input"
+                value={photoForm.altText}
+                onChange={(event) => setPhotoForm((current) => ({ ...current, altText: event.target.value }))}
+                placeholder={t.forms.altTextPlaceholder}
               />
             </Field>
-          </div>
-          <Field label={t.forms.altText} name="altText" fieldErrors={photoState.fieldErrors} optional optionalLabel={t.common.optional}>
-            <input
-              className="field-input"
-              value={photoForm.altText}
-              onChange={(event) => setPhotoForm((current) => ({ ...current, altText: event.target.value }))}
-              placeholder={t.forms.altTextPlaceholder}
-            />
-          </Field>
-          <Field label={t.forms.caption} name="caption" fieldErrors={photoState.fieldErrors} optional optionalLabel={t.common.optional}>
-            <textarea
-              className="field-input min-h-24"
-              value={photoForm.caption}
-              onChange={(event) => setPhotoForm((current) => ({ ...current, caption: event.target.value }))}
-              placeholder={t.forms.captionPlaceholder}
-            />
-          </Field>
-          <button className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit" disabled={photoPending}>
-            {photoPending ? t.catalog.savingImage : t.seedBatch.savePhoto}
-          </button>
-        </form>
-      </div>
+            <Field label={t.forms.caption} name="caption" fieldErrors={photoState.fieldErrors} optional optionalLabel={t.common.optional}>
+              <textarea
+                className="field-input min-h-24"
+                value={photoForm.caption}
+                onChange={(event) => setPhotoForm((current) => ({ ...current, caption: event.target.value }))}
+                placeholder={t.forms.captionPlaceholder}
+              />
+            </Field>
+            <button className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit" disabled={photoPending}>
+              {photoPending ? t.catalog.savingImage : t.seedBatch.savePhoto}
+            </button>
+          </form>
+        </DetailPanel>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
-            {t.seedBatch.germinationTestsTitle}
-          </p>
-          <div className="mt-2 grid gap-2">
-            {germinationTests.length ? (
-              germinationTests.slice(0, 2).map((entry) => (
-                <div key={entry.id} className="rounded-md bg-white px-3 py-3 text-sm">
-                  <p className="font-medium">{formatDate(entry.testedAt, locale, t.common.notSet)}</p>
-                  <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
-                    {entry.germinatedCount}/{entry.sampleSize} {t.seedBatch.germinated}
-                    {entry.germinationRate ? ` · ${entry.germinationRate}%` : ""}
-                    {entry.notes ? ` · ${entry.notes}` : ""}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="rounded-md bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
-                {t.seedBatch.noGerminationTests}
+        <DetailPanel
+          title={t.seedBatch.correctionHistoryTitle}
+          actionLabel={t.catalog.toolsOpen}
+        >
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
+                {t.seedBatch.germinationTestsTitle}
               </p>
-            )}
-          </div>
-        </div>
+              <div className="mt-2 grid gap-2">
+                {germinationTests.length ? (
+                  germinationTests.slice(0, 2).map((entry) => (
+                    <div key={entry.id} className="rounded-md bg-white px-3 py-3 text-sm">
+                      <p className="font-medium">{formatDate(entry.testedAt, locale, t.common.notSet)}</p>
+                      <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
+                        {entry.germinatedCount}/{entry.sampleSize} {t.seedBatch.germinated}
+                        {entry.germinationRate ? ` · ${entry.germinationRate}%` : ""}
+                        {entry.notes ? ` · ${entry.notes}` : ""}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-md bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
+                    {t.seedBatch.noGerminationTests}
+                  </p>
+                )}
+              </div>
+            </div>
 
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
-            {t.seedBatch.correctionHistoryTitle}
-          </p>
-          <div className="mt-2 grid gap-2">
-            {adjustments.length ? (
-              adjustments.slice(0, 2).map((entry) => (
-                <div key={entry.id} className="rounded-md bg-white px-3 py-3 text-sm">
-                  <p className="font-medium">{labelPlantingType(entry.type, t)}</p>
-                  <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
-                    {formatDate(entry.effectiveDate, locale, t.common.notSet)}
-                    {entry.quantityDelta ? ` · ${t.seedBatch.delta} ${entry.quantityDelta}` : ""}
-                    {entry.reason ? ` · ${entry.reason}` : ""}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="rounded-md bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
-                {t.seedBatch.noCorrectionHistory}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
+                {t.seedBatch.correctionHistoryTitle}
               </p>
-            )}
+              <div className="mt-2 grid gap-2">
+                {adjustments.length ? (
+                  adjustments.slice(0, 2).map((entry) => (
+                    <div key={entry.id} className="rounded-md bg-white px-3 py-3 text-sm">
+                      <p className="font-medium">{labelPlantingType(entry.type, t)}</p>
+                      <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
+                        {formatDate(entry.effectiveDate, locale, t.common.notSet)}
+                        {entry.quantityDelta ? ` · ${t.seedBatch.delta} ${entry.quantityDelta}` : ""}
+                        {entry.reason ? ` · ${entry.reason}` : ""}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-md bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
+                    {t.seedBatch.noCorrectionHistory}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        </DetailPanel>
       </div>
     </article>
   );
