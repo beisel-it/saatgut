@@ -3928,7 +3928,7 @@ export function SaatgutApp() {
                         ))}
                       </select>
                     </Field>
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4 xl:grid-cols-2">
                       <Field label={t.forms.type} name="type" fieldErrors={plantingEditState.fieldErrors} optionalLabel={t.common.optional}>
                         <select
                           className="field-input"
@@ -3961,7 +3961,7 @@ export function SaatgutApp() {
                         </select>
                       </Field>
                     </div>
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
                       <Field label={t.forms.seedBatch} name="seedBatchId" fieldErrors={plantingEditState.fieldErrors} optional optionalLabel={t.common.optional}>
                         <select
                           className="field-input"
@@ -3993,7 +3993,7 @@ export function SaatgutApp() {
                         />
                       </Field>
                     </div>
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4 xl:grid-cols-2">
                       <Field label={t.forms.plannedDate} name="plannedDate" fieldErrors={plantingEditState.fieldErrors} optional optionalLabel={t.common.optional}>
                         <input
                           className="field-input"
@@ -4047,7 +4047,7 @@ export function SaatgutApp() {
                       }
                     />
                   </Field>
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-4 xl:grid-cols-2">
                     <Field label={t.forms.lastFrostDate} name="lastFrostDate" fieldErrors={profileState.fieldErrors} optionalLabel={t.common.optional}>
                       <input
                         className="field-input"
@@ -4091,77 +4091,63 @@ export function SaatgutApp() {
                 </DataForm>
               </Panel>
 
-              <div className="grid gap-4 2xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-                <Panel title={t.profiles.helperTitle} subtitle={t.profiles.helperSubtitle}>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {phenologyStageIds.map((stageId) => (
+              <Panel title={t.profiles.summaryTitle} subtitle={t.profiles.summarySubtitle}>
+                {dashboard?.profiles.length ? (
+                  <div className="grid gap-3">
+                    {dashboard.profiles.map((profile) => (
                       <article
-                        key={stageId}
-                        className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
+                        key={profile.id}
+                        className={classNames(
+                          "rounded-lg border px-4 py-4",
+                          profile.isActive
+                            ? "border-[var(--accent)] bg-[color:rgba(127,155,71,0.12)]"
+                            : "border-[var(--border)] bg-[var(--muted)]",
+                        )}
                       >
-                        <h3 className="text-base font-semibold">{t.phenologyStages[stageId].label}</h3>
-                        <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{t.phenologyStages[stageId].hint}</p>
-                      </article>
-                    ))}
-                  </div>
-                </Panel>
-
-                <Panel title={t.profiles.summaryTitle} subtitle={t.profiles.summarySubtitle}>
-                  {dashboard?.profiles.length ? (
-                    <div className="grid gap-3">
-                      {dashboard.profiles.map((profile) => (
-                        <article
-                          key={profile.id}
-                          className={classNames(
-                            "rounded-lg border px-4 py-4",
-                            profile.isActive
-                              ? "border-[var(--accent)] bg-[color:rgba(127,155,71,0.12)]"
-                              : "border-[var(--border)] bg-[var(--muted)]",
-                          )}
-                        >
-                          {profileEditId === profile.id ? (
-                            <DataForm state={profileEditState} onSubmit={submitProfileEdit} submitLabel={t.common.saveChanges}>
-                              <Field label={t.forms.profileName} name="name" fieldErrors={profileEditState.fieldErrors} optionalLabel={t.common.optional}>
-                                <input className="field-input" value={profileEditForm.name} onChange={(event) => setProfileEditForm((current) => ({ ...current, name: event.target.value }))} />
+                        {profileEditId === profile.id ? (
+                          <DataForm state={profileEditState} onSubmit={submitProfileEdit} submitLabel={t.common.saveChanges}>
+                            <Field label={t.forms.profileName} name="name" fieldErrors={profileEditState.fieldErrors} optionalLabel={t.common.optional}>
+                              <input className="field-input" value={profileEditForm.name} onChange={(event) => setProfileEditForm((current) => ({ ...current, name: event.target.value }))} />
+                            </Field>
+                            <div className="grid gap-4 xl:grid-cols-2">
+                              <Field label={t.forms.lastFrostDate} name="lastFrostDate" fieldErrors={profileEditState.fieldErrors} optionalLabel={t.common.optional}>
+                                <input className="field-input" type="date" value={profileEditForm.lastFrostDate} onChange={(event) => setProfileEditForm((current) => ({ ...current, lastFrostDate: event.target.value }))} />
                               </Field>
-                              <div className="grid gap-4 md:grid-cols-2">
-                                <Field label={t.forms.lastFrostDate} name="lastFrostDate" fieldErrors={profileEditState.fieldErrors} optionalLabel={t.common.optional}>
-                                  <input className="field-input" type="date" value={profileEditForm.lastFrostDate} onChange={(event) => setProfileEditForm((current) => ({ ...current, lastFrostDate: event.target.value }))} />
-                                </Field>
-                                <Field label={t.forms.firstFrostDate} name="firstFrostDate" fieldErrors={profileEditState.fieldErrors} optionalLabel={t.common.optional}>
-                                  <input className="field-input" type="date" value={profileEditForm.firstFrostDate} onChange={(event) => setProfileEditForm((current) => ({ ...current, firstFrostDate: event.target.value }))} />
-                                </Field>
-                              </div>
-                              <label className="flex items-center gap-3 text-sm font-medium">
-                                <input type="checkbox" checked={profileEditForm.isActive} onChange={(event) => setProfileEditForm((current) => ({ ...current, isActive: event.target.checked }))} />
-                                {t.profiles.markActive}
-                              </label>
-                              <Field label={t.forms.notes} name="notes" fieldErrors={profileEditState.fieldErrors} optional optionalLabel={t.common.optional}>
-                                <textarea className="field-input min-h-24" value={profileEditForm.notes} onChange={(event) => setProfileEditForm((current) => ({ ...current, notes: event.target.value }))} />
+                              <Field label={t.forms.firstFrostDate} name="firstFrostDate" fieldErrors={profileEditState.fieldErrors} optionalLabel={t.common.optional}>
+                                <input className="field-input" type="date" value={profileEditForm.firstFrostDate} onChange={(event) => setProfileEditForm((current) => ({ ...current, firstFrostDate: event.target.value }))} />
                               </Field>
-                              <div className="flex flex-wrap gap-3">
-                                <button className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit">{t.common.saveChanges}</button>
-                                <button type="button" onClick={cancelProfileEdit} className="w-full rounded-lg border border-[var(--border)] bg-white px-5 py-3 text-sm font-semibold sm:w-fit">{t.common.cancel}</button>
+                            </div>
+                            <label className="flex items-center gap-3 text-sm font-medium">
+                              <input type="checkbox" checked={profileEditForm.isActive} onChange={(event) => setProfileEditForm((current) => ({ ...current, isActive: event.target.checked }))} />
+                              {t.profiles.markActive}
+                            </label>
+                            <Field label={t.forms.notes} name="notes" fieldErrors={profileEditState.fieldErrors} optional optionalLabel={t.common.optional}>
+                              <textarea className="field-input min-h-24" value={profileEditForm.notes} onChange={(event) => setProfileEditForm((current) => ({ ...current, notes: event.target.value }))} />
+                            </Field>
+                            <div className="flex flex-wrap gap-3">
+                              <button className="w-full rounded-lg bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white sm:w-fit">{t.common.saveChanges}</button>
+                              <button type="button" onClick={cancelProfileEdit} className="w-full rounded-lg border border-[var(--border)] bg-white px-5 py-3 text-sm font-semibold sm:w-fit">{t.common.cancel}</button>
+                            </div>
+                          </DataForm>
+                        ) : (
+                          <>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <h3 className="text-lg font-semibold">{profile.name}</h3>
+                              <div className="flex flex-wrap gap-2">
+                                {profile.isActive ? (
+                                  <span className="rounded-md bg-[var(--foreground)] px-3 py-1 text-xs font-semibold text-white">
+                                    {t.common.active}
+                                  </span>
+                                ) : null}
+                                <button type="button" onClick={() => startProfileEdit(profile)} className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold">{t.common.edit}</button>
+                                <button type="button" onClick={() => openCatalogDelete({ type: "profile", id: profile.id, label: profile.name })} className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{t.common.delete}</button>
                               </div>
-                            </DataForm>
-                          ) : (
-                            <>
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-                                <h3 className="text-lg font-semibold">{profile.name}</h3>
-                                <div className="flex flex-wrap gap-2">
-                                  {profile.isActive ? (
-                                    <span className="rounded-md bg-[var(--foreground)] px-3 py-1 text-xs font-semibold text-white">
-                                      {t.common.active}
-                                    </span>
-                                  ) : null}
-                                  <button type="button" onClick={() => startProfileEdit(profile)} className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm font-semibold">{t.common.edit}</button>
-                                  <button type="button" onClick={() => openCatalogDelete({ type: "profile", id: profile.id, label: profile.name })} className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{t.common.delete}</button>
-                                </div>
-                              </div>
-                              <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">
-                                {t.profiles.lastFrost} {formatDate(profile.lastFrostDate, locale, t.common.notSet)} · {t.profiles.firstFrost} {formatDate(profile.firstFrostDate, locale, t.common.notSet)}
-                              </p>
-                              <div className="mt-4 grid gap-2">
+                            </div>
+                            <p className="mt-2 text-sm text-[color:rgba(24,49,40,0.72)]">
+                              {t.profiles.lastFrost} {formatDate(profile.lastFrostDate, locale, t.common.notSet)} · {t.profiles.firstFrost} {formatDate(profile.firstFrostDate, locale, t.common.notSet)}
+                            </p>
+                            <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                              <div className="grid gap-2">
                                 <label className="grid gap-2 text-sm font-medium">
                                   <span>{t.profiles.observedStage}</span>
                                   <select
@@ -4189,7 +4175,7 @@ export function SaatgutApp() {
                                     : undefined) || t.profiles.phenologyFallback}
                                 </p>
                               </div>
-                              <div className="mt-3 grid gap-2">
+                              <div className="grid gap-2">
                                 <label className="grid gap-2 text-sm font-medium">
                                   <span>{t.profiles.phenologyNotes}</span>
                                   <textarea
@@ -4205,24 +4191,41 @@ export function SaatgutApp() {
                                   />
                                 </label>
                               </div>
-                              {profile.notes ? (
-                                <p className="mt-3 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
-                                  {profile.notes}
-                                </p>
-                              ) : null}
-                            </>
-                          )}
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState
-                      title={t.profiles.noProfilesTitle}
-                      copy={t.profiles.noProfilesCopy}
-                    />
-                  )}
-                </Panel>
-              </div>
+                            </div>
+                            {profile.notes ? (
+                              <p className="mt-3 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                                {profile.notes}
+                              </p>
+                            ) : null}
+                          </>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title={t.profiles.noProfilesTitle}
+                    copy={t.profiles.noProfilesCopy}
+                  />
+                )}
+              </Panel>
+
+              <CollapsiblePanel title={t.profiles.helperTitle} actionLabel={t.catalog.toolsOpen}>
+                <p className="mb-4 max-w-[60ch] text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                  {t.profiles.helperSubtitle}
+                </p>
+                <div className="grid gap-3 xl:grid-cols-2">
+                  {phenologyStageIds.map((stageId) => (
+                    <article
+                      key={stageId}
+                      className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4"
+                    >
+                      <h3 className="text-base font-semibold">{t.phenologyStages[stageId].label}</h3>
+                      <p className="mt-2 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">{t.phenologyStages[stageId].hint}</p>
+                    </article>
+                  ))}
+                </div>
+              </CollapsiblePanel>
               </div>
             </div>
           ) : null}
@@ -4281,7 +4284,7 @@ export function SaatgutApp() {
                                 <button type="button" onClick={() => openCatalogDelete({ type: "rule", id: rule.id, label: rule.variety.name })} className="rounded-lg border border-red-300/50 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{t.common.delete}</button>
                               </div>
                             </div>
-                            <div className="mt-3 grid gap-2 text-sm text-[color:rgba(24,49,40,0.72)] md:grid-cols-2">
+                            <div className="mt-3 grid gap-2 text-sm text-[color:rgba(24,49,40,0.72)] xl:grid-cols-2">
                               <p>{t.rules.indoorSowing}: {nullableRange(rule.sowIndoorsStartWeeks, rule.sowIndoorsEndWeeks, t.rules.weeksBefore, t.common.notDefined)}</p>
                               <p>{t.rules.outdoorSowing}: {nullableRange(rule.sowOutdoorsStartWeeks, rule.sowOutdoorsEndWeeks, t.rules.weeksBefore, t.common.notDefined)}</p>
                               <p>{t.rules.transplant}: {nullableRange(rule.transplantStartWeeks, rule.transplantEndWeeks, t.rules.weeksAfter, t.common.notDefined)}</p>
@@ -4376,7 +4379,7 @@ export function SaatgutApp() {
                       ))}
                     </select>
                   </Field>
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                     <Field label={t.forms.type} name="type" fieldErrors={plantingState.fieldErrors} optionalLabel={t.common.optional}>
                       <select
                         className="field-input"
@@ -4392,7 +4395,7 @@ export function SaatgutApp() {
                             <option key={type} value={type}>
                               {labelPlantingType(type, t)}
                             </option>
-                          ))}
+                        ))}
                       </select>
                     </Field>
                     <Field label={t.forms.growingProfile} name="growingProfileId" fieldErrors={plantingState.fieldErrors} optional optionalLabel={t.common.optional}>
@@ -4415,7 +4418,7 @@ export function SaatgutApp() {
                       </select>
                     </Field>
                   </div>
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
                     <Field label={t.forms.seedBatch} name="seedBatchId" fieldErrors={plantingState.fieldErrors} optional optionalLabel={t.common.optional}>
                       <select
                         className="field-input"
@@ -4448,7 +4451,7 @@ export function SaatgutApp() {
                       />
                     </Field>
                   </div>
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-4 xl:grid-cols-2">
                     <Field label={t.forms.plannedDate} name="plannedDate" fieldErrors={plantingState.fieldErrors} optional optionalLabel={t.common.optional}>
                       <input
                         className="field-input"
@@ -4544,7 +4547,7 @@ export function SaatgutApp() {
                 subtitle={t.workspace.accountSubtitle}
                 className="bg-white/85 shadow-none"
               >
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-3 xl:grid-cols-3">
                   <article className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
                       {t.workspace.emailLabel}
@@ -4582,7 +4585,7 @@ export function SaatgutApp() {
                   {passkeyManagementState.success ? <Alert tone="success">{passkeyManagementState.success}</Alert> : null}
                   {passkeyEnrollState.error ? <Alert tone="danger">{passkeyEnrollState.error}</Alert> : null}
                   {passkeyEnrollState.success ? <Alert tone="success">{passkeyEnrollState.success}</Alert> : null}
-                  <div className="grid gap-4 lg:grid-cols-[minmax(0,0.88fr)_minmax(18rem,0.72fr)]">
+                  <div className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(18rem,0.68fr)]">
                     <div className="grid gap-4">
                       <button
                         type="button"
@@ -4665,7 +4668,7 @@ export function SaatgutApp() {
                     </p>
                   </div>
                   <DataForm state={passwordState} onSubmit={submitPasswordChange} submitLabel={t.workspace.changePassword}>
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4 xl:grid-cols-2">
                       <Field label={t.workspace.currentPassword} name="currentPassword" fieldErrors={passwordState.fieldErrors} optionalLabel={t.common.optional}>
                         <input
                           className="field-input"
@@ -6765,7 +6768,7 @@ function RuleGrid({
               {group.help}
             </p>
           </div>
-          <div className={classNames("grid gap-4", group.fields.length > 1 && "md:grid-cols-2")}>
+          <div className={classNames("grid gap-4", group.fields.length > 1 && "xl:grid-cols-2")}>
             {group.fields.map((field) => (
               <label key={field.name} className="grid gap-2 text-sm font-medium">
                 <span>{field.label}</span>
