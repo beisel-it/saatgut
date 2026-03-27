@@ -6450,6 +6450,14 @@ function SeedBatchCard({
   locale: Locale;
   t: AppMessages;
 }) {
+  const [germinationEntryOpen, setGerminationEntryOpen] = useState(germinationTests.length === 0);
+  const [germinationEntryForm, setGerminationEntryForm] = useState({
+    entryDate: "",
+    sampleSize: "",
+    germinatedCount: "",
+    notes: "",
+  });
+  const [germinationEntryState, setGerminationEntryState] = useState<FormState>(initialFormState);
   const [photoForm, setPhotoForm] = useState({
     kind: "SEED_BATCH_PACKET" as MediaAsset["kind"],
     file: null as File | null,
@@ -6466,6 +6474,33 @@ function SeedBatchCard({
     [...(seedBatch.photos ?? [])]
       .filter((photo) => photo.kind === "SEED_BATCH_REFERENCE")
       .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] ?? null;
+  const recentGerminationTests = [...germinationTests]
+    .sort((left, right) => new Date(right.testedAt).getTime() - new Date(left.testedAt).getTime())
+    .slice(0, 3);
+  const latestGerminationTest = recentGerminationTests[0] ?? null;
+
+  function submitGerminationEntry(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setGerminationEntryState(initialFormState);
+    void createGerminationTest(seedBatch.id, {
+      testedAt: toIsoDate(germinationEntryForm.entryDate),
+      sampleSize: Number(germinationEntryForm.sampleSize),
+      germinatedCount: Number(germinationEntryForm.germinatedCount),
+      notes: germinationEntryForm.notes || null,
+    })
+      .then(async () => {
+        setGerminationEntryForm({
+          entryDate: "",
+          sampleSize: "",
+          germinatedCount: "",
+          notes: "",
+        });
+        setGerminationEntryOpen(false);
+        setGerminationEntryState({ error: null, success: t.statuses.germinationLogged, fieldErrors: {} });
+        await onMediaChanged();
+      })
+      .catch((error) => setGerminationEntryState(toFormState(error, t)));
+  }
 
   async function replacePhotoOfKind(kind: "SEED_BATCH_PACKET" | "SEED_BATCH_REFERENCE", file: File, altText: string, caption: string) {
     const existing = (seedBatch.photos ?? []).filter((photo) => photo.kind === kind);
@@ -6574,6 +6609,106 @@ function SeedBatchCard({
         ))}
       </div>
 
+      <section className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
+              {t.seedBatch.germinationTestsTitle}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+              {latestGerminationTest
+                ? `${formatDate(latestGerminationTest.testedAt, locale, t.common.notSet)} · ${latestGerminationTest.germinatedCount}/${latestGerminationTest.sampleSize} ${t.seedBatch.germinated}${latestGerminationTest.germinationRate ? ` · ${latestGerminationTest.germinationRate}%` : ""}`
+                : t.seedBatch.noGerminationTests}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setGerminationEntryState(initialFormState);
+                setGerminationEntryOpen((current) => !current);
+              }}
+              className="rounded-lg bg-[var(--foreground)] px-4 py-2 text-sm font-semibold text-white"
+            >
+              {germinationEntryOpen ? t.common.cancel : t.catalog.logGermination}
+            </button>
+          </div>
+        </div>
+
+        {germinationEntryOpen ? (
+          <div className="mt-4 border-t border-[var(--border)] pt-4">
+            <DataForm state={germinationEntryState} onSubmit={submitGerminationEntry} submitLabel={t.catalog.logGermination}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label={t.forms.testDate} name="testedAt" fieldErrors={germinationEntryState.fieldErrors} optionalLabel={t.common.optional}>
+                  <input
+                    className="field-input"
+                    type="date"
+                    lang={getIntlLocale(locale)}
+                    value={germinationEntryForm.entryDate}
+                    onChange={(event) =>
+                      setGerminationEntryForm((current) => ({ ...current, entryDate: event.target.value }))
+                    }
+                  />
+                </Field>
+                <Field label={t.forms.sampleSize} name="sampleSize" fieldErrors={germinationEntryState.fieldErrors} optionalLabel={t.common.optional}>
+                  <input
+                    className="field-input"
+                    type="number"
+                    min="0"
+                    value={germinationEntryForm.sampleSize}
+                    onChange={(event) =>
+                      setGerminationEntryForm((current) => ({ ...current, sampleSize: event.target.value }))
+                    }
+                  />
+                </Field>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label={t.forms.germinatedCount} name="germinatedCount" fieldErrors={germinationEntryState.fieldErrors} optionalLabel={t.common.optional}>
+                  <input
+                    className="field-input"
+                    type="number"
+                    min="0"
+                    value={germinationEntryForm.germinatedCount}
+                    onChange={(event) =>
+                      setGerminationEntryForm((current) => ({ ...current, germinatedCount: event.target.value }))
+                    }
+                  />
+                </Field>
+                <Field label={t.forms.resultNotes} name="notes" fieldErrors={germinationEntryState.fieldErrors} optional optionalLabel={t.common.optional}>
+                  <textarea
+                    className="field-input min-h-24"
+                    value={germinationEntryForm.notes}
+                    onChange={(event) =>
+                      setGerminationEntryForm((current) => ({ ...current, notes: event.target.value }))
+                    }
+                    placeholder={t.forms.resultNotesPlaceholder}
+                  />
+                </Field>
+              </div>
+            </DataForm>
+          </div>
+        ) : null}
+
+        <div className="mt-4 grid gap-2">
+          {recentGerminationTests.length ? (
+            recentGerminationTests.map((entry) => (
+              <div key={entry.id} className="rounded-md bg-white px-3 py-3 text-sm">
+                <p className="font-medium">{formatDate(entry.testedAt, locale, t.common.notSet)}</p>
+                <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
+                  {entry.germinatedCount}/{entry.sampleSize} {t.seedBatch.germinated}
+                  {entry.germinationRate ? ` · ${entry.germinationRate}%` : ""}
+                  {entry.notes ? ` · ${entry.notes}` : ""}
+                </p>
+              </div>
+            ))
+          ) : (
+            <p className="rounded-md bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
+              {t.seedBatch.noGerminationTests}
+            </p>
+          )}
+        </div>
+      </section>
+
       <div className="mt-4 grid gap-3">
         <DetailPanel
           title={t.seedBatch.photosTitle}
@@ -6651,53 +6786,24 @@ function SeedBatchCard({
           title={t.seedBatch.correctionHistoryTitle}
           actionLabel={t.catalog.toolsOpen}
         >
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
-                {t.seedBatch.germinationTestsTitle}
-              </p>
-              <div className="mt-2 grid gap-2">
-                {germinationTests.length ? (
-                  germinationTests.slice(0, 2).map((entry) => (
-                    <div key={entry.id} className="rounded-md bg-white px-3 py-3 text-sm">
-                      <p className="font-medium">{formatDate(entry.testedAt, locale, t.common.notSet)}</p>
-                      <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
-                        {entry.germinatedCount}/{entry.sampleSize} {t.seedBatch.germinated}
-                        {entry.germinationRate ? ` · ${entry.germinationRate}%` : ""}
-                        {entry.notes ? ` · ${entry.notes}` : ""}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="rounded-md bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
-                    {t.seedBatch.noGerminationTests}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
-                {t.seedBatch.correctionHistoryTitle}
-              </p>
-              <div className="mt-2 grid gap-2">
-                {adjustments.length ? (
-                  adjustments.slice(0, 2).map((entry) => (
-                    <div key={entry.id} className="rounded-md bg-white px-3 py-3 text-sm">
-                      <p className="font-medium">{labelPlantingType(entry.type, t)}</p>
-                      <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
-                        {formatDate(entry.effectiveDate, locale, t.common.notSet)}
-                        {entry.quantityDelta ? ` · ${t.seedBatch.delta} ${entry.quantityDelta}` : ""}
-                        {entry.reason ? ` · ${entry.reason}` : ""}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="rounded-md bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
-                    {t.seedBatch.noCorrectionHistory}
-                  </p>
-                )}
-              </div>
+          <div>
+            <div className="mt-2 grid gap-2">
+              {adjustments.length ? (
+                adjustments.slice(0, 3).map((entry) => (
+                  <div key={entry.id} className="rounded-md bg-white px-3 py-3 text-sm">
+                    <p className="font-medium">{labelPlantingType(entry.type, t)}</p>
+                    <p className="mt-1 text-[color:rgba(24,49,40,0.72)]">
+                      {formatDate(entry.effectiveDate, locale, t.common.notSet)}
+                      {entry.quantityDelta ? ` · ${t.seedBatch.delta} ${entry.quantityDelta}` : ""}
+                      {entry.reason ? ` · ${entry.reason}` : ""}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-md bg-white px-3 py-3 text-sm text-[color:rgba(24,49,40,0.68)]">
+                  {t.seedBatch.noCorrectionHistory}
+                </p>
+              )}
             </div>
           </div>
         </DetailPanel>
