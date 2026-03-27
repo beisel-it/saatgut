@@ -1,6 +1,6 @@
 services:
   db:
-    image: ghcr.io/beisel-it/saatgut-db:latest
+    image: ${SAATGUT_DB_IMAGE:-ghcr.io/beisel-it/saatgut-db:latest}
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-saatgut}
@@ -20,7 +20,7 @@ services:
       start_period: 10s
 
   app:
-    image: ghcr.io/beisel-it/saatgut:latest
+    image: ${SAATGUT_APP_IMAGE:-ghcr.io/beisel-it/saatgut:latest}
     restart: unless-stopped
     depends_on:
       db:
@@ -31,11 +31,18 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-saatgut}?schema=public
       AUTH_SECRET: ${AUTH_SECRET}
       APP_URL: ${APP_URL:-http://localhost:3000}
+      WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Saatgut}
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
+      WEBAUTHN_ALLOWED_ORIGINS: ${WEBAUTHN_ALLOWED_ORIGINS:-http://localhost:3000}
       API_RATE_LIMIT_PER_MINUTE: ${API_RATE_LIMIT_PER_MINUTE:-120}
       API_TOKEN_DEFAULT_RATE_LIMIT_PER_MINUTE: ${API_TOKEN_DEFAULT_RATE_LIMIT_PER_MINUTE:-60}
+      MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/app/var/media}
+      MEDIA_MAX_UPLOAD_BYTES: ${MEDIA_MAX_UPLOAD_BYTES:-5242880}
       MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-http://localhost:3000}
     ports:
       - "${APP_PORT:-3000}:3000"
+    volumes:
+      - media_data:/app/var/media
     healthcheck:
       test:
         [
@@ -49,3 +56,4 @@ services:
 
 volumes:
   postgres_data:
+  media_data:

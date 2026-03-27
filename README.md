@@ -104,7 +104,22 @@ Notes:
 
 - Compose derives the app `DATABASE_URL` from `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`.
 - The bundled PostgreSQL image reconciles `POSTGRES_PASSWORD` onto the persisted role during startup, which helps avoid stale-password issues on reused volumes.
+- The app container now receives the same runtime knobs the shipped app expects for passkeys, media storage, API limits, and MCP.
+- Uploaded images are persisted in the named `media_data` volume at `/app/var/media`.
+- Container startup runs `prisma migrate deploy`, so the app expects the shipped migration set in `prisma/migrations/` through `0008_variety_companions`.
 - This setup is intended to be self-hosting friendly and Portainer-friendly, but the README does not claim production hardening beyond the shipped health checks and container wiring.
+
+### Runtime Contract
+
+The current deployment assets assume:
+
+- `AUTH_SECRET` is set to a strong random value with at least 16 characters.
+- `APP_URL` is the public origin of the app and must match the URL users actually visit.
+- `WEBAUTHN_RP_ID` is the bare hostname for passkeys, and `WEBAUTHN_ALLOWED_ORIGINS` must include the exact browser origin.
+- `MEDIA_STORAGE_DIR` points at writable filesystem storage; the compose variants mount `/app/var/media` for this purpose.
+- `MCP_ALLOWED_ORIGINS` controls browser-origin access to `/api/v1/mcp`; simple server-to-server requests without an `Origin` header are unaffected.
+- `API_RATE_LIMIT_PER_MINUTE` and `API_TOKEN_DEFAULT_RATE_LIMIT_PER_MINUTE` shape the in-app throttling used by REST and MCP routes.
+- `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` remain the authoritative inputs for the containerized `DATABASE_URL`.
 
 ## 📦 GHCR Images
 
@@ -122,24 +137,31 @@ The workflow also publishes immutable SHA and Git tag variants.
 ## 🧭 Portainer Deployment
 
 For a registry-based Portainer stack, use [docker-compose.portainer.yml](docker-compose.portainer.yml).
+Start from [.env.portainer.example](.env.portainer.example) when creating the stack environment.
 
 Typical flow:
 
 1. Create a stack in Portainer from the repository or upload the compose file.
 2. Use `docker-compose.portainer.yml`.
-3. Set at least:
+3. Populate the stack environment from `.env.portainer.example`.
+4. Set at least:
    - `AUTH_SECRET`
    - `APP_URL`
+   - `WEBAUTHN_RP_ID`
+   - `WEBAUTHN_ALLOWED_ORIGINS`
    - `POSTGRES_DB`
    - `POSTGRES_USER`
    - `POSTGRES_PASSWORD`
-4. Deploy the stack.
+5. Deploy the stack.
 
 Notes:
 
 - The Portainer variant pulls prebuilt GHCR images instead of building locally.
 - The custom database image keeps the shipped password-reconciliation behavior for reused volumes.
-- If you want deterministic upgrades, pin the image tags from `latest` to a release tag or SHA tag.
+- The Portainer variant also mounts a named `media_data` volume so uploads and variety images survive restarts.
+- If you want deterministic upgrades, set `SAATGUT_APP_IMAGE` and `SAATGUT_DB_IMAGE` to a release tag or SHA tag instead of `latest`.
+- Passkeys will fail if `APP_URL`, `WEBAUTHN_RP_ID`, and `WEBAUTHN_ALLOWED_ORIGINS` do not reflect the public hostname exactly.
+- Browser-based MCP clients should keep `MCP_ALLOWED_ORIGINS` aligned with the same public origin.
 
 ## ✅ Verification
 
@@ -200,7 +222,9 @@ Important variables in `.env.example`:
 - `DATABASE_URL`: direct local development database connection
 - `AUTH_SECRET`: session and auth signing secret
 - `APP_URL`: app origin for local runtime behavior
+- `WEBAUTHN_RP_NAME`, `WEBAUTHN_RP_ID`, `WEBAUTHN_ALLOWED_ORIGINS`: passkey/WebAuthn runtime contract
 - `API_RATE_LIMIT_PER_MINUTE`: baseline per-minute rate limit
 - `API_TOKEN_DEFAULT_RATE_LIMIT_PER_MINUTE`: default rate limit for issued API tokens
+- `MEDIA_STORAGE_DIR`, `MEDIA_MAX_UPLOAD_BYTES`: local upload storage path and upload cap
 - `MCP_ALLOWED_ORIGINS`: allowed browser origins for the MCP HTTP endpoint
 - `POSTGRES_*` and `APP_PORT`: Compose-oriented runtime settings
