@@ -863,6 +863,36 @@ export function SaatgutApp() {
     storageWarningsByBatch,
   ]);
 
+  const catalogGroups = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        species: Species | Variety["species"] | null;
+        entries: typeof catalogEntries;
+      }
+    >();
+
+    for (const entry of catalogEntries) {
+      const speciesKey = entry.species?.id ?? `unknown-${entry.variety.speciesId}`;
+      const existing = groups.get(speciesKey);
+
+      if (existing) {
+        existing.entries.push(entry);
+      } else {
+        groups.set(speciesKey, {
+          species: entry.species,
+          entries: [entry],
+        });
+      }
+    }
+
+    return Array.from(groups.values()).sort((left, right) => {
+      const leftName = left.species?.commonName ?? t.common.notSet;
+      const rightName = right.species?.commonName ?? t.common.notSet;
+      return leftName.localeCompare(rightName, locale);
+    });
+  }, [catalogEntries, locale, t.common.notSet]);
+
   const printableCatalogEntries = useMemo(() => {
     const entries = (dashboard?.varieties ?? [])
       .map((variety) => {
@@ -2595,15 +2625,20 @@ export function SaatgutApp() {
 
           {view === "catalog" ? (
             <div className="space-y-4">
-              <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-5 shadow-[var(--shadow)] md:p-6">
+              <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-4 shadow-[var(--shadow)] md:p-5">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <ScreenHeader
-                    eyebrow={t.catalog.eyebrow}
-                    title={t.catalog.heroTitle}
-                    subtitle={t.catalog.heroSubtitle}
-                    titleClassName="max-w-[22ch]"
-                  />
-                  <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto lg:flex-col">
+                  <div className="max-w-[54rem]">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
+                      {t.catalog.eyebrow}
+                    </p>
+                    <h2 className="mt-2 max-w-[16ch] text-[clamp(1.9rem,3.6vw,2.6rem)] font-semibold tracking-tight leading-[1.02]">
+                      {t.catalog.heroTitle}
+                    </h2>
+                    <p className="mt-2 max-w-[48ch] text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+                      {t.catalog.heroSubtitle}
+                    </p>
+                  </div>
+                  <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
                     <button
                       type="button"
                       onClick={openCatalogAddModal}
@@ -3571,9 +3606,30 @@ export function SaatgutApp() {
                 </Panel>
               ) : null}
 
-              <Panel title={t.catalog.browseTitle} subtitle={t.catalog.browseSubtitle}>
-                <div className="grid gap-4">
-                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,0.7fr))]">
+              <section className="rounded-xl border border-[var(--border)] bg-[color:rgba(253,249,240,0.92)] p-4 shadow-[var(--shadow)] md:p-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="max-w-[44rem]">
+                    <h2 className="text-[1.45rem] font-semibold tracking-tight leading-tight">{t.catalog.browseTitle}</h2>
+                    <p className="mt-1 max-w-[62ch] text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                      {t.catalog.browseSubtitle}
+                    </p>
+                  </div>
+                  <div className="grid w-full gap-2 sm:grid-cols-3 lg:w-auto lg:min-w-[28rem]">
+                    <CatalogSummaryCard label={t.stats.varieties} value={catalogEntries.length} compact />
+                    <CatalogSummaryCard
+                      label={t.stats.seedBatches}
+                      value={catalogEntries.reduce((sum, entry) => sum + entry.seedBatches.length, 0)}
+                      compact
+                    />
+                    <CatalogSummaryCard
+                      label={t.catalog.needsAttention}
+                      value={catalogEntries.filter((entry) => entry.warnings.length > 0).length}
+                      compact
+                    />
+                  </div>
+                </div>
+                <div className="mt-4 rounded-lg border border-[var(--border)] bg-white/70 p-3 md:p-4">
+                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,0.72fr))]">
                     <label className="grid gap-2 text-sm font-medium text-[var(--foreground)]">
                       <span>{t.catalog.searchLabel}</span>
                       <input
@@ -3630,58 +3686,67 @@ export function SaatgutApp() {
                       </select>
                     </label>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <CatalogSummaryCard
-                      label={t.stats.varieties}
-                      value={catalogEntries.length}
-                    />
-                    <CatalogSummaryCard
-                      label={t.stats.seedBatches}
-                      value={catalogEntries.reduce((sum, entry) => sum + entry.seedBatches.length, 0)}
-                    />
-                    <CatalogSummaryCard
-                      label={t.catalog.needsAttention}
-                      value={catalogEntries.filter((entry) => entry.warnings.length > 0).length}
-                    />
-                  </div>
                 </div>
-              </Panel>
+              </section>
 
               <Panel title={t.catalog.inventoryTitle} subtitle={t.catalog.inventorySubtitle}>
-                <p className="mb-4 max-w-[42ch] text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
-                  {t.catalog.listHint}
-                </p>
                 {catalogEntries.length ? (
-                  <div className="grid gap-3">
-                    {catalogEntries.map((entry) => (
-                      <CatalogVarietyCard
-                        key={entry.variety.id}
-                        variety={entry.variety}
-                        species={entry.species}
-                        speciesOptions={dashboard?.species ?? []}
-                        seedBatches={entry.seedBatches}
-                        warningsByBatch={storageWarningsByBatch}
-                        latestTest={entry.latestTest}
-                        varietyEditId={varietyEditId}
-                        varietyEditForm={varietyEditForm}
-                        varietyEditState={varietyEditState}
-                        setVarietyEditForm={setVarietyEditForm}
-                        companionOptions={selectableCompanionVarieties}
-                        onStartVarietyEdit={startVarietyEdit}
-                        onCancelVarietyEdit={cancelVarietyEdit}
-                        onSubmitVarietyEdit={submitVarietyEdit}
-                        onDeleteVariety={(variety) => openCatalogDelete({ type: "variety", id: variety.id, label: variety.name })}
-                        onEditSeedBatch={openSeedBatchEdit}
-                        onDeleteSeedBatch={(seedBatch) =>
-                          openCatalogDelete({
-                            type: "seedBatch",
-                            id: seedBatch.id,
-                            label: `${entry.variety.name} · ${seedBatch.source ?? t.common.batchFallback}`,
-                          })}
-                        onMediaChanged={loadDashboard}
-                        locale={locale}
-                        t={t}
-                      />
+                  <div className="grid gap-4">
+                    {catalogGroups.map((group) => (
+                      <section
+                        key={group.species?.id ?? `group-${group.entries[0]?.variety.speciesId}`}
+                        className="rounded-lg border border-[var(--border)] bg-white/55 p-3 md:p-4"
+                      >
+                        <div className="flex flex-col gap-2 border-b border-[color:rgba(24,49,40,0.08)] pb-3 sm:flex-row sm:items-end sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                              {t.catalog.speciesTitle}
+                            </p>
+                            <h3 className="mt-1 text-lg font-semibold tracking-tight">
+                              {group.species?.commonName ?? t.common.notSet}
+                            </h3>
+                            <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.68)]">
+                              {group.species?.latinName ?? t.common.notSet}
+                              {group.species?.category ? ` · ${labelSpeciesCategory(group.species.category, t)}` : ""}
+                            </p>
+                          </div>
+                          <p className="text-sm font-medium text-[color:rgba(24,49,40,0.62)]">
+                            {group.entries.length} {t.catalog.varietiesTitle.toLowerCase()}
+                          </p>
+                        </div>
+                        <div className="mt-3 grid gap-3">
+                          {group.entries.map((entry) => (
+                            <CatalogVarietyCard
+                              key={entry.variety.id}
+                              variety={entry.variety}
+                              species={entry.species}
+                              speciesOptions={dashboard?.species ?? []}
+                              seedBatches={entry.seedBatches}
+                              warningsByBatch={storageWarningsByBatch}
+                              latestTest={entry.latestTest}
+                              varietyEditId={varietyEditId}
+                              varietyEditForm={varietyEditForm}
+                              varietyEditState={varietyEditState}
+                              setVarietyEditForm={setVarietyEditForm}
+                              companionOptions={selectableCompanionVarieties}
+                              onStartVarietyEdit={startVarietyEdit}
+                              onCancelVarietyEdit={cancelVarietyEdit}
+                              onSubmitVarietyEdit={submitVarietyEdit}
+                              onDeleteVariety={(variety) => openCatalogDelete({ type: "variety", id: variety.id, label: variety.name })}
+                              onEditSeedBatch={openSeedBatchEdit}
+                              onDeleteSeedBatch={(seedBatch) =>
+                                openCatalogDelete({
+                                  type: "seedBatch",
+                                  id: seedBatch.id,
+                                  label: `${entry.variety.name} · ${seedBatch.source ?? t.common.batchFallback}`,
+                                })}
+                              onMediaChanged={loadDashboard}
+                              locale={locale}
+                              t={t}
+                            />
+                          ))}
+                        </div>
+                      </section>
                     ))}
                   </div>
                 ) : (
@@ -5638,13 +5703,23 @@ function SheetTagList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-function CatalogSummaryCard({ label, value }: { label: string; value: number }) {
+function CatalogSummaryCard({
+  label,
+  value,
+  compact = false,
+}: {
+  label: string;
+  value: number;
+  compact?: boolean;
+}) {
   return (
-    <article className="rounded-lg border border-[var(--border)] bg-white/70 px-4 py-4">
+    <article
+      className={`rounded-lg border border-[var(--border)] bg-white/70 ${compact ? "px-3 py-3" : "px-4 py-4"}`}
+    >
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)]">
         {label}
       </p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
+      <p className={compact ? "mt-1 text-xl font-semibold" : "mt-2 text-2xl font-semibold"}>{value}</p>
     </article>
   );
 }
@@ -5801,11 +5876,11 @@ function CatalogVarietyCard({
   }
 
   return (
-    <details className="group rounded-lg border border-[var(--border)] bg-[var(--muted)] px-4 py-4 open:bg-white">
-      <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-4">
+    <details className="group rounded-lg border border-[var(--border)] bg-white/82 px-4 py-3 open:bg-white">
+      <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3">
         <div className="flex max-w-4xl min-w-0 items-start gap-4">
           {variety.representativeImage ? (
-            <div className="hidden h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-[var(--border)] bg-white sm:block">
+            <div className="hidden h-16 w-16 shrink-0 overflow-hidden rounded-md border border-[var(--border)] bg-white sm:block">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={variety.representativeImage.contentUrl}
@@ -5815,23 +5890,32 @@ function CatalogVarietyCard({
             </div>
           ) : null}
           <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-xl font-semibold break-words">{variety.name}</h3>
-            {variety.heirloom ? (
-              <span className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-[var(--accent-strong)] group-open:bg-[var(--muted)]">
-                {t.catalog.heirloom}
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+              {t.forms.variety}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <h3 className="break-words text-lg font-semibold">{variety.name}</h3>
+              {variety.heirloom ? (
+                <span className="rounded-md bg-[var(--muted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent-strong)]">
+                  {t.catalog.heirloom}
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
+              {species?.latinName ?? t.common.notSet}
+              {species?.category ? ` · ${labelSpeciesCategory(species.category, t)}` : ""}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="rounded-md border border-[var(--border)] bg-[var(--muted)] px-2.5 py-1 text-xs font-semibold text-[color:rgba(24,49,40,0.7)]">
+                {seedBatches.length} {t.catalog.batchesOnHand}
               </span>
-            ) : null}
-          </div>
-          <p className="mt-1 text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
-            {species?.commonName ?? t.common.notSet}
-            {species?.latinName ? ` · ${species.latinName}` : ""}
-            {species?.category ? ` · ${labelSpeciesCategory(species.category, t)}` : ""}
-          </p>
-          <p className="mt-3 max-w-[44rem] text-sm leading-6 text-[color:rgba(24,49,40,0.72)]">
-            {seedBatches.length} {t.catalog.batchesOnHand} · {warningCount} {t.catalog.needsAttention} · {t.catalog.latestCheck}{" "}
-            {latestTest ? formatDate(latestTest.testedAt, locale, t.common.notSet) : t.common.notSet}
-          </p>
+              <span className="rounded-md border border-[var(--border)] bg-[var(--muted)] px-2.5 py-1 text-xs font-semibold text-[color:rgba(24,49,40,0.7)]">
+                {warningCount} {t.catalog.needsAttention}
+              </span>
+              <span className="rounded-md border border-[var(--border)] bg-[var(--muted)] px-2.5 py-1 text-xs font-semibold text-[color:rgba(24,49,40,0.7)]">
+                {t.catalog.latestCheck} {latestTest ? formatDate(latestTest.testedAt, locale, t.common.notSet) : t.common.notSet}
+              </span>
+            </div>
           </div>
         </div>
         <span className="rounded-md border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[color:rgba(24,49,40,0.58)] group-open:hidden">

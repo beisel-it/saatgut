@@ -272,12 +272,12 @@ const de = {
   },
   catalog: {
     eyebrow: "Katalog und Vorrat",
-    heroTitle: "Sorten und Chargen pflegen.",
+    heroTitle: "Sorten und Chargen ordnen.",
     heroSubtitle:
-      "Lege Arten, Sorten und Saatgutpartien an und halte fest, was aussaatbereit ist.",
+      "Behalte Arten, Sorten und Saatgutpartien im Blick und öffne Werkzeuge nur dann, wenn Du wirklich etwas ändern willst.",
     browseTitle: "Im Bestand stöbern",
     browseSubtitle:
-      "Suche nach Sorten, filtere nach Art und prüfe schnell, welche Chargen bereit sind oder Aufmerksamkeit brauchen.",
+      "Suche nach Sorten, filtere nach Arten und sieh schneller, was im Bestand liegt und wo Handlungsbedarf entsteht.",
     searchLabel: "Im Katalog suchen",
     searchPlaceholder: "Nach Sorte, Art, Tag, Synonym oder Lagerort suchen",
     categoryFilterLabel: "Artengruppe",
@@ -1024,12 +1024,12 @@ const en: AppMessages = {
   },
   catalog: {
     eyebrow: "Catalog and stock",
-    heroTitle: "Care for varieties and batches.",
+    heroTitle: "Organize varieties and batches.",
     heroSubtitle:
-      "Add crop types, named varieties, and seed lots while keeping sowing readiness easy to judge.",
+      "Keep species, varieties, and seed lots in view, and open maintenance tools only when you actually need to change something.",
     browseTitle: "Browse the inventory",
     browseSubtitle:
-      "Search varieties, filter by crop type, and quickly see which batches are ready to sow or need attention.",
+      "Search varieties, filter by species groups, and see faster what is in stock and where attention is needed.",
     searchLabel: "Search the catalog",
     searchPlaceholder: "Search by variety, species, tag, synonym, or storage spot",
     categoryFilterLabel: "Crop group",
